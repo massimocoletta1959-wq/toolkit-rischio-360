@@ -110,7 +110,7 @@ export default function Cruscotto() {
   return (
     <div>
       <div className="page-header">
-        <h2>Cruscotto — {azienda?.nome || ''}</h2>
+        <h2>Cruscotto — {azienda?.nome || 'Caricamento...'}</h2>
         <p>Panoramica aggiornata in tempo reale</p>
       </div>
 
