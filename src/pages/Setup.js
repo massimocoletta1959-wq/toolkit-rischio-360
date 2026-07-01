@@ -3,9 +3,9 @@ import { supabase } from '../lib/supabase'
 const SETTORI = ['Manifatturiero','Servizi','Commercio','Edilizia','Sanità','Tecnologia','Agricoltura','Trasporti','Altro']
 const DIMENSIONI = ['Micro (< 10 dipendenti)','Piccola (10-49)','Media (50-249)','Grande (250+)']
 
-const FONTE_INTERNA = "Interna - rischio generato internamente"
-const FONTE_ESTERNA = "Esterna - rischio proveniente dall'esterno"
-const FONTE_MISTA   = "Mista - origine interna ed esterna"
+const FONTE_INTERNA = "Interna"
+const FONTE_ESTERNA = "Esterna"
+const FONTE_MISTA   = "Mista"
 
 const RISCHI_DEFAULT = [
   { categoria: 'IT / Cyber', descrizione: 'Attacco ransomware ai sistemi gestionali', fonte: FONTE_ESTERNA, probabilita: 2, impatto: 2, note: '' },
