@@ -78,13 +78,13 @@ export default function Cruscotto() {
   const load = useCallback(async () => {
     setLoading(true)
     const [{ data: r }, { data: a }] = await Promise.all([
-      supabase.from('rischi').select('*').eq('azienda_id', azienda.id),
-      supabase.from('azioni').select('*').eq('azienda_id', azienda.id),
+      supabase.from('rischi').select('*').eq('azienda_id', azienda?.id || ''),
+      supabase.from('azioni').select('*').eq('azienda_id', azienda?.id || ''),
     ])
     setRischi(r || [])
     setAzioni(a || [])
     setLoading(false)
-  }, [azienda.id])
+  }, [azienda?.id])
 
   useEffect(() => { load() }, [load])
 
