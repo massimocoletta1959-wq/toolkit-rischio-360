@@ -76,6 +76,7 @@ export default function Cruscotto() {
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
+    if (!azienda || !azienda.id) return;
     setLoading(true)
     const [{ data: r }, { data: a }] = await Promise.all([
       supabase.from('rischi').select('*').eq('azienda_id', azienda?.id || ''),
