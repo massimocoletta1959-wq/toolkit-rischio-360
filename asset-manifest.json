@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/toolkit-rischio-360/static/css/main.10af2273.css",
+    "main.js": "/toolkit-rischio-360/static/js/main.c04bf61b.js",
+    "index.html": "/toolkit-rischio-360/index.html",
+    "main.10af2273.css.map": "/toolkit-rischio-360/static/css/main.10af2273.css.map",
+    "main.c04bf61b.js.map": "/toolkit-rischio-360/static/js/main.c04bf61b.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.10af2273.css",
+    "static/js/main.c04bf61b.js"
+  ]
+}
