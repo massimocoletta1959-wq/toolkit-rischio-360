@@ -46,7 +46,7 @@ export default function App() {
     setSession(null); setProfilo(null); setAzienda(null)
   }
 
-  if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh" }}><div className="spinner" /></div>
+  if (loading || (session && profilo === null)) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh" }}><div className="spinner" /></div>
 
   const ctx = { session, profilo, azienda, reload: () => loadProfilo(session.user.id), page, setPage, logout }
   const pages = { cruscotto: <Cruscotto />, registro: <RegistroRischi />, piano: <PianoAzione /> }
