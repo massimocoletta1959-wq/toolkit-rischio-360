@@ -46,10 +46,12 @@ export default function App() {
     setSession(null); setProfilo(null); setAzienda(null)
   }
 
-  if (loading || (session && profilo === null)) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh" }}><div className="spinner" /></div>
+  if (loading) return <div style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh" }}><div className="spinner" /></div>
 
   const ctx = { session, profilo, azienda, reload: () => loadProfilo(session.user.id), page, setPage, logout }
   const pages = { cruscotto: <Cruscotto />, registro: <RegistroRischi />, piano: <PianoAzione /> }
+
+  if (!azienda) return <Setup onDone={() => loadProfilo(session.user.id)} userId={session.user.id} userEmail={session.user.email} />
 
   return (
     <AppContext.Provider value={ctx}>
