@@ -105,7 +105,7 @@ export default function Cruscotto() {
     .sort((a, b) => (b.probabilita * b.impatto) - (a.probabilita * a.impatto))
     .slice(0, 5)
 
-  if (loading) return <div className="spinner" />
+  if (loading || !azienda) return <div className="spinner" />
 
   return (
     <div>
