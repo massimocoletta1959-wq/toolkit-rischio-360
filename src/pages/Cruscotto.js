@@ -92,6 +92,8 @@ export default function Cruscotto() {
   const valutati = rischi.filter(r => r.probabilita && r.impatto)
   const tier1 = valutati.filter(r => getTier(r.probabilita, r.impatto).tier === 'Tier 1').length
   const tier2 = valutati.filter(r => getTier(r.probabilita, r.impatto).tier === 'Tier 2').length
+  const tier3 = valutati.filter(r => getTier(r.probabilita, r.impatto).tier === 'Tier 3').length
+  const tier4 = valutati.filter(r => getTier(r.probabilita, r.impatto).tier === 'Tier 4').length
   const completate = azioni.filter(a => a.stato === 'Completato').length
   const inCorso    = azioni.filter(a => a.stato === 'In corso').length
 
@@ -127,6 +129,8 @@ export default function Cruscotto() {
             <div className="stat-card"><div className="stat-num">{rischi.length}</div><div className="stat-label">Rischi identificati</div></div>
             <div className="stat-card"><div className="stat-num" style={{ color: '#C0392B' }}>{tier1}</div><div className="stat-label">Tier 1 — Critici</div></div>
             <div className="stat-card"><div className="stat-num" style={{ color: '#E67E22' }}>{tier2}</div><div className="stat-label">Tier 2 — Significativi</div></div>
+            <div className="stat-card"><div className="stat-num" style={{ color: '#D4AC0D' }}>{tier3}</div><div className="stat-label">Tier 3 — Moderati</div></div>
+            <div className="stat-card"><div className="stat-num" style={{ color: '#27AE60' }}>{tier4}</div><div className="stat-label">Tier 4 — Accettabili</div></div>
             <div className="stat-card"><div className="stat-num">{azioni.length}</div><div className="stat-label">Azioni nel piano</div></div>
             <div className="stat-card"><div className="stat-num" style={{ color: '#27AE60' }}>{completate}</div><div className="stat-label">Azioni completate</div></div>
             <div className="stat-card"><div className="stat-num" style={{ color: '#2B5FA5' }}>{inCorso}</div><div className="stat-label">In corso</div></div>
