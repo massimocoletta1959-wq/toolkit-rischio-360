@@ -50,42 +50,58 @@ const RISCHI_DEFAULT = [
   { categoria: 'Continuità Operativa', descrizione: 'Pandemia o assenza massiva del personale', fonte: FONTE_MISTA, probabilita: 1, impatto: 3, note: 'Pandemia: prob. bassa confermata / impatto critico (blocco operativo per definizione)' },
 ]
 
-export default function Setup({ onDone, userId, userEmail }) {
+export default function Setup({ onDone, onCancel, userId, userEmail, existingProfilo }) {
+  const isAdditional = !!existingProfilo // true = aggiunta nuova azienda a un account esistente
+
   const [nome, setNome]           = useState('')
   const [settore, setSettore]     = useState('')
   const [dimensione, setDimensione] = useState('')
   const [nomeProfilo, setNomeProfilo] = useState('')
   const [loading, setLoading]     = useState(false)
   const [error, setError]         = useState(null)
+
   async function handleSubmit(e) {
     e.preventDefault()
     setLoading(true); setError(null)
+
     // 1. Crea azienda
     const { data: az, error: e1 } = await supabase.from('aziende').insert({ nome, settore, dimensione }).select().single()
     if (e1) { setError(e1.message); setLoading(false); return }
-    // 2. Crea profilo
-    const { error: e2 } = await supabase.from('profili').insert({ id: userId, email: userEmail, nome: nomeProfilo, azienda_id: az.id })
-    if (e2) { setError(e2.message); setLoading(false); return }
-    // 3. Carica i rischi di default del Toolkit Rischio 360°
-    const rischiDaInserire = RISCHI_DEFAULT.map(r => ({ ...r, azienda_id: az.id }))
-    const { error: e3 } = await supabase.from('rischi').insert(rischiDaInserire)
+
+    // 2. Crea (o salta, se già esiste) il profilo utente
+    if (!isAdditional) {
+      const { error: e2 } = await supabase.from('profili').insert({ id: userId, email: userEmail, nome: nomeProfilo })
+      if (e2) { setError(e2.message); setLoading(false); return }
+    }
+
+    // 3. Collega l'utente alla nuova azienda tramite la tabella ponte
+    const { error: e3 } = await supabase.from('utente_aziende').insert({ utente_id: userId, azienda_id: az.id, ruolo: 'owner' })
     if (e3) { setError(e3.message); setLoading(false); return }
-    onDone()
+
+    // 4. Carica i rischi di default del Toolkit Rischio 360°
+    const rischiDaInserire = RISCHI_DEFAULT.map(r => ({ ...r, azienda_id: az.id }))
+    const { error: e4 } = await supabase.from('rischi').insert(rischiDaInserire)
+    if (e4) { setError(e4.message); setLoading(false); return }
+
+    onDone(az.id)
   }
+
   return (
     <div className="login-page">
       <div className="login-card" style={{ maxWidth: 480 }}>
         <div className="login-logo">
           <div style={{ fontSize: 36, marginBottom: 8 }}>🏢</div>
-          <h1>Configura la tua azienda</h1>
-          <p>Prima configurazione — ci vogliono 30 secondi</p>
+          <h1>{isAdditional ? 'Aggiungi una nuova azienda' : 'Configura la tua azienda'}</h1>
+          <p>{isAdditional ? 'Ci vogliono 30 secondi, come la prima volta' : 'Prima configurazione — ci vogliono 30 secondi'}</p>
         </div>
         {error && <div className="alert alert-error">{error}</div>}
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">Il tuo nome</label>
-            <input className="form-control" value={nomeProfilo} onChange={e => setNomeProfilo(e.target.value)} required placeholder="Es. Mario Rossi" />
-          </div>
+          {!isAdditional && (
+            <div className="form-group">
+              <label className="form-label">Il tuo nome</label>
+              <input className="form-control" value={nomeProfilo} onChange={e => setNomeProfilo(e.target.value)} required placeholder="Es. Mario Rossi" />
+            </div>
+          )}
           <div className="form-group">
             <label className="form-label">Nome azienda</label>
             <input className="form-control" value={nome} onChange={e => setNome(e.target.value)} required placeholder="Es. Rossi S.r.l." />
@@ -106,9 +122,16 @@ export default function Setup({ onDone, userId, userEmail }) {
               </select>
             </div>
           </div>
-          <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 8 }} disabled={loading}>
-            {loading ? 'Salvataggio...' : 'Inizia →'}
-          </button>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            {isAdditional && onCancel && (
+              <button type="button" className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={onCancel} disabled={loading}>
+                Annulla
+              </button>
+            )}
+            <button className="btn btn-primary" style={{ flex: 2, justifyContent: 'center' }} disabled={loading}>
+              {loading ? 'Salvataggio...' : 'Inizia →'}
+            </button>
+          </div>
         </form>
       </div>
     </div>
