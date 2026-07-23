@@ -76,11 +76,11 @@ export default function Cruscotto() {
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
-    if (!azienda || !azienda.id) return;
+    if (!azienda || !azienda.id) return
     setLoading(true)
     const [{ data: r }, { data: a }] = await Promise.all([
-      supabase.from('rischi').select('*').eq('azienda_id', azienda?.id || ''),
-      supabase.from('azioni').select('*').eq('azienda_id', azienda?.id || ''),
+      supabase.from('rischi').select('*').eq('azienda_id', azienda.id),
+      supabase.from('azioni').select('*').eq('azienda_id', azienda.id),
     ])
     setRischi(r || [])
     setAzioni(a || [])
@@ -88,6 +88,8 @@ export default function Cruscotto() {
   }, [azienda?.id])
 
   useEffect(() => { load() }, [load])
+
+  if (!azienda) return <div className="spinner" />
 
   const valutati = rischi.filter(r => r.probabilita && r.impatto)
   const tier1 = valutati.filter(r => getTier(r.probabilita, r.impatto).tier === 'Tier 1').length
@@ -107,12 +109,12 @@ export default function Cruscotto() {
     .sort((a, b) => (b.probabilita * b.impatto) - (a.probabilita * a.impatto))
     .slice(0, 5)
 
-  if (loading || !azienda) return <div className="spinner" />
+  if (loading) return <div className="spinner" />
 
   return (
     <div>
       <div className="page-header">
-        <h2>Cruscotto — {azienda?.nome || 'Caricamento...'}</h2>
+        <h2>Cruscotto — {azienda?.nome || ''}</h2>
         <p>Panoramica aggiornata in tempo reale</p>
       </div>
 
@@ -129,7 +131,7 @@ export default function Cruscotto() {
             <div className="stat-card"><div className="stat-num">{rischi.length}</div><div className="stat-label">Rischi identificati</div></div>
             <div className="stat-card"><div className="stat-num" style={{ color: '#C0392B' }}>{tier1}</div><div className="stat-label">Tier 1 — Critici</div></div>
             <div className="stat-card"><div className="stat-num" style={{ color: '#E67E22' }}>{tier2}</div><div className="stat-label">Tier 2 — Significativi</div></div>
-            <div className="stat-card"><div className="stat-num" style={{ color: '#D4AC0D' }}>{tier3}</div><div className="stat-label">Tier 3 — Moderati</div></div>
+            <div className="stat-card"><div className="stat-num" style={{ color: '#856404' }}>{tier3}</div><div className="stat-label">Tier 3 — Moderati</div></div>
             <div className="stat-card"><div className="stat-num" style={{ color: '#27AE60' }}>{tier4}</div><div className="stat-label">Tier 4 — Accettabili</div></div>
             <div className="stat-card"><div className="stat-num">{azioni.length}</div><div className="stat-label">Azioni nel piano</div></div>
             <div className="stat-card"><div className="stat-num" style={{ color: '#27AE60' }}>{completate}</div><div className="stat-label">Azioni completate</div></div>
