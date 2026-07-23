@@ -1,12 +1,12 @@
 import React, { useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { getRischiDefault } from '../lib/constants'
+import { getRischiDefault, RISCHI_DEFAULT, RISCHI_PER_SETTORE } from '../lib/constants'
 
 const SETTORI = ['Manifatturiero','Servizi','Commercio','Edilizia','Sanità','Tecnologia','Agricoltura','Trasporti','Altro']
 const DIMENSIONI = ['Micro (< 10 dipendenti)','Piccola (10-49)','Media (50-249)','Grande (250+)']
 
 export default function Setup({ onDone, userId, userEmail }) {
-  const [step, setStep]           = useState(1) // 1=dati azienda, 2=proposta default
+  const [step, setStep]           = useState(1)
   const [nome, setNome]           = useState('')
   const [settore, setSettore]     = useState('')
   const [dimensione, setDimensione] = useState('')
@@ -14,6 +14,12 @@ export default function Setup({ onDone, userId, userEmail }) {
   const [loading, setLoading]     = useState(false)
   const [error, setError]         = useState(null)
   const [aziendaId, setAziendaId] = useState(null)
+  const [scelta, setScelta]       = useState(null) // 'standard' | 'settore' | 'tutti' | 'nessuno'
+
+  const haSettoreSpecifico = !!(RISCHI_PER_SETTORE[settore]?.length)
+  const numStandard  = RISCHI_DEFAULT.length
+  const numSettore   = RISCHI_PER_SETTORE[settore]?.length || 0
+  const numTutti     = numStandard + numSettore
 
   async function handleStep1(e) {
     e.preventDefault()
@@ -27,61 +33,103 @@ export default function Setup({ onDone, userId, userEmail }) {
     setStep(2)
   }
 
-  async function caricaDefault() {
+  async function carica() {
+    if (scelta === 'nessuno') { onDone(); return }
     setLoading(true)
-    const rischi = getRischiDefault(settore)
-    const payload = rischi.map(r => ({ ...r, azienda_id: aziendaId }))
+
+    let rischiDaCaricare = []
+    if (scelta === 'standard')  rischiDaCaricare = [...RISCHI_DEFAULT]
+    if (scelta === 'settore')   rischiDaCaricare = [...(RISCHI_PER_SETTORE[settore] || [])]
+    if (scelta === 'tutti')     rischiDaCaricare = [...RISCHI_DEFAULT, ...(RISCHI_PER_SETTORE[settore] || [])]
+
+    const payload = rischiDaCaricare.map(r => ({ ...r, azienda_id: aziendaId }))
     const { error: err } = await supabase.from('rischi').insert(payload)
     if (err) { setError(err.message); setLoading(false); return }
     setLoading(false)
     onDone()
   }
 
-  function saltaDefault() {
-    onDone()
-  }
-
-  const rischiDefault = getRischiDefault(settore)
-  const hasSettoreSpecifico = settore === 'Edilizia' // espandibile
+  // Anteprima rischi in base alla scelta
+  const preview = scelta === 'standard' ? RISCHI_DEFAULT
+    : scelta === 'settore' ? (RISCHI_PER_SETTORE[settore] || [])
+    : scelta === 'tutti'   ? [...RISCHI_DEFAULT, ...(RISCHI_PER_SETTORE[settore] || [])]
+    : []
 
   if (step === 2) {
     return (
       <div className="login-page">
-        <div className="login-card" style={{ maxWidth: 520 }}>
+        <div className="login-card" style={{ maxWidth: 560 }}>
           <div className="login-logo">
             <div style={{ fontSize: 36, marginBottom: 8 }}>🛡️</div>
-            <h1>Rischi di default</h1>
-            <p>
-              {hasSettoreSpecifico
-                ? `Abbiamo ${rischiDefault.length} rischi specifici per il settore ${settore}`
-                : `Abbiamo ${rischiDefault.length} rischi standard per iniziare subito`}
-            </p>
+            <h1>Carica i rischi iniziali</h1>
+            <p>Scegli da quale punto partire con la mappatura</p>
           </div>
 
           {error && <div className="alert alert-error">{error}</div>}
 
-          <div style={{ background: '#F7F8FA', borderRadius: 8, padding: '12px 16px', marginBottom: 20, maxHeight: 240, overflowY: 'auto' }}>
-            {rischiDefault.slice(0, 8).map((r, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid #EEE', fontSize: 13 }}>
-                <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 10, background: '#E6F1FB', color: '#0C447C', flexShrink: 0 }}>{r.categoria}</span>
-                <span style={{ color: '#444' }}>{r.descrizione}</span>
+          {/* Opzioni di scelta */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+
+            <div onClick={() => setScelta('standard')} style={{ cursor: 'pointer', padding: '14px 16px', border: `2px solid ${scelta === 'standard' ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'standard' ? '#EBF4FC' : 'white', transition: 'all 0.15s' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 600, color: '#1A3A5C', fontSize: 14 }}>📋 Solo rischi standard</div>
+                  <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>I {numStandard} rischi generici validi per qualsiasi azienda</div>
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#2B5FA5', background: '#EBF4FC', padding: '3px 10px', borderRadius: 20 }}>{numStandard} rischi</span>
               </div>
-            ))}
-            {rischiDefault.length > 8 && (
-              <div style={{ fontSize: 12, color: '#888', textAlign: 'center', paddingTop: 8 }}>
-                + altri {rischiDefault.length - 8} rischi...
+            </div>
+
+            {haSettoreSpecifico && (
+              <div onClick={() => setScelta('settore')} style={{ cursor: 'pointer', padding: '14px 16px', border: `2px solid ${scelta === 'settore' ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'settore' ? '#EBF4FC' : 'white', transition: 'all 0.15s' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontWeight: 600, color: '#1A3A5C', fontSize: 14 }}>🏗️ Solo rischi {settore}</div>
+                    <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Rischi specifici per il settore {settore} con dati INAIL 2025</div>
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#2B5FA5', background: '#EBF4FC', padding: '3px 10px', borderRadius: 20 }}>{numSettore} rischi</span>
+                </div>
               </div>
             )}
+
+            {haSettoreSpecifico && (
+              <div onClick={() => setScelta('tutti')} style={{ cursor: 'pointer', padding: '14px 16px', border: `2px solid ${scelta === 'tutti' ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'tutti' ? '#EBF4FC' : 'white', transition: 'all 0.15s' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontWeight: 600, color: '#1A3A5C', fontSize: 14 }}>✅ Tutti — standard + {settore}</div>
+                    <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Copertura completa: rischi generici + specifici di settore</div>
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#27AE60', background: '#D5F5E3', padding: '3px 10px', borderRadius: 20 }}>{numTutti} rischi</span>
+                </div>
+              </div>
+            )}
+
+            <div onClick={() => setScelta('nessuno')} style={{ cursor: 'pointer', padding: '12px 16px', border: `2px solid ${scelta === 'nessuno' ? '#aaa' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'nessuno' ? '#F5F5F5' : 'white', transition: 'all 0.15s' }}>
+              <div style={{ fontWeight: 500, color: '#888', fontSize: 13 }}>Parto da zero — inserirò i rischi manualmente</div>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={saltaDefault} disabled={loading}>
-              Salta — parto da zero
-            </button>
-            <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={caricaDefault} disabled={loading}>
-              {loading ? 'Caricamento...' : `Carica i ${rischiDefault.length} rischi →`}
-            </button>
-          </div>
+          {/* Anteprima rischi selezionati */}
+          {preview.length > 0 && (
+            <div style={{ background: '#F7F8FA', borderRadius: 8, padding: '10px 14px', maxHeight: 200, overflowY: 'auto', marginBottom: 16 }}>
+              {preview.slice(0, 8).map((r, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid #EEE', fontSize: 12 }}>
+                  <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: '#E6F1FB', color: '#0C447C', flexShrink: 0 }}>{r.categoria}</span>
+                  <span style={{ color: '#444' }}>{r.descrizione}</span>
+                </div>
+              ))}
+              {preview.length > 8 && <div style={{ fontSize: 11, color: '#888', textAlign: 'center', paddingTop: 6 }}>+ altri {preview.length - 8} rischi...</div>}
+            </div>
+          )}
+
+          <button
+            className="btn btn-primary"
+            style={{ width: '100%', justifyContent: 'center' }}
+            onClick={carica}
+            disabled={!scelta || loading}
+          >
+            {loading ? 'Caricamento...' : scelta === 'nessuno' ? 'Inizia senza rischi →' : `Carica ${preview.length} rischi e inizia →`}
+          </button>
         </div>
       </div>
     )
@@ -121,9 +169,9 @@ export default function Setup({ onDone, userId, userEmail }) {
               </select>
             </div>
           </div>
-          {settore === 'Edilizia' && (
+          {settore && RISCHI_PER_SETTORE[settore] && (
             <div className="alert alert-info" style={{ marginBottom: 14 }}>
-              🏗️ Per il settore Edilizia abbiamo un catalogo di rischi specifici con dati INAIL 2025 — potrai caricarlo al passo successivo.
+              🏗️ Per il settore <strong>{settore}</strong> abbiamo un catalogo di rischi specifici — potrai scegliere al passo successivo.
             </div>
           )}
           <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 8 }} disabled={loading}>
