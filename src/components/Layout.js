@@ -7,6 +7,7 @@ const NAV = [
   { id: 'piano',     label: "Piano d'Azione",  icon: '✅' },
   { id: 'ticket',    label: 'Ticket',           icon: '🎫' },
   { id: 'membri',    label: 'Membri',           icon: '👥' },
+  { id: 'impostazioni', label: 'Impostazioni',   icon: '⚙️' },
 ]
 
 export default function Layout({ children }) {

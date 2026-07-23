@@ -7,6 +7,7 @@ import RegistroRischi from './pages/RegistroRischi'
 import PianoAzione from './pages/PianoAzione'
 import GestioneMembri from './pages/GestioneMembri'
 import GestioneTicket from './pages/GestioneTicket'
+import Impostazioni from './pages/Impostazioni'
 import Layout from './components/Layout'
 
 export const AppContext = createContext(null)
@@ -152,6 +153,7 @@ export default function App() {
     piano:     <PianoAzione />,
     ticket:    <GestioneTicket />,
     membri:    <GestioneMembri />,
+    impostazioni: <Impostazioni />,
   }
 
   return (
