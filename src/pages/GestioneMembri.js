@@ -1,0 +1,181 @@
+import React, { useState, useEffect, useCallback } from 'react'
+import { supabase } from '../lib/supabase'
+import { useApp } from '../App'
+
+function MembroModal({ membro, aziendaId, onSave, onClose }) {
+  const editing = !!membro?.id
+  const [form, setForm] = useState({
+    nome:     membro?.nome || '',
+    cognome:  membro?.cognome || '',
+    email:    membro?.email || '',
+    telefono: membro?.telefono || '',
+    ruolo:    membro?.ruolo || '',
+  })
+  const [loading, setLoading] = useState(false)
+  const [error, setError]     = useState(null)
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  async function save() {
+    if (!form.nome || !form.cognome || !form.email) {
+      setError('Nome, cognome ed email sono obbligatori')
+      return
+    }
+    setLoading(true); setError(null)
+    const payload = { ...form, azienda_id: aziendaId }
+    const { error: err } = editing
+      ? await supabase.from('membri').update(payload).eq('id', membro.id)
+      : await supabase.from('membri').insert(payload)
+    if (err) { setError(err.message); setLoading(false); return }
+    onSave()
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <h3 className="modal-title">{editing ? 'Modifica membro' : 'Aggiungi membro'}</h3>
+          <button className="btn btn-icon" onClick={onClose}>✕</button>
+        </div>
+        {error && <div className="alert alert-error">{error}</div>}
+        <div className="grid-2">
+          <div className="form-group">
+            <label className="form-label">Nome *</label>
+            <input className="form-control" value={form.nome} onChange={e => set('nome', e.target.value)} placeholder="Mario" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Cognome *</label>
+            <input className="form-control" value={form.cognome} onChange={e => set('cognome', e.target.value)} placeholder="Rossi" />
+          </div>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Email *</label>
+          <input className="form-control" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="mario.rossi@azienda.it" />
+        </div>
+        <div className="grid-2">
+          <div className="form-group">
+            <label className="form-label">Telefono</label>
+            <input className="form-control" value={form.telefono} onChange={e => set('telefono', e.target.value)} placeholder="+39 333 1234567" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Ruolo / Funzione</label>
+            <input className="form-control" value={form.ruolo} onChange={e => set('ruolo', e.target.value)} placeholder="Es. Responsabile IT, RSPP, CFO" />
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn" onClick={onClose}>Annulla</button>
+          <button className="btn btn-primary" onClick={save} disabled={loading}>{loading ? 'Salvataggio...' : 'Salva'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function GestioneMembri() {
+  const { azienda } = useApp()
+  const [membri, setMembri]   = useState([])
+  const [loading, setLoading] = useState(true)
+  const [modal, setModal]     = useState(null)
+  const [delConfirm, setDelConfirm] = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase.from('membri').select('*').eq('azienda_id', azienda.id).order('cognome')
+    setMembri(data || [])
+    setLoading(false)
+  }, [azienda.id])
+
+  useEffect(() => { load() }, [load])
+
+  async function deleteMembro(id) {
+    await supabase.from('membri').delete().eq('id', id)
+    setDelConfirm(null); load()
+  }
+
+  return (
+    <div>
+      <div className="page-header">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h2>Gestione Membri</h2>
+            <p>Anagrafica delle persone coinvolte nella gestione dei rischi</p>
+          </div>
+          <button className="btn btn-primary" onClick={() => setModal({})}>+ Aggiungi membro</button>
+        </div>
+      </div>
+
+      <div className="card">
+        {loading ? <div className="spinner" /> : membri.length === 0 ? (
+          <div className="empty-state">
+            <div style={{ fontSize: 36 }}>👥</div>
+            <p>Nessun membro aggiunto. Aggiungi le persone che gestiranno i task di mitigazione.</p>
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Nome</th>
+                <th>Email</th>
+                <th>Telefono</th>
+                <th>Ruolo</th>
+                <th>Ticket aperti</th>
+                <th></th>
+              </tr></thead>
+              <tbody>
+                {membri.map(m => (
+                  <tr key={m.id}>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{m.nome} {m.cognome}</div>
+                    </td>
+                    <td style={{ color: '#2B5FA5' }}>{m.email}</td>
+                    <td style={{ color: '#666' }}>{m.telefono || '—'}</td>
+                    <td>
+                      {m.ruolo && <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 10, background: '#EBF4FC', color: '#2B5FA5' }}>{m.ruolo}</span>}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <TicketCount membroId={m.id} />
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button className="btn btn-sm btn-icon" onClick={() => setModal(m)}>✏️</button>
+                        <button className="btn btn-sm btn-icon btn-danger" onClick={() => setDelConfirm(m)}>🗑️</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {modal !== null && (
+        <MembroModal membro={modal} aziendaId={azienda.id} onSave={() => { setModal(null); load() }} onClose={() => setModal(null)} />
+      )}
+
+      {delConfirm && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: 400 }}>
+            <h3 className="modal-title" style={{ marginBottom: 12 }}>Conferma eliminazione</h3>
+            <p style={{ fontSize: 14, color: '#555' }}>Vuoi eliminare <strong>{delConfirm.nome} {delConfirm.cognome}</strong>? I ticket associati rimarranno ma senza assegnatario.</p>
+            <div className="modal-footer">
+              <button className="btn" onClick={() => setDelConfirm(null)}>Annulla</button>
+              <button className="btn btn-danger" onClick={() => deleteMembro(delConfirm.id)}>Elimina</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TicketCount({ membroId }) {
+  const [count, setCount] = useState(null)
+  useEffect(() => {
+    supabase.from('ticket').select('id', { count: 'exact' })
+      .eq('membro_id', membroId)
+      .neq('stato', 'Completato')
+      .then(({ count: c }) => setCount(c || 0))
+  }, [membroId])
+  if (count === null) return <span style={{ color: '#aaa' }}>—</span>
+  return <span style={{ fontWeight: 600, color: count > 0 ? '#E67E22' : '#27AE60' }}>{count}</span>
+}
