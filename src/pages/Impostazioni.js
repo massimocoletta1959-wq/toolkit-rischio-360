@@ -16,14 +16,14 @@ export default function Impostazioni() {
       return
     }
     setLoading(true); setError(null)
-    // Elimina a cascata (azioni, rischi, ticket, membri, profili collegati)
-    await supabase.from('notifiche').delete().eq('ticket_id', supabase.from('ticket').select('id').eq('azienda_id', azienda.id))
-    await supabase.from('ticket').delete().eq('azienda_id', azienda.id)
-    await supabase.from('azioni').delete().eq('azienda_id', azienda.id)
-    await supabase.from('rischi').delete().eq('azienda_id', azienda.id)
-    await supabase.from('membri').delete().eq('azienda_id', azienda.id)
-    // Non eliminiamo il profilo utente — solo l'azienda
-    const { error: err } = await supabase.from('aziende').delete().eq('id', azienda.id)
+    const aid = azienda.id
+    // Elimina in ordine per rispettare le foreign key
+    await supabase.from('ticket').delete().eq('azienda_id', aid)
+    await supabase.from('azioni').delete().eq('azienda_id', aid)
+    await supabase.from('rischi').delete().eq('azienda_id', aid)
+    await supabase.from('membri').delete().eq('azienda_id', aid)
+    await supabase.from('profili').delete().eq('azienda_id', aid)
+    const { error: err } = await supabase.from('aziende').delete().eq('id', aid)
     if (err) { setError(err.message); setLoading(false); return }
 
     setLoading(false)
