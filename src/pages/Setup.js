@@ -5,7 +5,7 @@ import { getRischiDefault, RISCHI_DEFAULT, RISCHI_PER_SETTORE } from '../lib/con
 const SETTORI = ['Manifatturiero','Servizi','Commercio','Edilizia','Sanità','Tecnologia','Agricoltura','Trasporti','Altro']
 const DIMENSIONI = ['Micro (< 10 dipendenti)','Piccola (10-49)','Media (50-249)','Grande (250+)']
 
-export default function Setup({ onDone, userId, userEmail }) {
+export default function Setup({ onDone, userId, userEmail, nuovaAzienda = false }) {
   const [step, setStep]           = useState(1)
   const [nome, setNome]           = useState('')
   const [settore, setSettore]     = useState('')
@@ -26,8 +26,11 @@ export default function Setup({ onDone, userId, userEmail }) {
     setLoading(true); setError(null)
     const { data: az, error: e1 } = await supabase.from('aziende').insert({ nome, settore, dimensione }).select().single()
     if (e1) { setError(e1.message); setLoading(false); return }
-    const { error: e2 } = await supabase.from('profili').insert({ id: userId, email: userEmail, nome: nomeProfilo, azienda_id: az.id })
-    if (e2) { setError(e2.message); setLoading(false); return }
+    // Se è una nuova azienda (utente già loggato), non ricreare il profilo
+    if (!nuovaAzienda) {
+      const { error: e2 } = await supabase.from('profili').insert({ id: userId, email: userEmail, nome: nomeProfilo, azienda_id: az.id })
+      if (e2) { setError(e2.message); setLoading(false); return }
+    }
     setAziendaId(az.id)
     setLoading(false)
     setStep(2)
@@ -145,10 +148,12 @@ export default function Setup({ onDone, userId, userEmail }) {
         </div>
         {error && <div className="alert alert-error">{error}</div>}
         <form onSubmit={handleStep1}>
+          {!nuovaAzienda && (
           <div className="form-group">
             <label className="form-label">Il tuo nome</label>
-            <input className="form-control" value={nomeProfilo} onChange={e => setNomeProfilo(e.target.value)} required placeholder="Es. Mario Rossi" />
+            <input className="form-control" value={nomeProfilo} onChange={e => setNomeProfilo(e.target.value)} required={!nuovaAzienda} placeholder="Es. Mario Rossi" />
           </div>
+          )}
           <div className="form-group">
             <label className="form-label">Nome azienda</label>
             <input className="form-control" value={nome} onChange={e => setNome(e.target.value)} required placeholder="Es. Rossi S.r.l." />
