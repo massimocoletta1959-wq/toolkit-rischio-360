@@ -2,6 +2,33 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
 
+const QUALIFICHE = [
+  'Amministratore Delegato (AD)',
+  'Direttore Generale (DG)',
+  'Direttore Operativo (COO)',
+  'Direttore Finanziario (CFO)',
+  'Direttore Commerciale',
+  'Direttore Marketing',
+  'Direttore HR / Risorse Umane',
+  'Responsabile IT',
+  'Responsabile Qualità',
+  'Responsabile Produzione',
+  'Responsabile Logistica',
+  'Responsabile Amministrativo',
+  'Responsabile Acquisti',
+  'RSPP (Responsabile Sicurezza)',
+  'RLS (Rappresentante Lavoratori)',
+  'DPO (Data Protection Officer)',
+  'Consulente Legale / Compliance',
+  'Consulente Finanziario',
+  'Auditor Interno',
+  'Project Manager',
+  'Team Leader',
+  'Dipendente / Operativo',
+  'Collaboratore Esterno',
+  'Altro',
+]
+
 function MembroModal({ membro, aziendaId, onSave, onClose }) {
   const editing = !!membro?.id
   const [form, setForm] = useState({
@@ -10,18 +37,34 @@ function MembroModal({ membro, aziendaId, onSave, onClose }) {
     email:    membro?.email || '',
     telefono: membro?.telefono || '',
     ruolo:    membro?.ruolo || '',
+    qualifica_custom: '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState(null)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  // Se il ruolo attuale non è nella lista predefinita, è custom
+  const isCustom = form.ruolo && !QUALIFICHE.includes(form.ruolo) && form.ruolo !== 'Altro'
 
   async function save() {
     if (!form.nome || !form.cognome || !form.email) {
       setError('Nome, cognome ed email sono obbligatori')
       return
     }
+    const ruoloFinale = form.ruolo === 'Altro' ? form.qualifica_custom : form.ruolo
+    if (form.ruolo === 'Altro' && !form.qualifica_custom.trim()) {
+      setError('Inserisci la qualifica personalizzata')
+      return
+    }
     setLoading(true); setError(null)
-    const payload = { ...form, azienda_id: aziendaId }
+    const payload = {
+      nome: form.nome,
+      cognome: form.cognome,
+      email: form.email,
+      telefono: form.telefono,
+      ruolo: ruoloFinale,
+      azienda_id: aziendaId,
+    }
     const { error: err } = editing
       ? await supabase.from('membri').update(payload).eq('id', membro.id)
       : await supabase.from('membri').insert(payload)
@@ -37,6 +80,7 @@ function MembroModal({ membro, aziendaId, onSave, onClose }) {
           <button className="btn btn-icon" onClick={onClose}>✕</button>
         </div>
         {error && <div className="alert alert-error">{error}</div>}
+
         <div className="grid-2">
           <div className="form-group">
             <label className="form-label">Nome *</label>
@@ -47,20 +91,46 @@ function MembroModal({ membro, aziendaId, onSave, onClose }) {
             <input className="form-control" value={form.cognome} onChange={e => set('cognome', e.target.value)} placeholder="Rossi" />
           </div>
         </div>
+
         <div className="form-group">
           <label className="form-label">Email *</label>
           <input className="form-control" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="mario.rossi@azienda.it" />
         </div>
+
         <div className="grid-2">
           <div className="form-group">
             <label className="form-label">Telefono</label>
             <input className="form-control" value={form.telefono} onChange={e => set('telefono', e.target.value)} placeholder="+39 333 1234567" />
           </div>
           <div className="form-group">
-            <label className="form-label">Ruolo / Funzione</label>
-            <input className="form-control" value={form.ruolo} onChange={e => set('ruolo', e.target.value)} placeholder="Es. Responsabile IT, RSPP, CFO" />
+            <label className="form-label">Qualifica / Ruolo</label>
+            <select
+              className="form-control"
+              value={isCustom ? 'Altro' : form.ruolo}
+              onChange={e => {
+                set('ruolo', e.target.value)
+                if (e.target.value !== 'Altro') set('qualifica_custom', '')
+                if (isCustom) set('qualifica_custom', form.ruolo)
+              }}
+            >
+              <option value="">Seleziona qualifica...</option>
+              {QUALIFICHE.map(q => <option key={q}>{q}</option>)}
+            </select>
           </div>
         </div>
+
+        {(form.ruolo === 'Altro' || isCustom) && (
+          <div className="form-group">
+            <label className="form-label">Qualifica personalizzata *</label>
+            <input
+              className="form-control"
+              value={isCustom ? form.ruolo : form.qualifica_custom}
+              onChange={e => isCustom ? set('ruolo', e.target.value) : set('qualifica_custom', e.target.value)}
+              placeholder="Es. Responsabile ESG, Quality Manager..."
+            />
+          </div>
+        )}
+
         <div className="modal-footer">
           <button className="btn" onClick={onClose}>Annulla</button>
           <button className="btn btn-primary" onClick={save} disabled={loading}>{loading ? 'Salvataggio...' : 'Salva'}</button>
@@ -70,12 +140,24 @@ function MembroModal({ membro, aziendaId, onSave, onClose }) {
   )
 }
 
+function TicketCount({ membroId }) {
+  const [count, setCount] = useState(null)
+  useEffect(() => {
+    supabase.from('ticket').select('id', { count: 'exact' })
+      .eq('membro_id', membroId).neq('stato', 'Completato')
+      .then(({ count: c }) => setCount(c || 0))
+  }, [membroId])
+  if (count === null) return <span style={{ color: '#aaa' }}>—</span>
+  return <span style={{ fontWeight: 600, color: count > 0 ? '#E67E22' : '#27AE60' }}>{count}</span>
+}
+
 export default function GestioneMembri() {
   const { azienda } = useApp()
-  const [membri, setMembri]   = useState([])
-  const [loading, setLoading] = useState(true)
-  const [modal, setModal]     = useState(null)
+  const [membri, setMembri]     = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [modal, setModal]       = useState(null)
   const [delConfirm, setDelConfirm] = useState(null)
+  const [search, setSearch]     = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -91,6 +173,18 @@ export default function GestioneMembri() {
     setDelConfirm(null); load()
   }
 
+  const filtered = membri.filter(m =>
+    !search || `${m.nome} ${m.cognome} ${m.email} ${m.ruolo}`.toLowerCase().includes(search.toLowerCase())
+  )
+
+  // Raggruppa per qualifica
+  const byQualifica = filtered.reduce((acc, m) => {
+    const q = m.ruolo || 'Senza qualifica'
+    if (!acc[q]) acc[q] = []
+    acc[q].push(m)
+    return acc
+  }, {})
+
   return (
     <div>
       <div className="page-header">
@@ -103,41 +197,50 @@ export default function GestioneMembri() {
         </div>
       </div>
 
+      <div className="stats-grid">
+        <div className="stat-card"><div className="stat-num">{membri.length}</div><div className="stat-label">Membri totali</div></div>
+        <div className="stat-card"><div className="stat-num">{Object.keys(byQualifica).length}</div><div className="stat-label">Qualifiche diverse</div></div>
+      </div>
+
       <div className="card">
-        {loading ? <div className="spinner" /> : membri.length === 0 ? (
+        <div style={{ marginBottom: 16 }}>
+          <input className="form-control" style={{ maxWidth: 300 }} placeholder="🔍 Cerca per nome, email o qualifica..." value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+
+        {loading ? <div className="spinner" /> : filtered.length === 0 ? (
           <div className="empty-state">
             <div style={{ fontSize: 36 }}>👥</div>
-            <p>Nessun membro aggiunto. Aggiungi le persone che gestiranno i task di mitigazione.</p>
+            <p>{membri.length === 0 ? 'Nessun membro aggiunto. Clicca "+ Aggiungi membro" per iniziare.' : 'Nessun risultato per la ricerca.'}</p>
           </div>
         ) : (
           <div className="table-wrap">
             <table>
               <thead><tr>
                 <th>Nome</th>
+                <th>Qualifica / Ruolo</th>
                 <th>Email</th>
                 <th>Telefono</th>
-                <th>Ruolo</th>
-                <th>Ticket aperti</th>
+                <th style={{ textAlign: 'center' }}>Ticket aperti</th>
                 <th></th>
               </tr></thead>
               <tbody>
-                {membri.map(m => (
+                {filtered.map(m => (
                   <tr key={m.id}>
                     <td>
                       <div style={{ fontWeight: 600 }}>{m.nome} {m.cognome}</div>
                     </td>
-                    <td style={{ color: '#2B5FA5' }}>{m.email}</td>
-                    <td style={{ color: '#666' }}>{m.telefono || '—'}</td>
                     <td>
-                      {m.ruolo && <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 10, background: '#EBF4FC', color: '#2B5FA5' }}>{m.ruolo}</span>}
+                      {m.ruolo
+                        ? <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 10, background: '#EBF4FC', color: '#2B5FA5' }}>{m.ruolo}</span>
+                        : <span style={{ color: '#aaa', fontSize: 12 }}>—</span>}
                     </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <TicketCount membroId={m.id} />
-                    </td>
+                    <td style={{ color: '#2B5FA5', fontSize: 13 }}>{m.email}</td>
+                    <td style={{ color: '#666', fontSize: 13 }}>{m.telefono || '—'}</td>
+                    <td style={{ textAlign: 'center' }}><TicketCount membroId={m.id} /></td>
                     <td>
                       <div style={{ display: 'flex', gap: 4 }}>
-                        <button className="btn btn-sm btn-icon" onClick={() => setModal(m)}>✏️</button>
-                        <button className="btn btn-sm btn-icon btn-danger" onClick={() => setDelConfirm(m)}>🗑️</button>
+                        <button className="btn btn-sm btn-icon" title="Modifica" onClick={() => setModal(m)}>✏️</button>
+                        <button className="btn btn-sm btn-icon btn-danger" title="Elimina" onClick={() => setDelConfirm(m)}>🗑️</button>
                       </div>
                     </td>
                   </tr>
@@ -166,16 +269,4 @@ export default function GestioneMembri() {
       )}
     </div>
   )
-}
-
-function TicketCount({ membroId }) {
-  const [count, setCount] = useState(null)
-  useEffect(() => {
-    supabase.from('ticket').select('id', { count: 'exact' })
-      .eq('membro_id', membroId)
-      .neq('stato', 'Completato')
-      .then(({ count: c }) => setCount(c || 0))
-  }, [membroId])
-  if (count === null) return <span style={{ color: '#aaa' }}>—</span>
-  return <span style={{ fontWeight: 600, color: count > 0 ? '#E67E22' : '#27AE60' }}>{count}</span>
 }
