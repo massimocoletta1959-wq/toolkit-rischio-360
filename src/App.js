@@ -14,12 +14,12 @@ export const AppContext = createContext(null)
 export const useApp = () => useContext(AppContext)
 
 export default function App() {
-  const [session, setSession]       = useState(undefined)
-  const [profilo, setProfilo]       = useState(null)
-  const [aziende, setAziende]       = useState([])       // tutte le aziende dell'utente
-  const [azienda, setAziendaState]  = useState(null)     // azienda attiva
-  const [page, setPage]             = useState('cruscotto')
-  const [showSetup, setShowSetup]   = useState(false)    // crea nuova azienda
+  const [session, setSession]      = useState(undefined)
+  const [profilo, setProfilo]      = useState(null)
+  const [aziende, setAziende]      = useState([])
+  const [azienda, setAziendaState] = useState(null)
+  const [page, setPage]            = useState('cruscotto')
+  const [showSetup, setShowSetup]  = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -35,48 +35,30 @@ export default function App() {
   }, [])
 
   async function loadDati(userId) {
-    // Carica profilo
+    // 1. Carica profilo utente
     const { data: prof } = await supabase
-      .from('profili')
-      .select('*')
-      .eq('id', userId)
-      .single()
+      .from('profili').select('*').eq('id', userId).single()
 
     if (!prof) {
-      // Utente senza profilo — prima volta
-      setProfilo(null)
-      setAziende([])
-      setAziendaState(null)
+      setProfilo(null); setAziende([]); setAziendaState(null)
       return
     }
     setProfilo(prof)
 
-    // Carica tutte le aziende associate all'utente
-    // Un utente può avere più profili (uno per azienda) oppure
-    // usiamo una tabella di join utente-aziende
-    // Per semplicità: cerca tutti i profili con questo user_id o email
-    const { data: tuttiProfili } = await supabase
-      .from('profili')
-      .select('*, aziende(*)')
-      .eq('id', userId)
-
-    // Carica anche aziende dove l'utente è membro
-    const { data: membroAziende } = await supabase
-      .from('membri')
+    // 2. Carica TUTTE le aziende tramite la tabella utente_aziende
+    const { data: ua } = await supabase
+      .from('utente_aziende')
       .select('aziende(*)')
       .eq('user_id', userId)
 
-    const azFromProfili = (tuttiProfili || []).map(p => p.aziende).filter(Boolean)
-    const azFromMembri  = (membroAziende || []).map(m => m.aziende).filter(Boolean)
-
-    // Unisci e deduplicata per id
-    const tutteAziende = [...azFromProfili, ...azFromMembri].filter(
-      (az, idx, arr) => arr.findIndex(a => a.id === az.id) === idx
-    )
+    const tutteAziende = (ua || [])
+      .map(r => r.aziende)
+      .filter(Boolean)
+      .filter((az, idx, arr) => arr.findIndex(a => a.id === az.id) === idx)
 
     setAziende(tutteAziende)
 
-    // Seleziona la prima come attiva (o quella salvata in localStorage)
+    // 3. Seleziona azienda attiva (ultima usata o prima disponibile)
     const savedId = localStorage.getItem('azienda_attiva')
     const saved   = tutteAziende.find(a => a.id === savedId)
     setAziendaState(saved || tutteAziende[0] || null)
@@ -94,8 +76,7 @@ export default function App() {
     setSession(null); setProfilo(null); setAziende([]); setAziendaState(null)
   }
 
-  // Callback dopo creazione nuova azienda
-  async function onNuovaAzienda() {
+  async function onNuovaAziendaDone() {
     setShowSetup(false)
     if (session) await loadDati(session.user.id)
   }
@@ -109,24 +90,14 @@ export default function App() {
 
   // Prima volta: nessun profilo
   if (!profilo && !showSetup) return (
-    <Setup
-      onDone={() => loadDati(session.user.id)}
-      userId={session.user.id}
-      userEmail={session.user.email}
-    />
+    <Setup onDone={() => loadDati(session.user.id)} userId={session.user.id} userEmail={session.user.email} />
   )
 
   // Crea nuova azienda (utente già loggato)
   if (showSetup) return (
-    <Setup
-      onDone={onNuovaAzienda}
-      userId={session.user.id}
-      userEmail={session.user.email}
-      nuovaAzienda={true}
-    />
+    <Setup onDone={onNuovaAziendaDone} userId={session.user.id} userEmail={session.user.email} nuovaAzienda={true} />
   )
 
-  // Nessuna azienda disponibile
   if (!azienda) return (
     <div className="login-page">
       <div className="login-card" style={{ textAlign: 'center' }}>
@@ -142,17 +113,16 @@ export default function App() {
     session, profilo, azienda, aziende,
     switchAzienda,
     reload: () => loadDati(session.user.id),
-    page, setPage,
-    logout,
+    page, setPage, logout,
     onNuovaAzienda: () => setShowSetup(true),
   }
 
   const pages = {
-    cruscotto: <Cruscotto />,
-    registro:  <RegistroRischi />,
-    piano:     <PianoAzione />,
-    ticket:    <GestioneTicket />,
-    membri:    <GestioneMembri />,
+    cruscotto:    <Cruscotto />,
+    registro:     <RegistroRischi />,
+    piano:        <PianoAzione />,
+    ticket:       <GestioneTicket />,
+    membri:       <GestioneMembri />,
     impostazioni: <Impostazioni />,
   }
 

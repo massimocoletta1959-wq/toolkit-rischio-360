@@ -23,14 +23,26 @@ export default function Setup({ onDone, userId, userEmail, nuovaAzienda = false 
   async function handleStep1(e) {
     e.preventDefault()
     setLoading(true); setError(null)
+
+    // 1. Crea l'azienda
     const { data: az, error: e1 } = await supabase.from('aziende')
       .insert({ nome, settore, dimensione }).select().single()
     if (e1) { setError(e1.message); setLoading(false); return }
+
+    // 2. Se è la prima azienda, crea anche il profilo utente
     if (!nuovaAzienda) {
       const { error: e2 } = await supabase.from('profili')
         .insert({ id: userId, email: userEmail, nome: nomeProfilo, azienda_id: az.id })
       if (e2) { setError(e2.message); setLoading(false); return }
     }
+
+    // 3. Collega utente <-> azienda nella tabella di join
+    const { error: e3 } = await supabase.from('utente_aziende')
+      .insert({ user_id: userId, azienda_id: az.id })
+    if (e3 && !e3.message.includes('unique')) {
+      setError(e3.message); setLoading(false); return
+    }
+
     setAziendaId(az.id)
     setLoading(false)
     setStep(2)
