@@ -38,7 +38,7 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
 
     // 3. Collega utente <-> azienda nella tabella di join
     const { error: e3 } = await supabase.from('utente_aziende')
-      .insert({ user_id: userId, azienda_id: az.id })
+      .insert({ utente_id: userId, azienda_id: az.id })
     if (e3 && !e3.message.includes('unique')) {
       setError(e3.message); setLoading(false); return
     }

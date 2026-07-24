@@ -49,7 +49,7 @@ export default function App() {
     const { data: ua } = await supabase
       .from('utente_aziende')
       .select('aziende(*)')
-      .eq('user_id', userId)
+      .eq('utente_id', userId)
 
     const tutteAziende = (ua || [])
       .map(r => r.aziende)
