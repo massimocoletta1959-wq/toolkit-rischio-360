@@ -5,7 +5,7 @@ import { RISCHI_DEFAULT, RISCHI_PER_SETTORE } from '../lib/constants'
 const SETTORI = ['Manifatturiero','Servizi','Commercio','Edilizia','Sanità','Tecnologia','Agricoltura','Trasporti','Altro']
 const DIMENSIONI = ['Micro (< 10 dipendenti)','Piccola (10-49)','Media (50-249)','Grande (250+)']
 
-export default function Setup({ onDone, userId, userEmail, nuovaAzienda = false }) {
+export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzienda = false }) {
   const [step, setStep]         = useState(1)
   const [nome, setNome]         = useState('')
   const [settore, setSettore]   = useState('')
@@ -180,9 +180,16 @@ export default function Setup({ onDone, userId, userEmail, nuovaAzienda = false 
               🏗️ Per il settore <strong>{settore}</strong> abbiamo rischi specifici — potrai scegliere al passo successivo.
             </div>
           )}
-          <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 8 }} disabled={loading}>
-            {loading ? 'Salvataggio...' : 'Avanti →'}
-          </button>
+          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+            {nuovaAzienda && onAnnulla && (
+              <button type="button" className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={onAnnulla}>
+                ← Annulla
+              </button>
+            )}
+            <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} disabled={loading}>
+              {loading ? 'Salvataggio...' : 'Avanti →'}
+            </button>
+          </div>
         </form>
       </div>
     </div>

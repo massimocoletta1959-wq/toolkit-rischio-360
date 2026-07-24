@@ -95,7 +95,7 @@ export default function App() {
 
   // Crea nuova azienda (utente già loggato)
   if (showSetup) return (
-    <Setup onDone={onNuovaAziendaDone} userId={session.user.id} userEmail={session.user.email} nuovaAzienda={true} />
+    <Setup onDone={onNuovaAziendaDone} onAnnulla={() => setShowSetup(false)} userId={session.user.id} userEmail={session.user.email} nuovaAzienda={true} />
   )
 
   if (!azienda) return (
