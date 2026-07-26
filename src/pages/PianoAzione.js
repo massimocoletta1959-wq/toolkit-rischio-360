@@ -45,7 +45,7 @@ function AzioneModal({ azione, rischio, aziendaId, onSave, onClose, membri = [] 
         (m.nome + ' ' + m.cognome) === form.responsabile
       )
       if (membroScelto) {
-        await supabase.from('ticket').insert({
+        const { data: nuovoTicket } = await supabase.from('ticket').insert({
           azienda_id: aziendaId,
           membro_id: membroScelto.id,
           titolo: 'Azione: ' + form.azione.substring(0, 80) + (form.azione.length > 80 ? '...' : ''),
@@ -55,7 +55,23 @@ function AzioneModal({ azione, rischio, aziendaId, onSave, onClose, membri = [] 
             ? (rischio.probabilita * rischio.impatto >= 6 ? 'Alta' : rischio.probabilita * rischio.impatto >= 4 ? 'Media' : 'Bassa')
             : 'Media',
           stato: 'Aperto',
-        })
+        }).select().single()
+
+        if (nuovoTicket) {
+          const inviaEmail = window.confirm(
+            'Ticket creato per ' + membroScelto.nome + ' ' + membroScelto.cognome + '.\n\nVuoi inviare una email con i dettagli del task?'
+          )
+          if (inviaEmail) {
+            try {
+              const { data: { session } } = await supabase.auth.getSession()
+              await fetch('https://vwbixmbbcutjcplskjvg.supabase.co/functions/v1/invia-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session?.access_token },
+                body: JSON.stringify({ ticket_id: nuovoTicket.id, tipo: 'assegnazione' }),
+              })
+            } catch(e) { console.warn('Email non inviata:', e) }
+          }
+        }
       }
     }
 
