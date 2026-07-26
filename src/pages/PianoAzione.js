@@ -44,6 +44,7 @@ function AzioneModal({ azione, rischio, aziendaId, onSave, onClose }) {
       : await supabase.from('azioni').insert(payload)
     if (err) { setError(err.message); setLoading(false); return }
 
+    console.log('membri:', membri.length, 'responsabile:', form.responsabile)
     if (form.responsabile && form.responsabile !== '__custom' && !editing) {
       const membroScelto = membri.find(m =>
         (m.nome + ' ' + m.cognome + (m.ruolo ? ' — ' + m.ruolo : '')) === form.responsabile ||
