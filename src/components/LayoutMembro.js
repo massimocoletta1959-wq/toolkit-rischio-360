@@ -12,8 +12,8 @@ export default function LayoutMembro({ children }) {
           <p>Area personale</p>
         </div>
         <div className="sidebar-azienda">
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Azienda</span>
-          <strong style={{ fontSize: 13 }}>{azienda?.nome}</strong>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Area personale</span>
+          <strong style={{ fontSize: 13 }}>I miei task</strong>
         </div>
         <nav className="sidebar-nav">
           <div className="nav-item active">
