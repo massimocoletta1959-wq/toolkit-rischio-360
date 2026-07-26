@@ -66,7 +66,7 @@ function TicketModal({ ticket, aziendaId, rischi, membri, onSave, onClose }) {
     if (inviaEmail && ticketId) {
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        await fetch(`${process.env.REACT_APP_SUPABASE_URL}/functions/v1/invia-email`, {
+        await fetch('https://vwbixmbbcutjcplskjvg.supabase.co/functions/v1/invia-email', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
