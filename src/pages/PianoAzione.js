@@ -11,12 +11,19 @@ const STATO_COLORS = {
 }
 
 function AzioneModal({ azione, rischio, aziendaId, onSave, onClose }) {
+  const [membri, setMembri] = React.useState([])
+  React.useEffect(() => {
+    supabase.from('membri').select('id, nome, cognome, ruolo')
+      .eq('azienda_id', aziendaId).order('cognome')
+      .then(({ data }) => setMembri(data || []))
+  }, [aziendaId])
   const editing = !!azione?.id
   const suggerimento = getSuggerimentoAzione(rischio?.categoria, rischio?.descrizione)
 
   const [form, setForm] = useState({
     azione:       azione?.azione || '',
     responsabile: azione?.responsabile || '',
+    responsabile_custom: '',
     scadenza:     azione?.scadenza || '',
     strategia:    azione?.strategia || 'Ridurre',
     stato:        azione?.stato || 'Pianificato',
@@ -29,7 +36,9 @@ function AzioneModal({ azione, rischio, aziendaId, onSave, onClose }) {
   async function save() {
     if (!form.azione) { setError("Descrivi l'azione di mitigazione"); return }
     setLoading(true); setError(null)
-    const payload = { ...form, rischio_id: rischio.id, azienda_id: aziendaId }
+    const respFinale = form.responsabile === '__custom' ? (form.responsabile_custom || '') : form.responsabile
+    const { responsabile_custom, ...formClean } = form
+    const payload = { ...formClean, responsabile: respFinale, rischio_id: rischio.id, azienda_id: aziendaId }
     const { error: err } = editing
       ? await supabase.from('azioni').update(payload).eq('id', azione.id)
       : await supabase.from('azioni').insert(payload)
@@ -91,7 +100,22 @@ function AzioneModal({ azione, rischio, aziendaId, onSave, onClose }) {
         <div className="grid-2">
           <div className="form-group">
             <label className="form-label">Responsabile</label>
-            <input className="form-control" value={form.responsabile} onChange={e => set('responsabile', e.target.value)} placeholder="Es. Responsabile IT" />
+            {membri.length > 0 ? (
+              <select className="form-control" value={form.responsabile} onChange={e => set('responsabile', e.target.value)}>
+                <option value="">Seleziona membro...</option>
+                {membri.map(m => (
+                  <option key={m.id} value={`${m.nome} ${m.cognome}${m.ruolo ? ' — ' + m.ruolo : ''}`}>
+                    {m.nome} {m.cognome}{m.ruolo ? ` — ${m.ruolo}` : ''}
+                  </option>
+                ))}
+                <option value="__custom">— Inserisci manualmente</option>
+              </select>
+            ) : (
+              <input className="form-control" value={form.responsabile} onChange={e => set('responsabile', e.target.value)} placeholder="Es. Responsabile IT" />
+            )}
+            {form.responsabile === '__custom' && (
+              <input className="form-control" style={{ marginTop: 6 }} value={form.responsabile_custom || ''} onChange={e => set('responsabile_custom', e.target.value)} placeholder="Inserisci nome responsabile..." />
+            )}
           </div>
           <div className="form-group">
             <label className="form-label">Scadenza</label>

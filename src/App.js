@@ -66,13 +66,14 @@ export default function App() {
 
   function switchAzienda(az) {
     setAziendaState(az)
+    localStorage.setItem('azienda_attiva_' + (az.id || ''), az.id)
     localStorage.setItem('azienda_attiva', az.id)
     setPage('cruscotto')
   }
 
   async function logout() {
     await supabase.auth.signOut()
-    localStorage.removeItem('azienda_attiva')
+    // Non cancelliamo azienda_attiva — così al prossimo login riprende l'ultima usata
     setSession(null); setProfilo(null); setAziende([]); setAziendaState(null)
   }
 
