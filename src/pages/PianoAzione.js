@@ -43,6 +43,27 @@ function AzioneModal({ azione, rischio, aziendaId, onSave, onClose }) {
       ? await supabase.from('azioni').update(payload).eq('id', azione.id)
       : await supabase.from('azioni').insert(payload)
     if (err) { setError(err.message); setLoading(false); return }
+
+    if (form.responsabile && form.responsabile !== '__custom' && !editing) {
+      const membroScelto = membri.find(m =>
+        (m.nome + ' ' + m.cognome + (m.ruolo ? ' — ' + m.ruolo : '')) === form.responsabile ||
+        (m.nome + ' ' + m.cognome) === form.responsabile
+      )
+      if (membroScelto) {
+        await supabase.from('ticket').insert({
+          azienda_id: aziendaId,
+          membro_id: membroScelto.id,
+          titolo: 'Azione: ' + form.azione.substring(0, 80) + (form.azione.length > 80 ? '...' : ''),
+          istruzioni: form.azione,
+          scadenza: null,
+          priorita: rischio.probabilita && rischio.impatto
+            ? (rischio.probabilita * rischio.impatto >= 6 ? 'Alta' : rischio.probabilita * rischio.impatto >= 4 ? 'Media' : 'Bassa')
+            : 'Media',
+          stato: 'Aperto',
+        })
+      }
+    }
+
     onSave()
   }
 
