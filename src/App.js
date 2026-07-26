@@ -9,6 +9,7 @@ import GestioneMembri from './pages/GestioneMembri'
 import GestioneTicket from './pages/GestioneTicket'
 import Impostazioni from './pages/Impostazioni'
 import IMieiTask from './pages/IMieiTask'
+import Report from './pages/Report'
 import Layout from './components/Layout'
 import LayoutMembro from './components/LayoutMembro'
 
@@ -48,47 +49,55 @@ export default function App() {
   }, [])
 
   async function accettaInvito(userId, token) {
-    // Trova l'invito
+    // Trova l'invito valido
     const { data: inviti } = await supabase
       .from('inviti').select('*').eq('token', token).eq('accettato', false)
     if (!inviti || inviti.length === 0) return
-
     const invito = inviti[0]
-
-    // Controlla scadenza
     if (new Date(invito.expires_at) < new Date()) return
 
-    // Crea o aggiorna profilo con ruolo 'membro' e collegamento all'azienda
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // Controlla se il profilo esiste già (membro già registrato in un'altra azienda)
     const { data: existingProf } = await supabase
-      .from('profili').select('id').eq('id', userId).single()
+      .from('profili').select('*').eq('id', userId).single()
 
     if (!existingProf) {
-      const { data: { user } } = await supabase.auth.getUser()
+      // Prima registrazione — crea profilo con ruolo membro
       await supabase.from('profili').insert({
         id: userId,
         email: user.email,
         nome: '',
-        azienda_id: invito.azienda_id,
+        azienda_id: invito.azienda_id,  // azienda principale
         ruolo: 'membro',
         membro_id: invito.membro_id,
       })
     } else {
-      await supabase.from('profili').update({
-        azienda_id: invito.azienda_id,
-        ruolo: 'membro',
-        membro_id: invito.membro_id,
-      }).eq('id', userId)
+      // Profilo già esistente — aggiunge solo il collegamento alla nuova azienda
+      // NON sovrascrive ruolo o azienda principale se è già consulente
+      if (existingProf.ruolo !== 'consulente') {
+        // Se è un membro, aggiorna il membro_id per includere questo invito
+        // Usiamo un array di membro_ids nella tabella utente_aziende
+        await supabase.from('profili').update({
+          ruolo: 'membro',
+        }).eq('id', userId)
+      }
     }
 
-    // Collega in utente_aziende
+    // Collega utente <-> azienda (anche se già registrato altrove)
     await supabase.from('utente_aziende').upsert({
-      utente_id: userId, azienda_id: invito.azienda_id
+      utente_id: userId,
+      azienda_id: invito.azienda_id,
+      ruolo: 'membro',
     }, { onConflict: 'utente_id,azienda_id' })
+
+    // Collega il record membro all'utente (per trovare i ticket)
+    await supabase.from('membri').update({ user_id: userId })
+      .eq('id', invito.membro_id)
 
     // Marca invito come accettato
     await supabase.from('inviti').update({ accettato: true }).eq('id', invito.id)
 
-    // Salva azienda come attiva
     localStorage.setItem('azienda_attiva', invito.azienda_id)
   }
 
@@ -187,6 +196,7 @@ export default function App() {
     ticket:       <GestioneTicket />,
     membri:       <GestioneMembri />,
     impostazioni: <Impostazioni />,
+    report: <Report />,
   }
 
   return (

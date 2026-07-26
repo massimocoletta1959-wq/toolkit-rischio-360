@@ -8,6 +8,7 @@ const NAV = [
   { id: 'ticket',    label: 'Ticket',           icon: '🎫' },
   { id: 'membri',    label: 'Membri',           icon: '👥' },
   { id: 'impostazioni', label: 'Impostazioni',   icon: '⚙️' },
+  { id: 'report',       label: 'Report',          icon: '📄' },
 ]
 
 export default function Layout({ children }) {
