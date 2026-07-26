@@ -45,7 +45,7 @@ function AzioneModal({ azione, rischio, aziendaId, onSave, onClose, membri = [] 
         (m.nome + ' ' + m.cognome) === form.responsabile
       )
       if (membroScelto) {
-        const { data: nuovoTicket } = await supabase.from('ticket').insert({
+        const ticketPayload = {
           azienda_id: aziendaId,
           membro_id: membroScelto.id,
           titolo: 'Azione: ' + form.azione.substring(0, 80) + (form.azione.length > 80 ? '...' : ''),
@@ -55,7 +55,8 @@ function AzioneModal({ azione, rischio, aziendaId, onSave, onClose, membri = [] 
             ? (rischio.probabilita * rischio.impatto >= 6 ? 'Alta' : rischio.probabilita * rischio.impatto >= 4 ? 'Media' : 'Bassa')
             : 'Media',
           stato: 'Aperto',
-        }).select().single()
+        }
+        const { data: nuovoTicket } = await supabase.from('ticket').insert(ticketPayload).select().single()
 
         if (nuovoTicket) {
           const inviaEmail = window.confirm(
