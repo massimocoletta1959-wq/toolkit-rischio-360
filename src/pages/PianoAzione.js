@@ -10,13 +10,7 @@ const STATO_COLORS = {
   'Da rivedere': { bg: '#FADBD8', color: '#C0392B' },
 }
 
-function AzioneModal({ azione, rischio, aziendaId, onSave, onClose }) {
-  const [membri, setMembri] = React.useState([])
-  React.useEffect(() => {
-    supabase.from('membri').select('id, nome, cognome, ruolo')
-      .eq('azienda_id', aziendaId).order('cognome')
-      .then(({ data }) => setMembri(data || []))
-  }, [aziendaId])
+function AzioneModal({ azione, rischio, aziendaId, onSave, onClose, membri = [] }) {
   const editing = !!azione?.id
   const suggerimento = getSuggerimentoAzione(rischio?.categoria, rischio?.descrizione)
 
@@ -172,6 +166,7 @@ export default function PianoAzione() {
   const { azienda } = useApp()
   const [rischi, setRischi]   = useState([])
   const [azioni, setAzioni]   = useState({})
+  const [membri, setMembri]   = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal]     = useState(null)
   const [filterTier, setFilterTier] = useState('12')
@@ -181,6 +176,8 @@ export default function PianoAzione() {
     setLoading(true)
     const { data: r } = await supabase.from('rischi').select('*').eq('azienda_id', azienda.id).order('created_at')
     const { data: a } = await supabase.from('azioni').select('*').eq('azienda_id', azienda.id)
+    const { data: m } = await supabase.from('membri').select('id, nome, cognome, ruolo').eq('azienda_id', azienda.id).order('cognome')
+    setMembri(m || [])
     const aMap = {}
     ;(a || []).forEach(az => { if (!aMap[az.rischio_id]) aMap[az.rischio_id] = []; aMap[az.rischio_id].push(az) })
     setRischi(r || [])
@@ -311,6 +308,7 @@ export default function PianoAzione() {
           azione={modal.azione || (modal.azionePrecompilata ? { azione: modal.azionePrecompilata } : null)}
           rischio={modal.rischio}
           aziendaId={azienda.id}
+          membri={membri}
           onSave={() => { setModal(null); load() }}
           onClose={() => setModal(null)}
         />
