@@ -140,6 +140,42 @@ function MembroModal({ membro, aziendaId, onSave, onClose }) {
   )
 }
 
+function InvioInvito({ membro, aziendaId }) {
+  const [stato, setStato] = React.useState(null) // null | 'loading' | 'ok' | 'error'
+
+  async function invia() {
+    setStato('loading')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(
+        `https://vwbixmbbcutjcplskjvg.supabase.co/functions/v1/invia-invito`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ membro_id: membro.id, azienda_id: aziendaId }),
+        }
+      )
+      const data = await res.json()
+      setStato(data.successo ? 'ok' : 'error')
+    } catch {
+      setStato('error')
+    }
+    setTimeout(() => setStato(null), 3000)
+  }
+
+  return (
+    <button
+      className="btn btn-sm"
+      style={{ fontSize: 11, color: stato === 'ok' ? '#27AE60' : stato === 'error' ? '#C0392B' : '#2B5FA5' }}
+      onClick={invia}
+      disabled={stato === 'loading'}
+      title={`Invia invito a ${membro.email}`}
+    >
+      {stato === 'loading' ? '...' : stato === 'ok' ? '✓ Inviato' : stato === 'error' ? '✗ Errore' : '📧 Invita'}
+    </button>
+  )
+}
+
 function TicketCount({ membroId }) {
   const [count, setCount] = useState(null)
   useEffect(() => {
@@ -221,6 +257,7 @@ export default function GestioneMembri() {
                 <th>Email</th>
                 <th>Telefono</th>
                 <th style={{ textAlign: 'center' }}>Ticket aperti</th>
+                <th style={{ textAlign: 'center' }}>Invito</th>
                 <th></th>
               </tr></thead>
               <tbody>
@@ -237,6 +274,7 @@ export default function GestioneMembri() {
                     <td style={{ color: '#2B5FA5', fontSize: 13 }}>{m.email}</td>
                     <td style={{ color: '#666', fontSize: 13 }}>{m.telefono || '—'}</td>
                     <td style={{ textAlign: 'center' }}><TicketCount membroId={m.id} /></td>
+                    <td style={{ textAlign: 'center' }}><InvioInvito membro={m} aziendaId={azienda.id} /></td>
                     <td>
                       <div style={{ display: 'flex', gap: 4 }}>
                         <button className="btn btn-sm btn-icon" title="Modifica" onClick={() => setModal(m)}>✏️</button>
