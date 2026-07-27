@@ -271,7 +271,7 @@ export const SUGGERIMENTI_AZIONI = {
 
   'Rischi 231 — PA e Anticorruzione': {
     'corruzione': 'Adottare una procedura formale per la gestione dei rapporti con la PA: vietare pagamenti informali, documentare ogni contatto con funzionari pubblici, prevedere doppia firma per pratiche edilizie. Inserire clausole anticorruzione nei contratti con intermediari e agenti. Formare tutto il personale coinvolto nei rapporti con enti locali.',
-    'appalto': 'Definire una procedura scritta per la partecipazione alle gare d'appalto: separare le funzioni di preparazione offerta e approvazione, vietare contatti informali con RUP e commissioni, documentare le fonti di ogni informazione di gara. Nominare un responsabile gare con delega specifica.',
+    'appalto': 'Definire una procedura scritta per la partecipazione alle gare d\'appalto: separare le funzioni di preparazione offerta e approvazione, vietare contatti informali con RUP e commissioni, documentare le fonti di ogni informazione di gara. Nominare un responsabile gare con delega specifica.',
     'truffa': 'Istituire un controllo interno sui requisiti per accesso a incentivi e agevolazioni (Superbonus, PNRR, bandi regionali). Verificare la documentazione tecnica prima della presentazione, conservare evidenza di ogni comunicazione con gli enti erogatori. Prevedere audit periodici sulle pratiche di accesso ai fondi pubblici.',
     'default': 'Adottare un protocollo scritto per i rapporti con la Pubblica Amministrazione. Vietare regalie e utilità a funzionari pubblici. Formare il personale sui reati di corruzione e sulle procedure da seguire. Istituire un registro dei contatti con la PA e un canale di segnalazione anonima.',
   },
