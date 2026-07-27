@@ -7,6 +7,12 @@ export const CATEGORIE = [
   'Finanziario',
   'Terze Parti / Fornitori',
   'Continuità Operativa',
+  'Rischi 231 — PA e Anticorruzione',
+  'Rischi 231 — Sicurezza sul Lavoro',
+  'Rischi 231 — Ambiente',
+  'Rischi 231 — Finanziario e Tributario',
+  'Rischi 231 — Societario e Governance',
+  'Rischi 231 — Lavoro e Caporalato',
 ]
 
 export const CATALOGO = {
@@ -274,4 +280,60 @@ export function getSuggerimentoAzione(categoria, descrizione) {
     }
   }
   return catSugg['default'] || ''
+}
+
+// Catalogo Rischi 231 per settore Edile
+export const RISCHI_231_EDILIZIA = [
+
+  // Art. 24/25 — Reati contro la Pubblica Amministrazione
+  { categoria: 'Normativo / Compliance', descrizione: 'Corruzione di funzionari pubblici per ottenere permessi di costruire o concessioni edilizie', fonte: 'Interna', probabilita: 2, impatto: 3, note: 'Art. 24-25 D.Lgs. 231/01 — area sensibile: rapporti con enti locali e SUAP' },
+  { categoria: 'Normativo / Compliance', descrizione: 'Turbata libertà degli incanti in gare di appalto pubbliche', fonte: 'Interna', probabilita: 2, impatto: 3, note: 'Art. 25 D.Lgs. 231/01 — area sensibile: partecipazione a bandi pubblici' },
+  { categoria: 'Normativo / Compliance', descrizione: 'Truffa aggravata ai danni dello Stato per erogazioni pubbliche (incentivi, superbonus)', fonte: 'Interna', probabilita: 2, impatto: 3, note: 'Art. 24 D.Lgs. 231/01 — area sensibile: accesso a fondi pubblici e agevolazioni fiscali edilizie' },
+  { categoria: 'Normativo / Compliance', descrizione: 'Frode nelle pubbliche forniture o nelle perizie tecniche richieste dalla PA', fonte: 'Interna', probabilita: 1, impatto: 3, note: 'Art. 24 D.Lgs. 231/01 — area sensibile: collaudi, certificazioni e direzione lavori' },
+  { categoria: 'Normativo / Compliance', descrizione: 'Induzione indebita o concussione nel rilascio di autorizzazioni urbanistiche', fonte: 'Interna', probabilita: 1, impatto: 3, note: 'Art. 25 D.Lgs. 231/01 — area sensibile: varianti urbanistiche e piani attuativi' },
+
+  // Art. 25-septies — Sicurezza sul lavoro
+  { categoria: 'Operativo', descrizione: 'Omicidio colposo o lesioni gravi per violazione norme antinfortunistiche in cantiere (D.Lgs. 81/08)', fonte: 'Interna', probabilita: 2, impatto: 3, note: 'Art. 25-septies D.Lgs. 231/01 — AREA A RISCHIO MASSIMO: cadute dall\'alto, macchine, scavi' },
+  { categoria: 'Operativo', descrizione: 'Omessa o inadeguata valutazione dei rischi (DVR) nei cantieri temporanei e mobili', fonte: 'Interna', probabilita: 2, impatto: 3, note: 'Art. 25-septies D.Lgs. 231/01 — obbligo PSC e POS per ogni cantiere' },
+  { categoria: 'Operativo', descrizione: 'Mancata nomina o inadeguatezza del Coordinatore per la Sicurezza in fase di esecuzione (CSE)', fonte: 'Interna', probabilita: 2, impatto: 2, note: 'Art. 25-septies D.Lgs. 231/01 — obbligo per cantieri con più imprese' },
+  { categoria: 'Operativo', descrizione: 'Infortuni gravi su lavoratori di ditte subappaltatrici per carente coordinamento sicurezza', fonte: 'Mista', probabilita: 2, impatto: 3, note: 'Art. 25-septies D.Lgs. 231/01 — responsabilità solidale del committente nei subappalti' },
+
+  // Art. 25-undecies — Reati ambientali
+  { categoria: 'Normativo / Compliance', descrizione: 'Gestione illecita di rifiuti speciali da cantiere (terra, calcestruzzo, eternit, amianto)', fonte: 'Interna', probabilita: 2, impatto: 3, note: 'Art. 25-undecies D.Lgs. 231/01 — area sensibile: smaltimento rifiuti, formulari e registri' },
+  { categoria: 'Normativo / Compliance', descrizione: 'Violazione normativa terre e rocce da scavo (DPR 120/2017)', fonte: 'Interna', probabilita: 2, impatto: 2, note: 'Art. 25-undecies D.Lgs. 231/01 — obbligo di piano di utilizzo e tracciabilità' },
+  { categoria: 'Normativo / Compliance', descrizione: 'Traffico illecito di rifiuti o miscelazione non autorizzata di rifiuti pericolosi', fonte: 'Mista', probabilita: 1, impatto: 3, note: 'Art. 25-undecies D.Lgs. 231/01 — reato doloso con sanzioni molto elevate' },
+  { categoria: 'Normativo / Compliance', descrizione: 'Inquinamento ambientale da attività di cantiere (acque, suolo, aria)', fonte: 'Mista', probabilita: 1, impatto: 3, note: 'Art. 25-undecies D.Lgs. 231/01 — area sensibile: cantieri vicino a corsi d\'acqua o aree protette' },
+  { categoria: 'Normativo / Compliance', descrizione: 'Omessa bonifica di siti contaminati su aree oggetto di intervento edilizio', fonte: 'Interna', probabilita: 1, impatto: 3, note: 'Art. 25-undecies D.Lgs. 231/01 — obbligo di caratterizzazione preventiva del terreno' },
+
+  // Art. 25-octies — Riciclaggio e reati finanziari
+  { categoria: 'Finanziario', descrizione: 'Riciclaggio attraverso appalti gonfiati, subappalti fittizi o compravendite immobiliari', fonte: 'Mista', probabilita: 1, impatto: 3, note: 'Art. 25-octies D.Lgs. 231/01 — area sensibile: acquisto e vendita immobili, gestione cassa' },
+  { categoria: 'Finanziario', descrizione: 'Autoriciclaggio tramite reimpiego di proventi illeciti in attività edilizie', fonte: 'Interna', probabilita: 1, impatto: 3, note: 'Art. 25-octies D.Lgs. 231/01 — monitoraggio flussi finanziari anomali' },
+  { categoria: 'Finanziario', descrizione: 'Impiego di denaro di provenienza illecita nei cantieri (pagamenti in contanti non tracciati)', fonte: 'Mista', probabilita: 2, impatto: 2, note: 'Art. 25-octies D.Lgs. 231/01 — obbligo tracciabilità pagamenti in edilizia (L. 136/2010)' },
+
+  // Art. 25-quinquiesdecies — Reati tributari
+  { categoria: 'Finanziario', descrizione: 'Emissione o utilizzo di fatture per operazioni inesistenti nella catena dei subappalti', fonte: 'Mista', probabilita: 2, impatto: 3, note: 'Art. 25-quinquiesdecies D.Lgs. 231/01 — area sensibile: subappalti a cascata e costi gonfiati' },
+  { categoria: 'Finanziario', descrizione: 'Dichiarazione fraudolenta mediante uso di fatture false per ridurre il carico fiscale', fonte: 'Interna', probabilita: 1, impatto: 3, note: 'Art. 25-quinquiesdecies D.Lgs. 231/01 — controllo rigoroso sulla catena documentale' },
+  { categoria: 'Finanziario', descrizione: 'Omessa dichiarazione o occultamento di documenti contabili relativi ai cantieri', fonte: 'Interna', probabilita: 1, impatto: 2, note: 'Art. 25-quinquiesdecies D.Lgs. 231/01 — tenuta corretta della contabilità di cantiere' },
+
+  // Art. 25-ter — Reati societari
+  { categoria: 'Normativo / Compliance', descrizione: 'Falso in bilancio o comunicazioni sociali infedeli nelle società del gruppo', fonte: 'Interna', probabilita: 1, impatto: 3, note: 'Art. 25-ter D.Lgs. 231/01 — area sensibile: valutazione immobili, avanzamento lavori, accantonamenti' },
+  { categoria: 'Normativo / Compliance', descrizione: 'Impedimento al controllo da parte del Collegio Sindacale o del Revisore', fonte: 'Interna', probabilita: 1, impatto: 2, note: 'Art. 25-ter D.Lgs. 231/01 — obbligo di trasparenza verso organi di controllo' },
+
+  // Art. 25-quater/quinquies — Criminalità organizzata e caporalato
+  { categoria: 'Operativo', descrizione: 'Caporalato e sfruttamento del lavoro nella gestione della manodopera di cantiere', fonte: 'Mista', probabilita: 2, impatto: 3, note: 'Art. 25-quinquies D.Lgs. 231/01 — area ad ALTA CRITICITÀ: subappalti manodopera, cooperative false' },
+  { categoria: 'Operativo', descrizione: 'Utilizzo di manodopera di imprese collegate alla criminalità organizzata nei subappalti', fonte: 'Esterna', probabilita: 1, impatto: 3, note: 'Art. 25-quater D.Lgs. 231/01 — verifica antimafia su tutti i subappaltatori' },
+  { categoria: 'Operativo', descrizione: 'Impiego di cittadini stranieri con soggiorno irregolare nei cantieri', fonte: 'Mista', probabilita: 2, impatto: 2, note: 'Art. 25-duodecies D.Lgs. 231/01 — obbligo verifica documenti su tutta la catena di subappalto' },
+
+  // Art. 24-bis — Reati informatici
+  { categoria: 'IT / Cyber', descrizione: 'Accesso abusivo ai sistemi informatici di committenti pubblici o concorrenti (gare telematiche)', fonte: 'Interna', probabilita: 1, impatto: 3, note: 'Art. 24-bis D.Lgs. 231/01 — area sensibile: portali e-procurement, sistemi BIM condivisi' },
+  { categoria: 'IT / Cyber', descrizione: 'Danneggiamento o alterazione di dati informatici di progetto o documentazione di gara', fonte: 'Interna', probabilita: 1, impatto: 2, note: 'Art. 24-bis D.Lgs. 231/01 — protezione integrità documentazione tecnica e amministrativa' },
+
+  // OdV e presidi 231
+  { categoria: 'Normativo / Compliance', descrizione: 'Assenza o inefficacia del Modello Organizzativo 231 e dell\'Organismo di Vigilanza (OdV)', fonte: 'Interna', probabilita: 2, impatto: 3, note: 'Rischio trasversale: senza MOG 231 efficace la società risponde penalmente per tutti i reati presupposto' },
+  { categoria: 'Normativo / Compliance', descrizione: 'Mancata formazione del personale sui contenuti del Modello 231 e del Codice Etico', fonte: 'Interna', probabilita: 2, impatto: 2, note: 'Requisito art. 6 D.Lgs. 231/01: la formazione differenziata è condizione di efficacia del modello' },
+  { categoria: 'Normativo / Compliance', descrizione: 'Canale di whistleblowing assente o non conforme al D.Lgs. 24/2023', fonte: 'Interna', probabilita: 2, impatto: 2, note: 'Obbligo dal 2023 per aziende con >50 dipendenti — sanzioni fino a 50.000 euro' },
+]
+
+export const RISCHI_PER_SETTORE_231 = {
+  'Edilizia': RISCHI_231_EDILIZIA,
 }

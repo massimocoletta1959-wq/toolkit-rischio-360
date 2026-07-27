@@ -65,6 +65,10 @@ function MembroModal({ membro, aziendaId, onSave, onClose }) {
       ruolo: ruoloFinale,
       azienda_id: aziendaId,
     }
+    // Collega automaticamente user_id se esiste un utente con questa email
+    const { data: utente } = await supabase.auth.admin?.getUserByEmail?.(form.email).catch(() => ({ data: null })) || { data: null }
+    if (utente?.user?.id) payload.user_id = utente.user.id
+
     const { error: err } = editing
       ? await supabase.from('membri').update(payload).eq('id', membro.id)
       : await supabase.from('membri').insert(payload)
