@@ -24,9 +24,11 @@ export default function App() {
   const [page, setPage]            = useState('cruscotto')
   const [showSetup, setShowSetup]  = useState(false)
 
-  // Leggi token invito dall'URL
+  // Leggi token invito dall'URL e salvalo in localStorage per sopravvivere al redirect
   const urlParams = new URLSearchParams(window.location.search)
-  const tokenInvito = urlParams.get('invito')
+  const tokenDaUrl = urlParams.get('invito')
+  if (tokenDaUrl) localStorage.setItem('token_invito', tokenDaUrl)
+  const tokenInvito = tokenDaUrl || localStorage.getItem('token_invito')
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -40,7 +42,10 @@ export default function App() {
         if (tokenInvito) await accettaInvito(session.user.id, tokenInvito)
         await loadDati(session.user.id)
         // Pulisci URL dopo aver processato l'invito
-        if (tokenInvito) window.history.replaceState({}, '', window.location.pathname)
+        if (tokenInvito) {
+          window.history.replaceState({}, '', window.location.pathname)
+          localStorage.removeItem('token_invito')
+        }
       } else {
         setProfilo(null); setAziende([]); setAziendaState(null)
       }
@@ -150,9 +155,19 @@ export default function App() {
   // Mostra login — se c'è token invito, lo gestiremo dopo il login
   if (!session) return <Login tokenInvito={tokenInvito} />
 
-  if (!profilo && !showSetup) return (
-    <Setup onDone={() => loadDati(session.user.id)} userId={session.user.id} userEmail={session.user.email} />
-  )
+  // Se c'è un token invito nell'URL e non c'è ancora il profilo,
+  // mostra un loader — accettaInvito creerà il profilo automaticamente
+  if (!profilo && !showSetup) {
+    if (tokenInvito) return (
+      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', gap: 16 }}>
+        <div className="spinner" />
+        <p style={{ color: '#1A3A5C', fontSize: 14 }}>Collegamento al portale in corso...</p>
+      </div>
+    )
+    return (
+      <Setup onDone={() => loadDati(session.user.id)} userId={session.user.id} userEmail={session.user.email} />
+    )
+  }
 
   if (showSetup) return (
     <Setup onDone={onNuovaAziendaDone} onAnnulla={() => setShowSetup(false)} userId={session.user.id} userEmail={session.user.email} nuovaAzienda={true} />
