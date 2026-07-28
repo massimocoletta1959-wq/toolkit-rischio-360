@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { RISCHI_DEFAULT, RISCHI_PER_SETTORE, RISCHI_231_EDILIZIA } from '../lib/constants'
+import { RISCHI_DEFAULT, RISCHI_PER_SETTORE, RISCHI_231_EDILIZIA, RISCHI_231_GENERICO } from '../lib/constants'
 
 const SETTORI = ['Manifatturiero','Servizi','Commercio','Edilizia','Sanità','Tecnologia','Agricoltura','Trasporti','Altro']
 const DIMENSIONI = ['Micro (< 10 dipendenti)','Piccola (10-49)','Media (50-249)','Grande (250+)']
@@ -17,8 +17,11 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
   const [scelta, setScelta]     = useState(null)
 
   const haSettore  = !!(RISCHI_PER_SETTORE[settore]?.length)
-  const ha231      = settore === 'Edilizia'
-  const num231     = ha231 ? RISCHI_231_EDILIZIA.length : 0
+  const ha231Edil  = settore === 'Edilizia'
+  const ha231      = true  // disponibile per tutti i settori
+  const rischi231  = ha231Edil ? RISCHI_231_EDILIZIA : RISCHI_231_GENERICO
+  const num231     = rischi231.length
+  const label231   = ha231Edil ? 'Edilizia (D.Lgs. 231/01)' : 'PMI Generiche (D.Lgs. 231/01)'
   const numStd     = RISCHI_DEFAULT.length
   const numSet     = RISCHI_PER_SETTORE[settore]?.length || 0
 
@@ -57,8 +60,8 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
     if (scelta === 'standard') lista = [...RISCHI_DEFAULT]
     if (scelta === 'settore')  lista = [...(RISCHI_PER_SETTORE[settore] || [])]
     if (scelta === 'tutti')    lista = [...RISCHI_DEFAULT, ...(RISCHI_PER_SETTORE[settore] || [])]
-    if (scelta === 'tutti231') lista = [...RISCHI_DEFAULT, ...(RISCHI_PER_SETTORE[settore] || []), ...(ha231 ? RISCHI_231_EDILIZIA : [])]
-    if (scelta === 'solo231')  lista = [...RISCHI_231_EDILIZIA]
+    if (scelta === 'tutti231') lista = [...RISCHI_DEFAULT, ...(RISCHI_PER_SETTORE[settore] || []), ...rischi231]
+    if (scelta === 'solo231')  lista = [...rischi231]
     if (lista.length > 0) {
       const payload = lista.map(r => ({ ...r, azienda_id: aziendaId }))
       const { error: err } = await supabase.from('rischi').insert(payload)
@@ -71,8 +74,8 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
   const preview = scelta === 'standard' ? RISCHI_DEFAULT
     : scelta === 'settore'  ? (RISCHI_PER_SETTORE[settore] || [])
     : scelta === 'tutti'    ? [...RISCHI_DEFAULT, ...(RISCHI_PER_SETTORE[settore] || [])]
-    : scelta === 'tutti231' ? [...RISCHI_DEFAULT, ...(RISCHI_PER_SETTORE[settore] || []), ...(ha231 ? RISCHI_231_EDILIZIA : [])]
-    : scelta === 'solo231'  ? RISCHI_231_EDILIZIA
+    : scelta === 'tutti231' ? [...RISCHI_DEFAULT, ...(RISCHI_PER_SETTORE[settore] || []), ...rischi231]
+    : scelta === 'solo231'  ? rischi231
     : []
 
   if (step === 2) return (
@@ -121,29 +124,25 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
             </div>
           )}
 
-          {ha231 && (
-            <div onClick={() => setScelta('solo231')} style={{ cursor: 'pointer', padding: '14px 16px', border: `2px solid ${scelta === 'solo231' ? '#856404' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'solo231' ? '#FEF9E7' : 'white' }}>
+          <div onClick={() => setScelta('solo231')} style={{ cursor: 'pointer', padding: '14px 16px', border: `2px solid ${scelta === 'solo231' ? '#856404' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'solo231' ? '#FEF9E7' : 'white' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontWeight: 600, color: '#856404', fontSize: 14 }}>⚖️ Solo Rischi 231 — D.Lgs. 231/2001</div>
-                  <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Reati presupposto specifici per il settore Edile (PA, sicurezza, ambiente, lavoro)</div>
+                  <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Reati presupposto per {label231} (PA, sicurezza, ambiente, lavoro, societario)</div>
                 </div>
                 <span style={{ fontSize: 12, fontWeight: 600, color: '#856404', background: '#FEF9E7', padding: '3px 10px', borderRadius: 20 }}>{num231} rischi</span>
               </div>
             </div>
-          )}
 
-          {ha231 && (
-            <div onClick={() => setScelta('tutti231')} style={{ cursor: 'pointer', padding: '14px 16px', border: `2px solid ${scelta === 'tutti231' ? '#856404' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'tutti231' ? '#FEF9E7' : 'white' }}>
+          <div onClick={() => setScelta('tutti231')} style={{ cursor: 'pointer', padding: '14px 16px', border: `2px solid ${scelta === 'tutti231' ? '#856404' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'tutti231' ? '#FEF9E7' : 'white' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontWeight: 600, color: '#856404', fontSize: 14 }}>🏆 Copertura completa — Standard + Settore + 231</div>
-                  <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Tutti i rischi: {numStd} standard + {numSet} edilizia + {num231} rischi D.Lgs. 231/01</div>
+                  <div style={{ fontWeight: 600, color: '#856404', fontSize: 14 }}>🏆 Copertura completa — Standard + {haSettore ? 'Settore + ' : ''}231</div>
+                  <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{numStd} standard{haSettore ? ` + ${numSet} settore` : ''} + {num231} rischi D.Lgs. 231/01</div>
                 </div>
                 <span style={{ fontSize: 12, fontWeight: 600, color: '#856404', background: '#FEF9E7', padding: '3px 10px', borderRadius: 20 }}>{numStd + numSet + num231} rischi</span>
               </div>
             </div>
-          )}
 
           <div onClick={() => setScelta('nessuno')} style={{ cursor: 'pointer', padding: '12px 16px', border: `2px solid ${scelta === 'nessuno' ? '#aaa' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'nessuno' ? '#F5F5F5' : 'white' }}>
             <div style={{ fontWeight: 500, color: '#888', fontSize: 13 }}>Parto da zero — inserirò i rischi manualmente</div>

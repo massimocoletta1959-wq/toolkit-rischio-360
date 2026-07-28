@@ -317,87 +317,155 @@ export const SUGGERIMENTI_AZIONI = {
 export function getSuggerimentoAzione(categoria, descrizione) {
   const desc = (descrizione || '').toLowerCase()
 
-  // ── Suggerimenti specifici per Rischi 231 ────────────────────────────────
+  // ── Suggerimenti specifici per descrizione esatta ────────────────────────
+
+  // IT / Cyber
+  if (desc.includes('ransomware'))
+    return 'Implementare soluzione EDR (Endpoint Detection & Response) su tutti i dispositivi aziendali. Attivare MFA obbligatorio su tutti gli accessi (VPN, email, gestionali, cloud). Predisporre un piano di risposta agli incidenti ransomware: procedura di isolamento, contatti CERT, comunicazione interna. Effettuare simulazioni di phishing semestrali. Testare il ripristino da backup almeno ogni trimestre verificando i tempi di recovery.'
+  if (desc.includes('violazione dei dati personali') || desc.includes('gdpr'))
+    return 'Eseguire un audit GDPR completo: mappatura di tutti i trattamenti (art. 30), verifica dei DPA con i fornitori, aggiornamento delle informative. Verificare la nomina del DPO (obbligatoria per alcune categorie). Implementare procedure di data breach: notifica al Garante entro 72 ore, comunicazione agli interessati se il rischio è elevato. Effettuare DPIA per i trattamenti ad alto rischio. Formare tutto il personale con modulo e-learning annuale.'
+  if (desc.includes('vulnerabilit') || desc.includes('software non aggiornato'))
+    return 'Inventariare tutti i software aziendali e definire una patch policy con cadenza mensile per patch ordinarie e 48 ore per patch critiche. Attivare aggiornamenti automatici dove possibile. Eseguire vulnerability scan semestrale con strumento dedicato (es. Tenable, OpenVAS). Rimuovere o isolare i sistemi che non ricevono più aggiornamenti dal produttore (end-of-life). Tenere un registro delle vulnerabilità aperte con priorità e responsabile.'
+  if (desc.includes('backup'))
+    return 'Implementare la regola 3-2-1: 3 copie dei dati, su 2 supporti diversi, 1 offsite o cloud. Automatizzare i backup giornalieri con verifica di integrità automatica (hash check). Testare il ripristino completo almeno ogni trimestre, documentando i tempi effettivi di recovery. Definire RTO e RPO per ogni sistema critico. Conservare i backup offline (air-gapped) per proteggersi dal ransomware.'
+  if (desc.includes('provider') || desc.includes('hosting') || desc.includes('cloud'))
+    return 'Definire una strategia di resilienza cloud: valutare un provider secondario (multi-cloud) o una soluzione hot-standby on-premise per i servizi critici. Documentare RTO e RPO negoziati contrattualmente con il provider. Inserire nel contratto SLA con penali per downtime. Testare il failover almeno una volta l\'anno con verbale. Mantenere una copia locale dei dati critici aggiornata.'
+
+  // Strategico
+  if (desc.includes('cliente chiave') || desc.includes('>20% fatturato'))
+    return 'Avviare un piano di diversificazione del portafoglio clienti con obiettivo di ridurre la concentrazione sotto il 15% per singolo cliente entro 12 mesi. Implementare QBR (Quarterly Business Review) sistematici con i top 5 clienti per rafforzare la relazione. Sviluppare nuovi mercati o segmenti adiacenti. Monitorare mensilmente la concentrazione del fatturato come KPI strategico. Inserire in bilancio un accantonamento per rischio cliente.'
+  if (desc.includes('leadership') || desc.includes('figure chiave'))
+    return 'Avviare un piano di succession planning: identificare le 5-10 posizioni chiave, valutare i potenziali successori interni, definire piani di sviluppo individuali. Designare un backup operativo per ogni ruolo C-level. Inserire clausole di retention (vesting, bonus pluriennali) nei contratti dei manager strategici. Documentare le conoscenze critiche in wiki interna. Effettuare revisione annuale del piano di successione.'
+
+  // Operativo
+  if (desc.includes('macchinari') || desc.includes('infrastrutture critiche'))
+    return 'Implementare un piano di manutenzione preventiva programmata per tutti i macchinari critici con registro degli interventi. Stipulare contratti di manutenzione con SLA definiti per i macchinari più critici. Identificare i macchinari senza ridondanza e valutare un backup o un contratto di noleggio di emergenza. Effettuare analisi FMEA (Failure Mode and Effects Analysis) per i processi produttivi critici.'
+  if (desc.includes('dipendenza da un singolo fornitore') || desc.includes('unico fornitore'))
+    return 'Mappare tutti i fornitori critici (quelli la cui interruzione blocca la produzione). Per ognuno identificare almeno un fornitore alternativo qualificato e mantenere un rapporto attivo. Diversificare gli acquisti: massimo 60% da un singolo fornitore per le categorie critiche. Mantenere uno stock di sicurezza adeguato per i materiali a lungo lead time. Inserire clausole contrattuali di continuità fornitura.'
+  if (desc.includes('carenza di personale qualificato'))
+    return 'Attivare partnership con ITS, università e agenzie per il lavoro per pipeline di talenti. Strutturare un piano di formazione interna e upskilling con budget dedicato. Rivedere la job architecture e i livelli retributivi rispetto al mercato (benchmark HR annuale con dati Assinform/Hay Group). Implementare un programma di employee retention: survey di clima, piani di carriera, benefit competitivi. Monitorare il turnover mensile come KPI HR.'
+  if (desc.includes('ordini') || desc.includes('contratti'))
+    return 'Implementare un sistema di gestione dei contratti con alert automatici sulle scadenze. Introdurre una checklist di revisione contrattuale prima della firma (4-eyes principle). Formare il personale commerciale e operativo sulla corretta gestione degli ordini. Effettuare riconciliazione mensile tra ordini ricevuti, consegnati e fatturati. Conservare tutta la documentazione contrattuale in un repository centralizzato.'
+  if (desc.includes('know-how') || desc.includes('turnover'))
+    return 'Avviare un programma di knowledge management: documentare i processi chiave in wiki interna, creare video tutorial per le attività critiche, istituire affiancamenti strutturati per ogni figura critica (almeno 3 mesi). Costruire una matrice delle competenze per identificare i punti di singola dipendenza. Monitorare il turnover mensile e condurre exit interview sistematiche. Inserire obiettivi di knowledge sharing nella valutazione delle performance.'
+  if (desc.includes('logistica') || desc.includes('consegna'))
+    return 'Mappare la catena logistica e identificare i nodi critici senza ridondanza. Qualificare almeno 2 vettori alternativi per le rotte principali. Mantenere uno stock di sicurezza per i prodotti a maggiore rotazione. Inserire nei contratti logistici SLA con penali per ritardi. Definire un piano di emergenza logistica con procedure di rerouting. Monitorare le performance dei vettori con KPI mensili.'
+
+  // Reputazionale
+  if (desc.includes('comportamento scorretto') || desc.includes('dipendente'))
+    return 'Adottare un Codice Etico con norme di comportamento chiare e diffonderlo a tutto il personale con firma per ricevuta. Istituire un canale di segnalazione anonima (whistleblowing). Definire un processo disciplinare trasparente e proporzionato. Formare i responsabili HR sulla gestione dei casi di comportamento scorretto. Effettuare screening reputazionale per le posizioni di responsabilità.'
+  if (desc.includes('comunicazione di crisi'))
+    return 'Redigere un Crisis Communication Plan: identificare il portavoce ufficiale, preparare messaggi chiave per gli scenari più probabili (infortuni, data breach, controversie contrattuali), definire i canali di comunicazione e le approvazioni necessarie. Effettuare un tabletop exercise annuale con simulazione di crisi. Monitorare la reputazione online con strumenti di social listening. Aggiornare il piano ogni anno.'
+  if (desc.includes('certificazioni') || desc.includes('riconoscimenti'))
+    return 'Mappare tutte le certificazioni aziendali con scadenze e responsabili. Impostare alert automatici 90 e 30 giorni prima di ogni scadenza. Assegnare un responsabile certificazioni con delega formale. Effettuare audit interni di pre-certificazione 3 mesi prima del rinnovo. Valutare le certificazioni come leva competitiva e comunicarle nel materiale commerciale.'
+  if (desc.includes('controversie pubbliche') || desc.includes('stakeholder'))
+    return 'Mappare gli stakeholder rilevanti e i potenziali temi di controversia. Istituire un processo di stakeholder engagement proattivo: incontri periodici, canali di comunicazione dedicati, report di sostenibilità. Definire una procedura di gestione delle controversie pubbliche con escalation verso la direzione. Formare i responsabili sulla comunicazione con stakeholder critici.'
+  if (desc.includes('fornitori o partner') || desc.includes('reputazionali da fornitori'))
+    return 'Introdurre un processo di due diligence reputazionale sui fornitori strategici: verifica online, referenze di mercato, visita presso la sede. Inserire nei contratti clausole etiche (anti-corruzione, rispetto dei diritti del lavoro, compliance ambientale) con diritto di risoluzione in caso di violazioni. Monitorare la reputazione dei fornitori principali con alert online. Effettuare audit fornitori annuali per quelli critici.'
+
+  // Normativo / Compliance
+  if (desc.includes('non conformita gdpr') || desc.includes('gdpr / privacy'))
+    return 'Eseguire un audit GDPR completo: mappare tutti i trattamenti nel registro ex art. 30, verificare la base giuridica per ognuno, aggiornare le informative, rivedere i DPA con fornitori e partner. Formare tutto il personale con modulo e-learning annuale con test di verifica. Nominare o verificare il DPO. Implementare una procedura di gestione dei data breach con notifica al Garante entro 72 ore. Effettuare DPIA per i nuovi trattamenti ad alto rischio.'
+  if (desc.includes('81/08') || desc.includes('sicurezza sul lavoro'))
+    return 'Aggiornare il DVR e verificare tutte le scadenze di formazione obbligatoria (preposti, addetti antincendio, primo soccorso). Pianificare un sopralluogo con l\'RSPP entro 30 giorni. Verificare la disponibilità e l\'adeguatezza di tutti i DPI in uso. Aggiornare il registro infortuni e dei quasi-infortuni. Effettuare simulazioni di emergenza semestrali con verbale.'
+  if (desc.includes('fiscale') || desc.includes('tributaria'))
+    return 'Effettuare una revisione fiscale preventiva annuale con il commercialista. Verificare il rispetto di tutti gli adempimenti periodici (IVA, F24, dichiarazioni). Implementare un calendario degli adempimenti con alert automatici. Valutare un sistema di controllo interno sulla contabilità (internal audit). Conservare tutta la documentazione fiscale per almeno 10 anni.'
+
+  // Finanziario
+  if (desc.includes('liquidit'))
+    return 'Implementare un cash flow forecast settimanale a 13 settimane aggiornato ogni lunedì. Negoziare una linea di credito revolving di emergenza con la banca principale (anche se non utilizzata). Definire soglie di alert sulla liquidità disponibile (es. < 3 mensilità di costi fissi) e un protocollo di escalation immediata al CFO e CEO. Accelerare i tempi di incasso con incentivi per pagamento anticipato e gestione proattiva dei crediti scaduti.'
+  if (desc.includes('insolvenza di clienti'))
+    return 'Implementare un sistema di credit scoring per tutti i clienti con esposizione superiore al 5% del fatturato. Attivare un\'assicurazione crediti (SACE, Euler Hermes, Atradius) per i clienti principali. Monitorare mensilmente la puntualità dei pagamenti e intervenire entro 15 giorni dallo scaduto. Inserire nei contratti clausole di riserva di proprietà e fideiussioni per commesse rilevanti. Valutare il factoring pro-soluto per le fatture verso la PA.'
+  if (desc.includes('credito bancario') || desc.includes('accesso al credito'))
+    return 'Predisporre e mantenere aggiornato un dossier finanziario (bilanci, business plan triennale, proiezioni di cash flow) pronto per presentazioni agli istituti di credito. Diversificare le fonti di finanziamento: esplorare Confidi di settore, finanza agevolata (SIMEST, SACE), factoring, minibond. Mantenere relazioni proattive con almeno 2 istituti di credito. Monitorare il rating bancario e intervenire per migliorarlo prima di necessità urgenti.'
+
+  // Terze Parti
+  if (desc.includes('fallimento di un fornitore strategico'))
+    return 'Identificare i fornitori strategici (quelli la cui interruzione blocca l\'operatività) e qualificare per ognuno un fornitore alternativo. Richiedere ai fornitori critici bilanci e situazione finanziaria almeno annualmente. Monitorare i segnali di difficoltà (ritardi, riduzione qualità, richieste di anticipi). Inserire nei contratti clausole di continuità del servizio in caso di procedure concorsuali. Valutare l\'opportunità di contratti pluriennali con garanzie.'
+  if (desc.includes('mancato rispetto contrattuale') || desc.includes('partner'))
+    return 'Rafforzare la fase di due diligence prima di stipulare contratti con nuovi partner: verifica referenze, sopralluogo, analisi finanziaria. Inserire nei contratti SLA misurabili con penali proporzionate, clausole risolutive per inadempimenti gravi e diritto di audit. Monitorare le performance con KPI mensili. Prevedere un processo strutturato di contestazione e escalation prima di arrivare al contenzioso.'
+
+  // Continuità Operativa
+  if (desc.includes('assenza prolungata') || desc.includes('malattia, dimissioni'))
+    return 'Identificare le posizioni critiche (quelle la cui assenza blocca processi chiave) e designare un sostituto operativo per ognuna. Documentare i processi critici in procedure scritte. Garantire la copertura assicurativa (polizza key man) per le figure indispensabili. Effettuare rotazione delle responsabilità per ridurre le dipendenze da singole persone. Testare i piani di sostituzione almeno una volta l\'anno.'
+  if (desc.includes('rete internet') || desc.includes('telecomunicazioni'))
+    return 'Dotarsi di una connessione internet di backup su tecnologia diversa (es. fibra principale + 4G/5G backup) con failover automatico. Verificare che i sistemi critici possano operare in modalità offline o con banda ridotta. Contrattualizzare SLA con il provider con penali per downtime. Effettuare un test di failover semestrale. Identificare le attività che richiedono connessione continua e prioritizzarle nel piano di ripristino.'
+  if (desc.includes('blackout') || desc.includes('elettrico'))
+    return 'Installare un UPS (Uninterruptible Power Supply) per i sistemi IT critici dimensionato per almeno 4 ore di autonomia. Valutare un gruppo elettrogeno per continuità oltre le 4 ore. Testare il sistema di backup elettrico ogni 6 mesi con verbale. Identificare i processi che possono continuare senza corrente e quelli che richiedono arresto controllato. Verificare i contratti con il fornitore di energia per gli SLA.'
+  if (desc.includes('piani di continuita') || desc.includes('BCP'))
+    return 'Redigere un Business Continuity Plan (BCP) strutturato: (1) analisi d\'impatto sui processi critici (BIA), (2) identificazione delle minacce principali, (3) definizione delle strategie di risposta, (4) procedure operative di emergenza, (5) piano di comunicazione interna ed esterna, (6) piano di test annuale. Nominare un BCP Manager con delega formale. Condurre un drill annuale e aggiornare il piano in base ai risultati. Riferimento: ISO 22301.'
+  if (desc.includes('pandemia') || desc.includes('assenza massiva'))
+    return 'Definire un protocollo di smart working esteso: lista delle posizioni che possono lavorare da remoto, dotazione tecnologica adeguata, regole di sicurezza informatica per il lavoro da casa. Creare un team di gestione delle emergenze sanitarie. Identificare le attività che richiedono presenza fisica e le relative misure di protezione. Mantenere scorte di DPI. Testare la capacità di operare in modalità ridotta con una simulazione annuale.'
+
+  // ── Edilizia specifica ───────────────────────────────────────────────────
+  if (desc.includes('bim') || desc.includes('gestionali di cantiere'))
+    return 'Implementare policy di sicurezza specifica per i sistemi BIM e gestionali di cantiere: backup giornaliero dei modelli BIM, accesso con credenziali personali (mai condivise), log di ogni modifica, crittografia dei file di progetto in transito. Definire i diritti di accesso per ogni figura professionale. Prevedere una copia offline aggiornata settimanalmente. Inserire clausole di riservatezza nei contratti con studi esterni che accedono ai modelli.'
+  if (desc.includes('furto o perdita di dati di progetto'))
+    return 'Classificare i dati di progetto per livello di riservatezza (gare in corso = massima riservatezza). Cifrare tutti i file relativi a gare pubbliche e progetti riservati. Vietare l\'uso di dispositivi personali per dati di progetto. Implementare DLP (Data Loss Prevention) per bloccare l\'invio di file riservati via email non aziendale. Prevedere NDA con tutti i collaboratori esterni. Effettuare audit semestrale sugli accessi ai file di progetto.'
+  if (desc.includes('fluttuazione della domanda') || desc.includes('cicli edilizi'))
+    return 'Diversificare il portafoglio lavori per tipologia (privato, pubblico, manutenzione, nuova costruzione) e per area geografica per ridurre l\'esposizione ai cicli settoriali. Monitorare gli indicatori anticipatori del mercato edile (permessi di costruire, bandi pubblici, indici di fiducia delle imprese). Mantenere una struttura di costi flessibile (subappalto vs personale diretto). Costruire una pipeline di commesse con copertura minima a 18 mesi.'
+  if (desc.includes('appalto pubblico') || desc.includes('singolo grande appalto'))
+    return 'Limitare la dipendenza da un singolo committente pubblico al 40% del portafoglio ordini. Diversificare per stazione appaltante (Comuni, ANAS, RFI, privati). Monitorare la solidità finanziaria dei committenti pubblici prima di partecipare a gare rilevanti. Inserire nei contratti clausole di revisione prezzi (price revision) per commesse pluriennali. Verificare la disponibilità finanziaria effettiva del committente prima dell\'avvio lavori.'
+  if (desc.includes('infortunio grave') || desc.includes('caduta dall'))
+    return 'Implementare la procedura Zero Cadute: check-list obbligatoria giornaliera per ponteggi, trabattelli e aperture nel vuoto; verifica DPI anticaduta ad ogni inizio turno; stop immediato dei lavori in quota in caso di vento > 50 km/h o pioggia intensa. Effettuare sopralluogo di sicurezza settimanale con verbale firmato dal preposto. Installare sistemi di videosorveglianza nelle aree più rischiose. Segnalare e analizzare ogni quasi-infortunio entro 24 ore.'
+  if (desc.includes('cronoprogramma') || desc.includes('ritardi di cantiere'))
+    return 'Implementare una gestione del cantiere con software dedicato (es. MS Project, Primavera) con aggiornamento settimanale del cronoprogramma. Identificare il percorso critico e monitorarlo quotidianamente. Istituire riunioni di avanzamento settimanali con verbale. Definire un sistema di early warning: alert automatico quando il ritardo supera il 10% su attività critiche. Prevedere contrattualmente penali e bonus per rispetto dei tempi con il committente.'
+  if (desc.includes('mezzi e macchinari') || desc.includes('gru') || desc.includes('escavatori'))
+    return 'Implementare un registro di manutenzione per ogni mezzo con check-list pre-utilizzo giornaliera firmata dall\'operatore. Verificare la formazione e l\'abilitazione specifica per ogni mezzo (patentino gru, abilitazione escavatore). Effettuare verifiche periodiche obbligatorie (ISPESL/ASL) nei tempi previsti. Vietare l\'utilizzo di mezzi senza manutenzione in regola. Prevedere un contratto di manutenzione con SLA per i mezzi critici.'
+  if (desc.includes('furto di materiali') || desc.includes('attrezzature da cantiere'))
+    return 'Installare sistema di videosorveglianza perimetrale con registrazione H24 e alert in caso di movimento notturno. Inventariare e contrassegnare (incisione, RFID) tutti i macchinari e le attrezzature di valore. Stipulare polizza assicurativa All-Risk di cantiere specifica. Recinzione adeguata del cantiere con chiusura sicura. Valutare guardiania notturna per cantieri in zone ad alto rischio. Conservare le ricevute di acquisto per la denuncia e il rimborso assicurativo.'
+  if (desc.includes('condizioni meteo') || desc.includes('bloccano i lavori'))
+    return 'Inserire nei contratti con i committenti clausole meteo che escludano i giorni di sospensione per maltempo dal computo dei giorni lavorativi (clausola intemperie). Pianificare le attività in quota e all\'aperto nei periodi meteorologicamente favorevoli. Monitorare le previsioni meteo a 7 giorni per la pianificazione operativa. Prevedere attività alternative al coperto (lavori interni, prefabbricazione) da attivare in caso di blocco. Verificare la copertura assicurativa per danni da maltempo.'
+  if (desc.includes('manodopera specializzata') || desc.includes('gruisti'))
+    return 'Costruire una rete di subappaltatori specializzati qualificati e mantenere relazioni anche nei periodi di bassa attività. Investire in programmi di formazione interna per le figure più carenti sul mercato. Anticipare le assunzioni rispetto all\'avvio dei cantieri (lead time medio 2-3 mesi). Collaborare con le associazioni di categoria per segnalazioni di personale disponibile. Valutare la formazione tramite ITS e apprendistato per figure junior.'
+  if (desc.includes('difetti costruttivi') || desc.includes('vizi'))
+    return 'Implementare un sistema di qualità di cantiere (ISO 9001 o equivalente): check-list di controllo qualità per ogni fase lavorativa, verbali di accettazione materiali, test e collaudi intermedi documentati. Nominare un Direttore Tecnico di Cantiere con poteri di stop ai lavori in caso di non conformità. Conservare tutta la documentazione di cantiere per 10 anni (termine prescrizione garanzia decennale). Stipulare polizza decennale postuma per opere strutturali. Effettuare ispezioni a campione durante le fasi nascoste.'
+  if (desc.includes('eco mediatica') || desc.includes('infortunio') and desc.includes('mediatica'))
+    return 'Preparare un piano di comunicazione di crisi specifico per gli infortuni: portavoce designato (non il responsabile di cantiere), messaggio di condoglianze/vicinanza alla famiglia prima di qualsiasi altra comunicazione, nessuna dichiarazione sulle cause prima dell\'indagine dell\'ispettorato. Definire la procedura di notifica interna (chi avvisa chi e in quanto tempo). Monitorare i social media nelle ore successive. Prepararsi a comunicare le misure correttive adottate.'
+  if (desc.includes('contestazioni pubbliche') || desc.includes('rumore') || desc.includes('polvere'))
+    return 'Prima dell\'avvio del cantiere effettuare una riunione informativa con i residenti e le associazioni di zona. Affliggere all\'esterno del cantiere il calendario previsto delle lavorazioni più rumorose. Rispettare le fasce orarie comunali per i lavori rumorosi. Installare sistemi di abbattimento polveri (nebulizzatori, teloni). Designare un referente del cantiere per le segnalazioni dei cittadini con risposta garantita entro 24 ore. Monitorare i livelli di rumore e vibrazione nelle fasi critiche.'
+  if (desc.includes('contenziosi con il committente'))
+    return 'Tenere aggiornato il giornale dei lavori con annotazione di ogni evento rilevante (meteo, varianti, ordini verbali). Formalizzare per iscritto (PEC) ogni variante, riserva o contestazione entro i termini contrattuali. Non eseguire mai lavori in variante senza ordine scritto del committente. Avvalersi di un legale specializzato in contratti d\'appalto per la redazione dei contratti. Valutare clausole ADR (mediazione, arbitrato) per evitare contenziosi lunghi e costosi.'
+  if (desc.includes('violazione d.lgs 81') || desc.includes('sicurezza nei cantieri'))
+    return 'Effettuare un audit di sicurezza completo di tutti i cantieri attivi entro 30 giorni. Verificare la validità di tutti i documenti obbligatori (DVR, POS, PSC, PIMUS per ponteggi). Controllare le scadenze di formazione obbligatoria di tutto il personale. Nominare i preposti alla sicurezza per ogni cantiere con nomina scritta e formazione specifica. Istituire un sistema di segnalazione anonima dei rischi di sicurezza.'
+  if (desc.includes('normative urbanistiche') || desc.includes('permessi a costruire'))
+    return 'Prima di ogni intervento verificare la conformità urbanistica con il professionista incaricato. Conservare copia di tutte le autorizzazioni edilizie nel fascicolo di cantiere. Aggiornare i permessi in caso di varianti significative prima di procedere. Effettuare sopralluogo con il tecnico comunale nei casi dubbi. Monitorare l\'iter dei permessi con alert sulle scadenze. Prevedere in offerta i costi e i tempi per eventuali varianti in corso d\'opera.'
+  if (desc.includes('durc') || desc.includes('codice dei contratti'))
+    return 'Verificare il DURC in tempo reale prima di ogni pagamento ai subappaltatori (non accettare DURC cartacei, sempre verifica online su portale INPS/INAIL). Conservare evidenza delle verifiche. Verificare l\'iscrizione alla CCIAA e l\'oggetto sociale del subappaltatore. Per contratti pubblici verificare la conformità al Codice dei Contratti (D.Lgs. 36/2023): qualificazione SOA, subappalto nei limiti di legge, tracciabilità pagamenti L. 136/2010.'
+  if (desc.includes('lavoro irregolare') || desc.includes('subappalto non autorizzato'))
+    return 'Istituire un sistema di controllo della regolarità del lavoro: lista nominativa obbligatoria di tutti i lavoratori presenti in cantiere con documento d\'identità e contratto di lavoro. Verificare che ogni subappalto sia autorizzato dal committente e notificato alla Cassa Edile. Effettuare verifica documentale mensile su tutti i subappaltatori. Formare il responsabile di cantiere sulla responsabilità solidale del committente in caso di irregolarità del subappaltatore.'
+  if (desc.includes('sal non pagati') || desc.includes('liquidit') and desc.includes('committente'))
+    return 'Inserire nei contratti con la PA e con i privati clausole di pagamento SAL con scadenze certe e interessi di mora ex D.Lgs. 231/2002. Monitorare i crediti verso la PA e attivare le procedure di sollecito/diffida entro 30 giorni dallo scaduto. Valutare il factoring dei crediti verso la PA (cessione del credito). Prevedere in piano finanziario la copertura di almeno 3 mesi di costi fissi senza incassi. Inserire in contratto clausole di sospensione lavori in caso di SAL non pagati oltre 60 giorni.'
+  if (desc.includes('costo dei materiali') || desc.includes('acciaio') || desc.includes('cemento'))
+    return 'Inserire in tutti i contratti pluriennali una clausola di revisione prezzi agganciata agli indici DEI o ISTAT delle costruzioni. Per commesse brevi, effettuare acquisti anticipati dei materiali principali non appena aggiudicata la commessa. Diversificare i fornitori per le materie prime critiche. Monitorare mensilmente i prezzi di acciaio, cemento, energia e materie plastiche. Valutare strumenti di hedging per i materiali con mercato finanziario (es. acciaio).'
+  if (desc.includes('incentivi fiscali') || desc.includes('superbonus') || desc.includes('ecobonus'))
+    return 'Monitorare costantemente l\'evoluzione normativa degli incentivi fiscali (Superbonus, Ecobonus, Sismabonus) tramite circolari Agenzia delle Entrate e Enea. Non avviare lavori senza asseverazione tecnica preliminare. Inserire nei contratti con i clienti finali clausole di adeguamento in caso di modifica normativa e di restituzione degli acconti in caso di decadenza dell\'incentivo. Diversificare il portafoglio tra lavori incentivati e non.'
+  if (desc.includes('subappaltatore') and (desc.includes('fallimento') or desc.includes('inadempienza')))
+    return 'Prima di ogni subappalto verificare la solidità finanziaria del subappaltatore: visura CCIAA, bilancio degli ultimi 2 anni, DURC, referenze di cantieri analoghi. Non anticipare più del 20% dell\'importo contrattuale. Inserire nel contratto clausola di risoluzione per inadempimento con preavviso di 10 giorni e liquidazione dei lavori eseguiti. Prevedere un subappaltatore alternativo qualificato per le lavorazioni più critiche. Effettuare SAL parziali mensili per limitare l\'esposizione.'
+  if (desc.includes('fornitura di materiali') || desc.includes('ritardi nella fornitura'))
+    return 'Diversificare i fornitori per le categorie di materiali più critiche (almeno 2 fornitori qualificati per categoria). Anticipare gli ordini di almeno 4-6 settimane per i materiali con lungo lead time. Inserire nei contratti di fornitura penali per ritardi e diritto di approvvigionamento alternativo a spese del fornitore inadempiente. Monitorare settimanalmente lo stato degli ordini in corso. Mantenere scorte di sicurezza per i materiali più utilizzati.'
+  if (desc.includes('comportamento scorretto') and desc.includes('subappaltatore'))
+    return 'Adottare un codice di condotta per i fornitori (Supplier Code of Conduct) che includa requisiti etici, di sicurezza e ambientali. Effettuare audit periodici sui subappaltatori strategici (almeno annuali). Inserire nel contratto il diritto di risoluzione immediata per comportamenti illeciti del subappaltatore. Richiedere ai subappaltatori di aderire al codice etico aziendale con firma. Prevedere una valutazione della condotta del subappaltatore alla chiusura di ogni commessa.'
+  if (desc.includes('sequestro del cantiere'))
+    return 'Istituire un sistema di controllo documentale preventivo: check-list mensile di tutti i documenti obbligatori di cantiere (autorizzazioni, DVR, POS, DURC, notifica preliminare). Nominare un responsabile della conformità di cantiere con potere di bloccare i lavori in caso di irregolarità. Prevedere un piano di risposta al sequestro: legale di riferimento reperibile H24, procedura di comunicazione al committente, piano di ripresa lavori. Effettuare simulazione annuale di ispezione ispettorato.'
+  if (desc.includes('danni a strutture') || desc.includes('danni a terzi'))
+    return 'Prima dell\'avvio del cantiere effettuare un rilievo fotografico e video documentato di tutti gli immobili e le infrastrutture adiacenti. Stipulare una polizza RCT/RCO (Responsabilità Civile Terzi/Operai) adeguata per importo e tipologia dei lavori. Installare sistemi di monitoraggio vibrazioni e cedimenti per cantieri vicini a strutture sensibili. Definire le soglie di allerta e le procedure di intervento. Informare preventivamente i proprietari degli immobili adiacenti.'
+
+  // ── Suggerimenti per categorie 231 (per rischi inseriti manualmente) ─────
   if (categoria && categoria.includes('231')) {
-
-    // PA e Anticorruzione
-    if (desc.includes('permessi di costruire') || desc.includes('concessioni edilizie'))
-      return 'Adottare una Procedura Gestione Rapporti con la PA (PGRPA): registro obbligatorio di ogni contatto con funzionari pubblici (data, oggetto, persone presenti), doppia firma per l\'invio di pratiche edilizie, divieto assoluto di omaggi o utilità. Inserire una clausola anticorruzione standard in tutti i contratti con professionisti e intermediari che operano verso enti pubblici. Effettuare formazione annuale specifica sul reato di corruzione per i tecnici e i responsabili di cantiere.'
-    if (desc.includes('turbata') || desc.includes('gare di appalto'))
-      return 'Istituire una procedura interna per la partecipazione alle gare pubbliche: separare il team di preparazione dell\'offerta dalla direzione aziendale, vietare qualsiasi contatto informale con RUP o commissioni di gara al di fuori dei canali ufficiali, documentare tutte le fonti delle informazioni usate. Prevedere un legale interno o esterno che validi l\'offerta. Conservare per 10 anni tutta la documentazione di gara.'
-    if (desc.includes('superbonus') || desc.includes('erogazioni pubbliche') || desc.includes('incentivi'))
-      return 'Predisporre una checklist di verifica dei requisiti tecnici e soggettivi prima di ogni domanda di incentivo (Superbonus, PNRR, bandi regionali). Designare un responsabile interno per i rapporti con gli enti erogatori con delega scritta. Conservare tutta la documentazione tecnica e le comunicazioni ufficiali. Effettuare un audit interno trimestrale sulle pratiche in corso. Prevedere clausole di restituzione nei contratti con i clienti finali.'
-    if (desc.includes('perizie') || desc.includes('pubbliche forniture'))
-      return 'Implementare un sistema di controllo qualità sulle perizie e certificazioni destinate alla PA: revisione obbligatoria da parte di un tecnico indipendente prima della trasmissione, registro delle perizie emesse con firma del responsabile. Vietare pressioni sui tecnici certificatori. Prevedere sanzioni disciplinari interne per falsificazioni documentali.'
-    if (desc.includes('induzione') || desc.includes('concussione') || desc.includes('autorizzazioni urbanistiche'))
-      return 'Formare i responsabili tecnici a riconoscere e gestire situazioni di pressione da parte di funzionari pubblici. Predisporre un canale di segnalazione riservato (whistleblowing) per episodi di richieste improprie. Documentare immediatamente ogni richiesta anomala ricevuta da funzionari pubblici e comunicarla all\'OdV. Prevedere una procedura di escalation immediata verso la direzione aziendale e il legale.'
-
-    // Sicurezza sul lavoro
-    if (desc.includes('omicidio colposo') || desc.includes('lesioni gravi') || desc.includes('antinfortunistiche'))
-      return 'Certificare il sistema di gestione della sicurezza ISO 45001. Nominare RSPP con esperienza specifica in edilizia e CSE qualificato per ogni cantiere con più imprese. Introdurre la stop-work authority: chiunque può bloccare i lavori per pericolo imminente senza subire conseguenze. Effettuare sopralluoghi mensili documentati con verbale firmato. Inserire i KPI di sicurezza (indice di frequenza, gravità) nella valutazione annuale dei responsabili di cantiere.'
-    if (desc.includes('DVR') || desc.includes('valutazione dei rischi'))
-      return 'Aggiornare il DVR entro 30 giorni dall\'apertura di ogni nuovo cantiere o variante significativa. Predisporre il POS (Piano Operativo Sicurezza) specifico per ogni subappaltatore prima dell\'inizio lavori. Effettuare audit interno mensile sulla corretta applicazione delle misure: check-list DPI, ponteggi, scavi, impianti elettrici. Conservare verbali firmati di tutte le verifiche. Nominare un preposto alla sicurezza per ogni fronte di lavoro.'
-    if (desc.includes('CSE') || desc.includes('Coordinatore per la Sicurezza'))
-      return 'Prima dell\'avvio di qualsiasi cantiere con più di un\'impresa nominare formalmente il CSE con contratto scritto. Verificare l\'iscrizione all\'albo e i crediti formativi aggiornati. Imporre riunioni di coordinamento documentate almeno ogni 2 settimane. Il CSE deve effettuare sopralluoghi a sorpresa e avere potere di sospensione lavori. Conservare il PSC aggiornato e il fascicolo del fabbricato firmato dal CSE a ogni variante.'
-    if (desc.includes('subappaltatrici') || desc.includes('coordinamento sicurezza'))
-      return 'Prima di ogni subappalto verificare obbligatoriamente: DURC in tempo reale, iscrizione CCIAA, DVR del subappaltatore, lista nominativa lavoratori con attestati di formazione sicurezza aggiornati. Inserire nel contratto di subappalto clausole di responsabilità solidale e di risoluzione immediata per gravi violazioni sicurezza. Effettuare sopralluoghi a sorpresa sui lavoratori del subappaltatore almeno una volta al mese. Documentare ogni verifica con verbale firmato.'
-
-    // Ambiente
-    if (desc.includes('rifiuti speciali') || desc.includes('eternit') || desc.includes('amianto'))
-      return 'Per ogni cantiere predisporre obbligatoriamente: classificazione CER di tutti i rifiuti prodotti, formulari di identificazione rifiuti (FIR) per ogni trasporto, registro di carico/scarico aggiornato. Qualificare preventivamente tutti i trasportatori (iscrizione Albo Gestori Ambientali, categoria e classe adeguate). Se presente amianto, nominare un responsabile amianto certificato e redigere il Piano di Lavoro ex D.Lgs. 81/08 art. 256. Effettuare audit documentale trimestrale sulla corretta tenuta dei registri.'
-    if (desc.includes('terre e rocce') || desc.includes('DPR 120/2017'))
-      return 'Prima dell\'avvio scavi redigere il Piano di Utilizzo (PdU) ai sensi del DPR 120/2017, con caratterizzazione chimica del terreno (almeno 1 campione ogni 5.000 m³). Tracciare ogni movimento di materiale con DDT specifici e documentazione analitica. Se le terre non rispettano le CSC del sito di destinazione, gestirle come rifiuto (codice CER 17 05 04). Conservare tutta la documentazione per almeno 5 anni. Nominare un geologo responsabile del Piano di Utilizzo.'
-    if (desc.includes('traffico illecito') || desc.includes('miscelazione'))
-      return 'Vietare contrattualmente e proceduralmente qualsiasi miscelazione di rifiuti di diversa classificazione CER. Verificare l\'iscrizione all\'Albo Gestori Ambientali di TUTTI i trasportatori per categoria e classe specifiche. Effettuare audit a sorpresa sulle aree di stoccaggio temporaneo almeno ogni 2 mesi. Inserire nei contratti con i subappaltatori clausole di responsabilità per gestione illecita dei rifiuti con risoluzione immediata. Formare il responsabile di cantiere sul reato di traffico illecito (art. 259 D.Lgs. 152/06).'
-    if (desc.includes('inquinamento ambientale') || desc.includes('acque, suolo'))
-      return 'Prima dell\'avvio cantieri vicino a corsi d\'acqua, falde o aree protette effettuare una valutazione di impatto ambientale preliminare. Installare barriere di contenimento per acque di lavaggio cemento e oli. Predisporre un piano di gestione delle acque meteoriche di cantiere. Nominare un responsabile ambientale di cantiere con delega scritta. Monitorare acque di falda con piezometri nei cantieri ad alto rischio. In caso di contaminazione accidentale, attivare entro 24 ore la procedura di comunicazione ex art. 304 D.Lgs. 152/06.'
-    if (desc.includes('bonifica') || desc.includes('siti contaminati'))
-      return 'Prima di qualsiasi intervento su aree potenzialmente contaminate (ex siti industriali, discariche, aree militari) effettuare obbligatoriamente: Fase I (indagine storica documentale) e Fase II (campionamento del suolo e analisi chimica). Se emergono superamenti delle CSC attivare immediatamente la procedura ex art. 242 D.Lgs. 152/06 con comunicazione al Comune e ARPA. Non avviare i lavori fino a definizione del piano di bonifica approvato. Conservare tutta la documentazione delle analisi per almeno 10 anni.'
-
-    // Finanziario e riciclaggio
-    if (desc.includes('riciclaggio') || desc.includes('subappalti fittizi') || desc.includes('appalti gonfiati'))
-      return 'Implementare procedure AML (Anti Money Laundering) per tutte le operazioni immobiliari: verifica identità e provenienza fondi per acquisti/vendite sopra 10.000 euro, segnalazione operazioni sospette al Responsabile Antiriciclaggio. Applicare rigorosamente la tracciabilità dei pagamenti (L. 136/2010): TUTTI i pagamenti relativi a contratti pubblici tramite conto corrente dedicato. Monitorare i flussi finanziari anomali (triangolazioni, pagamenti a terzi non giustificati). Formare il responsabile amministrativo sul reato di riciclaggio e sugli obblighi antiriciclaggio.'
-    if (desc.includes('autoriciclaggio'))
-      return 'Istituire un sistema di monitoraggio dei flussi finanziari anomali: alert automatico per movimenti di cassa superiori a soglie definite, verifica trimestrale della coerenza tra ricavi dichiarati e lavori effettivamente eseguiti. Separare i conti correnti per azienda e per commessa. Effettuare una revisione contabile annuale da parte di un revisore esterno indipendente. Prevedere nell\'OdV un componente con esperienza in diritto penale economico.'
-    if (desc.includes('pagamenti in contanti') || desc.includes('provenienza illecita'))
-      return 'Vietare formalmente qualsiasi pagamento in contanti superiore a 1.000 euro (soglia ex D.Lgs. 231/2007 come modificato). Implementare una procedura di autorizzazione per tutti i pagamenti: chi autorizza ≠ chi esegue ≠ chi registra. Effettuare riconciliazioni bancarie mensili. Formare il personale amministrativo sul divieto di contanti e sulle segnalazioni antiriciclaggio. Conservare evidenza documentale di ogni pagamento per almeno 10 anni.'
-    if (desc.includes('fatture per operazioni inesistenti') || desc.includes('catena dei subappalti'))
-      return 'Istituire un Registro Fornitori Qualificati: nessun subappalto a fornitori non verificati preventivamente (visura CCIAA aggiornata, DURC, confronto fatturato dichiarato vs importi richiesti). Verificare la congruità dei prezzi rispetto ai prezzari regionali. Imporre doppia firma del Direttore Tecnico e del CFO per ogni fattura di subappalto superiore a 10.000 euro. Effettuare audit mensile sulla corrispondenza tra SAL (Stato Avanzamento Lavori) e fatture ricevute. Segnalare immediatamente all\'OdV qualsiasi anomalia documentale.'
-    if (desc.includes('dichiarazione fraudolenta') || desc.includes('fatture false'))
-      return 'Implementare la separazione delle funzioni contabili: chi registra le fatture ≠ chi approva i pagamenti ≠ chi prepara le dichiarazioni fiscali. Effettuare una revisione interna delle scritture contabili prima della presentazione delle dichiarazioni, con verifica della corrispondenza tra costi registrati e documentazione a supporto. Prevedere audit fiscale annuale da parte di un commercialista esterno. Formare il responsabile amministrativo sui reati tributari ex D.Lgs. 231/01 e sulle sanzioni penali applicabili.'
-    if (desc.includes('occultamento') || desc.includes('documenti contabili'))
-      return 'Implementare un sistema di archiviazione digitale certificata (conservazione sostitutiva) per tutta la documentazione contabile di cantiere: giornale di cantiere, SAL, DDT, bolle di consegna, registri rifiuti. Stabilire policy di retention obbligatoria: minimo 10 anni per documenti fiscali, minimo 5 anni per documenti ambientali. Vietare la distruzione di qualsiasi documento senza autorizzazione scritta dell\'OdV. Effettuare audit annuale sull\'integrità degli archivi.'
-
-    // Societario
-    if (desc.includes('falso in bilancio') || desc.includes('comunicazioni sociali'))
-      return 'Adottare procedure formali per la valutazione degli immobili e il calcolo dell\'avanzamento lavori: perizie immobiliari da professionisti iscritti all\'albo, SAL approvati dalla DL (Direzione Lavori) e dal committente. Prevedere la revisione legale obbligatoria anche sotto le soglie di legge. Garantire flussi informativi completi e tempestivi verso il Collegio Sindacale prima dell\'approvazione del bilancio. Formare gli amministratori sui reati societari e sulle responsabilità personali connesse al falso in bilancio (art. 2621 c.c.).'
-    if (desc.includes('impedimento al controllo') || desc.includes('Collegio Sindacale'))
-      return 'Predisporre un regolamento dei flussi informativi verso il Collegio Sindacale e il Revisore: trasmissione mensile dei dati contabili gestionali, accesso illimitato a tutta la documentazione su richiesta entro 48 ore, comunicazione immediata di ogni evento rilevante (contenziosi, verifiche fiscali, infortuni gravi). Vietare qualsiasi comportamento ostruzionistico verso gli organi di controllo. Prevedere sanzioni disciplinari fino al licenziamento per chi impedisca le verifiche.'
-
-    // Lavoro e caporalato
-    if (desc.includes('caporalato') || desc.includes('sfruttamento del lavoro'))
-      return 'Adottare un sistema di qualificazione obbligatoria dei subappaltatori di manodopera: verifica DURC in tempo reale (non storico), copia del CCNL applicato, estratto conto contributivo INPS degli ultimi 6 mesi, buste paga di 3 lavoratori campione, presenza del libro unico del lavoro. Effettuare sopralluoghi a sorpresa almeno mensili con verifica orari, condizioni di lavoro e coincidenza tra lavoratori presenti e quelli risultanti dal LUL. Inserire clausola risolutiva immediata in caso di accertata irregolarità. Aderire al Protocollo di legalità di settore.'
-    if (desc.includes('criminalità organizzata') || desc.includes('imprese collegate'))
-      return 'Prima di qualsiasi subappalto richiedere la documentazione antimafia a tutte le imprese della filiera (art. 83-84 D.Lgs. 159/2011) per importi superiori alle soglie di legge. Verificare la congruità economica dei prezzi offerti rispetto ai prezzari di riferimento (anomalie >30% = segnale di allarme). Consultare le banche dati pubbliche (BDNA, Prefettura) prima della qualificazione. Prevedere nel contratto la clausola risolutiva immediata in caso di emissione di interdittiva antimafia. Formare il responsabile acquisti sui segnali di infiltrazione mafiosa.'
-    if (desc.includes('stranieri') || desc.includes('soggiorno irregolare'))
-      return 'Prima dell\'assunzione o dell\'ingresso in cantiere di lavoratori extracomunitari verificare: permesso di soggiorno valido, relativa idoneità al lavoro, eventuali limitazioni. Estendere la verifica a TUTTI i lavoratori di tutte le imprese presenti in cantiere, anche subappaltatrici. Conservare copia delle verifiche effettuate con data e firma del responsabile. Effettuare verifiche periodiche durante il rapporto (scadenza permesso). Formare il responsabile HR sul reato di impiego di clandestini (art. 22 D.Lgs. 286/98) e sulla responsabilità 231.'
-
-    // Informatico
-    if (desc.includes('sistemi informatici') || desc.includes('gare telematiche') || desc.includes('BIM'))
-      return 'Implementare una policy di sicurezza informatica specifica per i sistemi di gara e BIM: accesso con autenticazione a due fattori, log di ogni accesso ai portali e-procurement, divieto di condivisione credenziali. Formare i responsabili gare sui reati informatici (art. 615-ter c.p.). Effettuare penetration test annuale sui sistemi aziendali. Prevedere procedure di incident response per accessi anomali. Vietare qualsiasi tentativo di accesso a sistemi informatici di committenti o concorrenti al di fuori dei canali ufficiali.'
-    if (desc.includes('dati informatici di progetto') || desc.includes('documentazione di gara'))
-      return 'Adottare un sistema di controllo dell\'integrità dei documenti tecnici: firma digitale qualificata su tutti i documenti di gara, hash crittografico dei file BIM prima della trasmissione, log immutabile di ogni modifica. Vietare l\'utilizzo di strumenti non aziendali per la gestione di documentazione di gara. Effettuare backup giornalieri con verifica di integrità. Prevedere sanzioni disciplinari per la manipolazione di documenti tecnici ufficiali.'
-
-    // MOG 231 e presidi
-    if (desc.includes('Modello Organizzativo 231') || desc.includes('Organismo di Vigilanza'))
-      return 'Avviare un progetto strutturato di adozione del MOG 231: (1) delibera CdA con nomina del responsabile di progetto, (2) gap analysis e mappatura processi sensibili (2 mesi), (3) stesura Parte Generale e Parti Speciali del Modello (2 mesi), (4) nomina OdV con almeno un componente esterno indipendente e budget autonomo deliberato dal CdA, (5) adozione formale del Modello con delibera CdA motivata, (6) programma di formazione differenziata per apicali, dipendenti e subappaltatori. Riferimento tempistiche: 7-9 mesi dall\'avvio. Aggiornare il Modello almeno ogni 2 anni o in caso di modifiche normative.'
-    if (desc.includes('formazione del personale') || desc.includes('Codice Etico'))
-      return 'Predisporre un piano di formazione 231 differenziato: (A) apicali e dirigenti — corso approfondito 4 ore su responsabilità personali e reati presupposto specifici del settore; (B) dipendenti operativi — modulo e-learning 2 ore con test di verifica; (C) subappaltatori — informativa scritta sui contenuti del Codice Etico con firma per ricevuta. Effettuare la formazione entro 3 mesi dall\'adozione del Modello e ripeterla ogni 2 anni o in caso di aggiornamenti. Conservare gli attestati di partecipazione. Prevedere la formazione come requisito di qualificazione per i nuovi subappaltatori.'
-    if (desc.includes('whistleblowing') || desc.includes('D.Lgs. 24/2023'))
-      return 'Implementare un sistema di segnalazione (whistleblowing) conforme al D.Lgs. 24/2023: canale digitale cifrato gestito da soggetto terzo indipendente, possibilità di segnalazione anonima, risposta al segnalante entro 3 mesi, divieto assoluto di ritorsioni con sanzioni fino a 50.000 euro per violazione. Nominare il Gestore delle Segnalazioni. Comunicare il canale a tutti i dipendenti, collaboratori e subappaltatori. Registrare e trasmettere all\'OdV tutte le segnalazioni ricevute. Conservare le segnalazioni per 5 anni.'
+    const catSugg231 = SUGGERIMENTI_AZIONI[categoria]
+    if (catSugg231) {
+      for (const [keyword, azione] of Object.entries(catSugg231)) {
+        if (keyword !== 'default' && desc.includes(keyword.toLowerCase())) {
+          return azione
+        }
+      }
+      return catSugg231['default'] || ''
+    }
+    return 'Consultare il consulente legale specializzato in D.Lgs. 231/2001. Verificare se il rischio rientra nelle aree sensibili del Modello Organizzativo e definire un protocollo specifico di presidio. Comunicare all\'OdV e documentare le misure adottate.'
   }
 
-  // ── Suggerimenti per categorie standard ──────────────────────────────────
+  // ── Fallback per categorie standard ─────────────────────────────────────
   const catSugg = SUGGERIMENTI_AZIONI[categoria]
   if (!catSugg) return ''
   const descLower = (descrizione || '').toLowerCase()
@@ -461,6 +529,49 @@ export const RISCHI_231_EDILIZIA = [
   { categoria: 'Normativo / Compliance', descrizione: 'Canale di whistleblowing assente o non conforme al D.Lgs. 24/2023', fonte: 'Interna', probabilita: 2, impatto: 2, note: 'Obbligo dal 2023 per aziende con >50 dipendenti — sanzioni fino a 50.000 euro' },
 ]
 
+
+// Catalogo Rischi 231 GENERICO — per tutti i settori non edili
+export const RISCHI_231_GENERICO = [
+
+  // Art. 24/25 — PA e Anticorruzione
+  { categoria: 'Normativo / Compliance', descrizione: 'Corruzione o induzione indebita di funzionari pubblici per ottenere vantaggi commerciali o autorizzazioni', fonte: 'Interna', probabilita: 1, impatto: 3, note: 'Art. 24-25 D.Lgs. 231/01 — area sensibile: gare pubbliche, concessioni, ispezioni' },
+  { categoria: 'Normativo / Compliance', descrizione: 'Truffa aggravata ai danni dello Stato per accesso a fondi pubblici, contributi o agevolazioni', fonte: 'Interna', probabilita: 1, impatto: 3, note: 'Art. 24 D.Lgs. 231/01 — area sensibile: bandi, PNRR, incentivi regionali' },
+  { categoria: 'Normativo / Compliance', descrizione: 'Turbata libertà degli incanti o delle procedure di gara pubblica', fonte: 'Interna', probabilita: 1, impatto: 3, note: 'Art. 25 D.Lgs. 231/01 — area sensibile: appalti pubblici e forniture alla PA' },
+
+  // Art. 25-septies — Sicurezza
+  { categoria: 'Normativo / Compliance', descrizione: 'Omicidio colposo o lesioni gravi per violazione delle norme sulla sicurezza nei luoghi di lavoro (D.Lgs. 81/08)', fonte: 'Interna', probabilita: 2, impatto: 3, note: 'Art. 25-septies D.Lgs. 231/01 — obbligo DVR, RSPP, formazione e DPI per tutti i settori' },
+  { categoria: 'Normativo / Compliance', descrizione: 'Omessa o inadeguata valutazione dei rischi (DVR) e mancata nomina delle figure obbligatorie per la sicurezza', fonte: 'Interna', probabilita: 2, impatto: 2, note: 'Art. 25-septies D.Lgs. 231/01 — RSPP, medico competente, RLS obbligatori' },
+
+  // Art. 25-undecies — Ambiente
+  { categoria: 'Normativo / Compliance', descrizione: 'Gestione illecita di rifiuti speciali prodotti dall'attività aziendale', fonte: 'Interna', probabilita: 1, impatto: 2, note: 'Art. 25-undecies D.Lgs. 231/01 — registro carico/scarico, formulari, trasportatori qualificati' },
+  { categoria: 'Normativo / Compliance', descrizione: 'Scarichi industriali o emissioni atmosferiche non conformi alle autorizzazioni', fonte: 'Interna', probabilita: 1, impatto: 2, note: 'Art. 25-undecies D.Lgs. 231/01 — autorizzazione AIA/AUA, monitoraggio emissioni' },
+
+  // Art. 25-octies — Finanziario
+  { categoria: 'Finanziario', descrizione: 'Riciclaggio o autoriciclaggio di proventi illeciti attraverso attività aziendali', fonte: 'Mista', probabilita: 1, impatto: 3, note: 'Art. 25-octies D.Lgs. 231/01 — monitoraggio flussi finanziari anomali, adeguata verifica' },
+  { categoria: 'Finanziario', descrizione: 'Impiego di denaro di provenienza illecita nei pagamenti aziendali (contanti, triangolazioni)', fonte: 'Mista', probabilita: 1, impatto: 2, note: 'Art. 25-octies D.Lgs. 231/01 — tracciabilità dei pagamenti, divieto contanti oltre soglia' },
+
+  // Art. 25-quinquiesdecies — Tributario
+  { categoria: 'Finanziario', descrizione: 'Emissione o utilizzo di fatture per operazioni inesistenti per ridurre il carico fiscale', fonte: 'Interna', probabilita: 1, impatto: 3, note: 'Art. 25-quinquiesdecies D.Lgs. 231/01 — controllo sulla catena dei fornitori e dei costi' },
+  { categoria: 'Finanziario', descrizione: 'Dichiarazione fraudolenta o omessa dichiarazione fiscale', fonte: 'Interna', probabilita: 1, impatto: 2, note: 'Art. 25-quinquiesdecies D.Lgs. 231/01 — separazione funzioni contabili, audit fiscale annuale' },
+
+  // Art. 25-ter — Societario
+  { categoria: 'Normativo / Compliance', descrizione: 'Falso in bilancio o comunicazioni sociali infedeli verso soci e mercato', fonte: 'Interna', probabilita: 1, impatto: 3, note: 'Art. 25-ter D.Lgs. 231/01 — revisione legale, trasparenza verso organi di controllo' },
+  { categoria: 'Normativo / Compliance', descrizione: 'Impedimento o ostruzione al controllo da parte del Collegio Sindacale o del Revisore', fonte: 'Interna', probabilita: 1, impatto: 2, note: 'Art. 25-ter D.Lgs. 231/01 — flussi informativi regolari verso gli organi di controllo' },
+
+  // Art. 25-quinquies — Lavoro
+  { categoria: 'Operativo', descrizione: 'Intermediazione illecita e sfruttamento del lavoro (caporalato) nella gestione della manodopera', fonte: 'Mista', probabilita: 1, impatto: 3, note: 'Art. 25-quinquies D.Lgs. 231/01 — qualificazione fornitori manodopera, DURC, buste paga' },
+  { categoria: 'Operativo', descrizione: 'Impiego di lavoratori stranieri con permesso di soggiorno irregolare o scaduto', fonte: 'Mista', probabilita: 1, impatto: 2, note: 'Art. 25-duodecies D.Lgs. 231/01 — verifica documenti obbligatoria prima dell'assunzione' },
+
+  // Art. 24-bis — Informatico
+  { categoria: 'IT / Cyber', descrizione: 'Accesso abusivo a sistemi informatici di concorrenti, clienti o pubbliche amministrazioni', fonte: 'Interna', probabilita: 1, impatto: 2, note: 'Art. 24-bis D.Lgs. 231/01 — policy sicurezza IT, accessi con autenticazione, log degli accessi' },
+
+  // MOG 231 e presidi trasversali
+  { categoria: 'Normativo / Compliance', descrizione: 'Assenza o inefficacia del Modello Organizzativo 231 e dell'Organismo di Vigilanza (OdV)', fonte: 'Interna', probabilita: 2, impatto: 3, note: 'Rischio trasversale: senza MOG 231 efficace la società risponde penalmente per tutti i reati presupposto' },
+  { categoria: 'Normativo / Compliance', descrizione: 'Mancata formazione del personale sui contenuti del Modello 231 e del Codice Etico aziendale', fonte: 'Interna', probabilita: 2, impatto: 2, note: 'Requisito art. 6 D.Lgs. 231/01 — formazione differenziata obbligatoria per apicali e dipendenti' },
+  { categoria: 'Normativo / Compliance', descrizione: 'Canale di whistleblowing assente o non conforme al D.Lgs. 24/2023', fonte: 'Interna', probabilita: 2, impatto: 2, note: 'Obbligo dal 2023 per aziende con >50 dipendenti — sanzioni fino a 50.000 euro per inadempienza' },
+]
+
 export const RISCHI_PER_SETTORE_231 = {
   'Edilizia': RISCHI_231_EDILIZIA,
+  'Generico': RISCHI_231_GENERICO,
 }
