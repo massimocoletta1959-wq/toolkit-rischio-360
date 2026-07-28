@@ -315,39 +315,97 @@ export const SUGGERIMENTI_AZIONI = {
 }
 
 export function getSuggerimentoAzione(categoria, descrizione) {
+  const desc = (descrizione || '').toLowerCase()
+
+  // ── Suggerimenti specifici per Rischi 231 ────────────────────────────────
+  if (categoria && categoria.includes('231')) {
+
+    // PA e Anticorruzione
+    if (desc.includes('permessi di costruire') || desc.includes('concessioni edilizie'))
+      return 'Adottare una Procedura Gestione Rapporti con la PA (PGRPA): registro obbligatorio di ogni contatto con funzionari pubblici (data, oggetto, persone presenti), doppia firma per l\'invio di pratiche edilizie, divieto assoluto di omaggi o utilità. Inserire una clausola anticorruzione standard in tutti i contratti con professionisti e intermediari che operano verso enti pubblici. Effettuare formazione annuale specifica sul reato di corruzione per i tecnici e i responsabili di cantiere.'
+    if (desc.includes('turbata') || desc.includes('gare di appalto'))
+      return 'Istituire una procedura interna per la partecipazione alle gare pubbliche: separare il team di preparazione dell\'offerta dalla direzione aziendale, vietare qualsiasi contatto informale con RUP o commissioni di gara al di fuori dei canali ufficiali, documentare tutte le fonti delle informazioni usate. Prevedere un legale interno o esterno che validi l\'offerta. Conservare per 10 anni tutta la documentazione di gara.'
+    if (desc.includes('superbonus') || desc.includes('erogazioni pubbliche') || desc.includes('incentivi'))
+      return 'Predisporre una checklist di verifica dei requisiti tecnici e soggettivi prima di ogni domanda di incentivo (Superbonus, PNRR, bandi regionali). Designare un responsabile interno per i rapporti con gli enti erogatori con delega scritta. Conservare tutta la documentazione tecnica e le comunicazioni ufficiali. Effettuare un audit interno trimestrale sulle pratiche in corso. Prevedere clausole di restituzione nei contratti con i clienti finali.'
+    if (desc.includes('perizie') || desc.includes('pubbliche forniture'))
+      return 'Implementare un sistema di controllo qualità sulle perizie e certificazioni destinate alla PA: revisione obbligatoria da parte di un tecnico indipendente prima della trasmissione, registro delle perizie emesse con firma del responsabile. Vietare pressioni sui tecnici certificatori. Prevedere sanzioni disciplinari interne per falsificazioni documentali.'
+    if (desc.includes('induzione') || desc.includes('concussione') || desc.includes('autorizzazioni urbanistiche'))
+      return 'Formare i responsabili tecnici a riconoscere e gestire situazioni di pressione da parte di funzionari pubblici. Predisporre un canale di segnalazione riservato (whistleblowing) per episodi di richieste improprie. Documentare immediatamente ogni richiesta anomala ricevuta da funzionari pubblici e comunicarla all\'OdV. Prevedere una procedura di escalation immediata verso la direzione aziendale e il legale.'
+
+    // Sicurezza sul lavoro
+    if (desc.includes('omicidio colposo') || desc.includes('lesioni gravi') || desc.includes('antinfortunistiche'))
+      return 'Certificare il sistema di gestione della sicurezza ISO 45001. Nominare RSPP con esperienza specifica in edilizia e CSE qualificato per ogni cantiere con più imprese. Introdurre la stop-work authority: chiunque può bloccare i lavori per pericolo imminente senza subire conseguenze. Effettuare sopralluoghi mensili documentati con verbale firmato. Inserire i KPI di sicurezza (indice di frequenza, gravità) nella valutazione annuale dei responsabili di cantiere.'
+    if (desc.includes('DVR') || desc.includes('valutazione dei rischi'))
+      return 'Aggiornare il DVR entro 30 giorni dall\'apertura di ogni nuovo cantiere o variante significativa. Predisporre il POS (Piano Operativo Sicurezza) specifico per ogni subappaltatore prima dell\'inizio lavori. Effettuare audit interno mensile sulla corretta applicazione delle misure: check-list DPI, ponteggi, scavi, impianti elettrici. Conservare verbali firmati di tutte le verifiche. Nominare un preposto alla sicurezza per ogni fronte di lavoro.'
+    if (desc.includes('CSE') || desc.includes('Coordinatore per la Sicurezza'))
+      return 'Prima dell\'avvio di qualsiasi cantiere con più di un\'impresa nominare formalmente il CSE con contratto scritto. Verificare l\'iscrizione all\'albo e i crediti formativi aggiornati. Imporre riunioni di coordinamento documentate almeno ogni 2 settimane. Il CSE deve effettuare sopralluoghi a sorpresa e avere potere di sospensione lavori. Conservare il PSC aggiornato e il fascicolo del fabbricato firmato dal CSE a ogni variante.'
+    if (desc.includes('subappaltatrici') || desc.includes('coordinamento sicurezza'))
+      return 'Prima di ogni subappalto verificare obbligatoriamente: DURC in tempo reale, iscrizione CCIAA, DVR del subappaltatore, lista nominativa lavoratori con attestati di formazione sicurezza aggiornati. Inserire nel contratto di subappalto clausole di responsabilità solidale e di risoluzione immediata per gravi violazioni sicurezza. Effettuare sopralluoghi a sorpresa sui lavoratori del subappaltatore almeno una volta al mese. Documentare ogni verifica con verbale firmato.'
+
+    // Ambiente
+    if (desc.includes('rifiuti speciali') || desc.includes('eternit') || desc.includes('amianto'))
+      return 'Per ogni cantiere predisporre obbligatoriamente: classificazione CER di tutti i rifiuti prodotti, formulari di identificazione rifiuti (FIR) per ogni trasporto, registro di carico/scarico aggiornato. Qualificare preventivamente tutti i trasportatori (iscrizione Albo Gestori Ambientali, categoria e classe adeguate). Se presente amianto, nominare un responsabile amianto certificato e redigere il Piano di Lavoro ex D.Lgs. 81/08 art. 256. Effettuare audit documentale trimestrale sulla corretta tenuta dei registri.'
+    if (desc.includes('terre e rocce') || desc.includes('DPR 120/2017'))
+      return 'Prima dell\'avvio scavi redigere il Piano di Utilizzo (PdU) ai sensi del DPR 120/2017, con caratterizzazione chimica del terreno (almeno 1 campione ogni 5.000 m³). Tracciare ogni movimento di materiale con DDT specifici e documentazione analitica. Se le terre non rispettano le CSC del sito di destinazione, gestirle come rifiuto (codice CER 17 05 04). Conservare tutta la documentazione per almeno 5 anni. Nominare un geologo responsabile del Piano di Utilizzo.'
+    if (desc.includes('traffico illecito') || desc.includes('miscelazione'))
+      return 'Vietare contrattualmente e proceduralmente qualsiasi miscelazione di rifiuti di diversa classificazione CER. Verificare l\'iscrizione all\'Albo Gestori Ambientali di TUTTI i trasportatori per categoria e classe specifiche. Effettuare audit a sorpresa sulle aree di stoccaggio temporaneo almeno ogni 2 mesi. Inserire nei contratti con i subappaltatori clausole di responsabilità per gestione illecita dei rifiuti con risoluzione immediata. Formare il responsabile di cantiere sul reato di traffico illecito (art. 259 D.Lgs. 152/06).'
+    if (desc.includes('inquinamento ambientale') || desc.includes('acque, suolo'))
+      return 'Prima dell\'avvio cantieri vicino a corsi d\'acqua, falde o aree protette effettuare una valutazione di impatto ambientale preliminare. Installare barriere di contenimento per acque di lavaggio cemento e oli. Predisporre un piano di gestione delle acque meteoriche di cantiere. Nominare un responsabile ambientale di cantiere con delega scritta. Monitorare acque di falda con piezometri nei cantieri ad alto rischio. In caso di contaminazione accidentale, attivare entro 24 ore la procedura di comunicazione ex art. 304 D.Lgs. 152/06.'
+    if (desc.includes('bonifica') || desc.includes('siti contaminati'))
+      return 'Prima di qualsiasi intervento su aree potenzialmente contaminate (ex siti industriali, discariche, aree militari) effettuare obbligatoriamente: Fase I (indagine storica documentale) e Fase II (campionamento del suolo e analisi chimica). Se emergono superamenti delle CSC attivare immediatamente la procedura ex art. 242 D.Lgs. 152/06 con comunicazione al Comune e ARPA. Non avviare i lavori fino a definizione del piano di bonifica approvato. Conservare tutta la documentazione delle analisi per almeno 10 anni.'
+
+    // Finanziario e riciclaggio
+    if (desc.includes('riciclaggio') || desc.includes('subappalti fittizi') || desc.includes('appalti gonfiati'))
+      return 'Implementare procedure AML (Anti Money Laundering) per tutte le operazioni immobiliari: verifica identità e provenienza fondi per acquisti/vendite sopra 10.000 euro, segnalazione operazioni sospette al Responsabile Antiriciclaggio. Applicare rigorosamente la tracciabilità dei pagamenti (L. 136/2010): TUTTI i pagamenti relativi a contratti pubblici tramite conto corrente dedicato. Monitorare i flussi finanziari anomali (triangolazioni, pagamenti a terzi non giustificati). Formare il responsabile amministrativo sul reato di riciclaggio e sugli obblighi antiriciclaggio.'
+    if (desc.includes('autoriciclaggio'))
+      return 'Istituire un sistema di monitoraggio dei flussi finanziari anomali: alert automatico per movimenti di cassa superiori a soglie definite, verifica trimestrale della coerenza tra ricavi dichiarati e lavori effettivamente eseguiti. Separare i conti correnti per azienda e per commessa. Effettuare una revisione contabile annuale da parte di un revisore esterno indipendente. Prevedere nell\'OdV un componente con esperienza in diritto penale economico.'
+    if (desc.includes('pagamenti in contanti') || desc.includes('provenienza illecita'))
+      return 'Vietare formalmente qualsiasi pagamento in contanti superiore a 1.000 euro (soglia ex D.Lgs. 231/2007 come modificato). Implementare una procedura di autorizzazione per tutti i pagamenti: chi autorizza ≠ chi esegue ≠ chi registra. Effettuare riconciliazioni bancarie mensili. Formare il personale amministrativo sul divieto di contanti e sulle segnalazioni antiriciclaggio. Conservare evidenza documentale di ogni pagamento per almeno 10 anni.'
+    if (desc.includes('fatture per operazioni inesistenti') || desc.includes('catena dei subappalti'))
+      return 'Istituire un Registro Fornitori Qualificati: nessun subappalto a fornitori non verificati preventivamente (visura CCIAA aggiornata, DURC, confronto fatturato dichiarato vs importi richiesti). Verificare la congruità dei prezzi rispetto ai prezzari regionali. Imporre doppia firma del Direttore Tecnico e del CFO per ogni fattura di subappalto superiore a 10.000 euro. Effettuare audit mensile sulla corrispondenza tra SAL (Stato Avanzamento Lavori) e fatture ricevute. Segnalare immediatamente all\'OdV qualsiasi anomalia documentale.'
+    if (desc.includes('dichiarazione fraudolenta') || desc.includes('fatture false'))
+      return 'Implementare la separazione delle funzioni contabili: chi registra le fatture ≠ chi approva i pagamenti ≠ chi prepara le dichiarazioni fiscali. Effettuare una revisione interna delle scritture contabili prima della presentazione delle dichiarazioni, con verifica della corrispondenza tra costi registrati e documentazione a supporto. Prevedere audit fiscale annuale da parte di un commercialista esterno. Formare il responsabile amministrativo sui reati tributari ex D.Lgs. 231/01 e sulle sanzioni penali applicabili.'
+    if (desc.includes('occultamento') || desc.includes('documenti contabili'))
+      return 'Implementare un sistema di archiviazione digitale certificata (conservazione sostitutiva) per tutta la documentazione contabile di cantiere: giornale di cantiere, SAL, DDT, bolle di consegna, registri rifiuti. Stabilire policy di retention obbligatoria: minimo 10 anni per documenti fiscali, minimo 5 anni per documenti ambientali. Vietare la distruzione di qualsiasi documento senza autorizzazione scritta dell\'OdV. Effettuare audit annuale sull\'integrità degli archivi.'
+
+    // Societario
+    if (desc.includes('falso in bilancio') || desc.includes('comunicazioni sociali'))
+      return 'Adottare procedure formali per la valutazione degli immobili e il calcolo dell\'avanzamento lavori: perizie immobiliari da professionisti iscritti all\'albo, SAL approvati dalla DL (Direzione Lavori) e dal committente. Prevedere la revisione legale obbligatoria anche sotto le soglie di legge. Garantire flussi informativi completi e tempestivi verso il Collegio Sindacale prima dell\'approvazione del bilancio. Formare gli amministratori sui reati societari e sulle responsabilità personali connesse al falso in bilancio (art. 2621 c.c.).'
+    if (desc.includes('impedimento al controllo') || desc.includes('Collegio Sindacale'))
+      return 'Predisporre un regolamento dei flussi informativi verso il Collegio Sindacale e il Revisore: trasmissione mensile dei dati contabili gestionali, accesso illimitato a tutta la documentazione su richiesta entro 48 ore, comunicazione immediata di ogni evento rilevante (contenziosi, verifiche fiscali, infortuni gravi). Vietare qualsiasi comportamento ostruzionistico verso gli organi di controllo. Prevedere sanzioni disciplinari fino al licenziamento per chi impedisca le verifiche.'
+
+    // Lavoro e caporalato
+    if (desc.includes('caporalato') || desc.includes('sfruttamento del lavoro'))
+      return 'Adottare un sistema di qualificazione obbligatoria dei subappaltatori di manodopera: verifica DURC in tempo reale (non storico), copia del CCNL applicato, estratto conto contributivo INPS degli ultimi 6 mesi, buste paga di 3 lavoratori campione, presenza del libro unico del lavoro. Effettuare sopralluoghi a sorpresa almeno mensili con verifica orari, condizioni di lavoro e coincidenza tra lavoratori presenti e quelli risultanti dal LUL. Inserire clausola risolutiva immediata in caso di accertata irregolarità. Aderire al Protocollo di legalità di settore.'
+    if (desc.includes('criminalità organizzata') || desc.includes('imprese collegate'))
+      return 'Prima di qualsiasi subappalto richiedere la documentazione antimafia a tutte le imprese della filiera (art. 83-84 D.Lgs. 159/2011) per importi superiori alle soglie di legge. Verificare la congruità economica dei prezzi offerti rispetto ai prezzari di riferimento (anomalie >30% = segnale di allarme). Consultare le banche dati pubbliche (BDNA, Prefettura) prima della qualificazione. Prevedere nel contratto la clausola risolutiva immediata in caso di emissione di interdittiva antimafia. Formare il responsabile acquisti sui segnali di infiltrazione mafiosa.'
+    if (desc.includes('stranieri') || desc.includes('soggiorno irregolare'))
+      return 'Prima dell\'assunzione o dell\'ingresso in cantiere di lavoratori extracomunitari verificare: permesso di soggiorno valido, relativa idoneità al lavoro, eventuali limitazioni. Estendere la verifica a TUTTI i lavoratori di tutte le imprese presenti in cantiere, anche subappaltatrici. Conservare copia delle verifiche effettuate con data e firma del responsabile. Effettuare verifiche periodiche durante il rapporto (scadenza permesso). Formare il responsabile HR sul reato di impiego di clandestini (art. 22 D.Lgs. 286/98) e sulla responsabilità 231.'
+
+    // Informatico
+    if (desc.includes('sistemi informatici') || desc.includes('gare telematiche') || desc.includes('BIM'))
+      return 'Implementare una policy di sicurezza informatica specifica per i sistemi di gara e BIM: accesso con autenticazione a due fattori, log di ogni accesso ai portali e-procurement, divieto di condivisione credenziali. Formare i responsabili gare sui reati informatici (art. 615-ter c.p.). Effettuare penetration test annuale sui sistemi aziendali. Prevedere procedure di incident response per accessi anomali. Vietare qualsiasi tentativo di accesso a sistemi informatici di committenti o concorrenti al di fuori dei canali ufficiali.'
+    if (desc.includes('dati informatici di progetto') || desc.includes('documentazione di gara'))
+      return 'Adottare un sistema di controllo dell\'integrità dei documenti tecnici: firma digitale qualificata su tutti i documenti di gara, hash crittografico dei file BIM prima della trasmissione, log immutabile di ogni modifica. Vietare l\'utilizzo di strumenti non aziendali per la gestione di documentazione di gara. Effettuare backup giornalieri con verifica di integrità. Prevedere sanzioni disciplinari per la manipolazione di documenti tecnici ufficiali.'
+
+    // MOG 231 e presidi
+    if (desc.includes('Modello Organizzativo 231') || desc.includes('Organismo di Vigilanza'))
+      return 'Avviare un progetto strutturato di adozione del MOG 231: (1) delibera CdA con nomina del responsabile di progetto, (2) gap analysis e mappatura processi sensibili (2 mesi), (3) stesura Parte Generale e Parti Speciali del Modello (2 mesi), (4) nomina OdV con almeno un componente esterno indipendente e budget autonomo deliberato dal CdA, (5) adozione formale del Modello con delibera CdA motivata, (6) programma di formazione differenziata per apicali, dipendenti e subappaltatori. Riferimento tempistiche: 7-9 mesi dall\'avvio. Aggiornare il Modello almeno ogni 2 anni o in caso di modifiche normative.'
+    if (desc.includes('formazione del personale') || desc.includes('Codice Etico'))
+      return 'Predisporre un piano di formazione 231 differenziato: (A) apicali e dirigenti — corso approfondito 4 ore su responsabilità personali e reati presupposto specifici del settore; (B) dipendenti operativi — modulo e-learning 2 ore con test di verifica; (C) subappaltatori — informativa scritta sui contenuti del Codice Etico con firma per ricevuta. Effettuare la formazione entro 3 mesi dall\'adozione del Modello e ripeterla ogni 2 anni o in caso di aggiornamenti. Conservare gli attestati di partecipazione. Prevedere la formazione come requisito di qualificazione per i nuovi subappaltatori.'
+    if (desc.includes('whistleblowing') || desc.includes('D.Lgs. 24/2023'))
+      return 'Implementare un sistema di segnalazione (whistleblowing) conforme al D.Lgs. 24/2023: canale digitale cifrato gestito da soggetto terzo indipendente, possibilità di segnalazione anonima, risposta al segnalante entro 3 mesi, divieto assoluto di ritorsioni con sanzioni fino a 50.000 euro per violazione. Nominare il Gestore delle Segnalazioni. Comunicare il canale a tutti i dipendenti, collaboratori e subappaltatori. Registrare e trasmettere all\'OdV tutte le segnalazioni ricevute. Conservare le segnalazioni per 5 anni.'
+  }
+
+  // ── Suggerimenti per categorie standard ──────────────────────────────────
   const catSugg = SUGGERIMENTI_AZIONI[categoria]
   if (!catSugg) return ''
   const descLower = (descrizione || '').toLowerCase()
-  
-  // Cerca corrispondenza per keyword nella descrizione
   for (const [keyword, azione] of Object.entries(catSugg)) {
     if (keyword !== 'default' && descLower.includes(keyword.toLowerCase())) {
       return azione
     }
   }
-  
-  // Per categorie 231, cerca anche per parole chiave nella descrizione
-  if (categoria.includes('231')) {
-    const keywords231 = {
-      'corruzione': ['corruzione', 'concussione', 'pubblica', 'pa ', 'permesso', 'concessione', 'gara', 'appalto', 'bando', 'incant'],
-      'omicidio': ['omicidio', 'lesioni', 'infortun', 'antinfortun', 'cantiere', '81/08', 'sicurezza'],
-      'rifiuti': ['rifiuti', 'smaltim', 'rifiuto', 'eternit', 'amianto', 'speciali'],
-      'terre': ['terre', 'rocce', 'scavo', 'scavi'],
-      'fatture': ['fattur', 'inesistent', 'subappalto', 'subappalt'],
-      'caporalato': ['caporalato', 'sfruttamento', 'manodopera', 'intermediaz'],
-      'riciclaggio': ['riciclagg', 'riciclo', 'autoricicl'],
-      'bilancio': ['bilancio', 'comunicazioni sociali', 'falso'],
-    }
-    for (const [key, words] of Object.entries(keywords231)) {
-      if (words.some(w => descLower.includes(w))) {
-        // Cerca in tutte le categorie 231
-        for (const [cat, sugg] of Object.entries(SUGGERIMENTI_AZIONI)) {
-          if (cat.includes('231') && sugg[key]) return sugg[key]
-        }
-      }
-    }
-  }
-  
   return catSugg['default'] || ''
 }
 
