@@ -187,11 +187,12 @@ export default function PianoAzione() {
   const [loading, setLoading] = useState(true)
   const [modal, setModal]     = useState(null)
   const [filterTier, setFilterTier] = useState('12')
+  const [filterCategoria, setFilterCategoria] = useState('')
   const [delConfirm, setDelConfirm] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data: r } = await supabase.from('rischi').select('*').eq('azienda_id', azienda.id).order('created_at')
+    const { data: r } = await supabase.from('rischi').select('*').eq('azienda_id', azienda.id).order('categoria').order('descrizione')
     const { data: a } = await supabase.from('azioni').select('*').eq('azienda_id', azienda.id)
     const { data: m } = await supabase.from('membri').select('id, nome, cognome, ruolo').eq('azienda_id', azienda.id).order('cognome')
     setMembri(m || [])
@@ -211,6 +212,7 @@ export default function PianoAzione() {
 
   const rischiFiltered = rischi.filter(r => {
     if (!r.probabilita || !r.impatto) return false
+    if (filterCategoria && r.categoria !== filterCategoria) return false
     const t = getTier(r.probabilita, r.impatto)
     if (filterTier === '12') return t.tier === 'Tier 1' || t.tier === 'Tier 2'
     if (filterTier === '1')  return t.tier === 'Tier 1'
@@ -239,10 +241,17 @@ export default function PianoAzione() {
         <div className="stat-card"><div className="stat-num" style={{ color: '#E67E22' }}>{totAzioni - completate}</div><div className="stat-label">Da completare</div></div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         {[['12','Tier 1 + 2'], ['1','Solo Tier 1'], ['2','Solo Tier 2'], ['all','Tutti']].map(([v, l]) => (
           <button key={v} className={`btn btn-sm${filterTier === v ? ' btn-primary' : ''}`} onClick={() => setFilterTier(v)}>{l}</button>
         ))}
+        <select className="form-control" style={{ maxWidth: 220, marginLeft: 8 }} value={filterCategoria} onChange={e => setFilterCategoria(e.target.value)}>
+          <option value="">Tutte le categorie</option>
+          {[...new Set(rischi.map(r => r.categoria).filter(Boolean))].sort().map(cat => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
+        {filterCategoria && <button className="btn btn-sm" onClick={() => setFilterCategoria('')}>✕ Reset</button>}
       </div>
 
       {loading ? <div className="spinner" /> : rischiFiltered.length === 0 ? (

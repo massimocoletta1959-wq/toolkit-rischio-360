@@ -106,6 +106,7 @@ export default function IMieiTask() {
   const [loading, setLoading]       = useState(true)
   const [modal, setModal]           = useState(null)
   const [filterStato, setFilterStato] = useState('')
+  const [filterCategoria, setFilterCategoria] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -155,6 +156,7 @@ export default function IMieiTask() {
   const filtered = tickets.filter(t => {
     if (aziendaSelezionata !== 'tutte' && t.aziende?.id !== aziendaSelezionata) return false
     if (filterStato && t.stato !== filterStato) return false
+    if (filterCategoria && t.rischi?.categoria !== filterCategoria) return false
     return true
   })
 
@@ -191,6 +193,13 @@ export default function IMieiTask() {
         {[['','Tutti'],['Aperto','Da fare'],['In lavorazione','In lavorazione'],['Completato','Completati']].map(([v,l]) => (
           <button key={v} className={`btn btn-sm${filterStato === v ? ' btn-primary' : ''}`} onClick={() => setFilterStato(v)}>{l}</button>
         ))}
+        <select className="form-control" style={{ maxWidth: 220 }} value={filterCategoria} onChange={e => setFilterCategoria(e.target.value)}>
+          <option value="">Tutte le categorie rischio</option>
+          {[...new Set(tickets.map(t => t.rischi?.categoria).filter(Boolean))].sort().map(cat => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
+        {filterCategoria && <button className="btn btn-sm" onClick={() => setFilterCategoria('')}>✕</button>}
       </div>
 
       {loading ? <div className="spinner" /> : filtered.length === 0 ? (

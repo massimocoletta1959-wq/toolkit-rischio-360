@@ -167,6 +167,7 @@ export default function GestioneTicket() {
   const [filterStato, setFilterStato]     = useState('')
   const [filterPriorita, setFilterPriorita] = useState('')
   const [filterMembro, setFilterMembro]   = useState('')
+  const [filterCategoria, setFilterCategoria] = useState('')
   const [delConfirm, setDelConfirm]       = useState(null)
   const [tab, setTab]           = useState('tutti') // tutti | miei
 
@@ -195,6 +196,7 @@ export default function GestioneTicket() {
     if (filterStato && t.stato !== filterStato) return false
     if (filterPriorita && t.priorita !== filterPriorita) return false
     if (filterMembro && t.membro_id !== filterMembro) return false
+    if (filterCategoria && t.rischi?.categoria !== filterCategoria) return false
     return true
   })
 
@@ -241,8 +243,14 @@ export default function GestioneTicket() {
             <option value="">Tutti i membri</option>
             {membri.map(m => <option key={m.id} value={m.id}>{m.nome} {m.cognome}</option>)}
           </select>
-          {(filterStato || filterPriorita || filterMembro) && (
-            <button className="btn btn-sm" onClick={() => { setFilterStato(''); setFilterPriorita(''); setFilterMembro('') }}>✕ Reset</button>
+          <select className="form-control" style={{ maxWidth: 220 }} value={filterCategoria} onChange={e => setFilterCategoria(e.target.value)}>
+            <option value="">Tutte le categorie rischio</option>
+            {[...new Set(tickets.map(t => t.rischi?.categoria).filter(Boolean))].sort().map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+          {(filterStato || filterPriorita || filterMembro || filterCategoria) && (
+            <button className="btn btn-sm" onClick={() => { setFilterStato(''); setFilterPriorita(''); setFilterMembro(''); setFilterCategoria('') }}>✕ Reset</button>
           )}
         </div>
 
