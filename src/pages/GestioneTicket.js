@@ -19,7 +19,36 @@ const PRIOR_COLORS = {
   'Bassa': { bg: '#D5F5E3', color: '#27AE60' },
 }
 
+function NotaModal({ ticket, autore, onSave, onClose }) {
+  const [testo, setTesto] = useState('')
+  const [loading, setLoading] = useState(false)
+  async function save() {
+    if (!testo.trim()) return
+    setLoading(true)
+    await supabase.from('ticket_note').insert({
+      ticket_id: ticket.id, autore, ruolo: 'consulente',
+      testo: testo.trim(), stato_al_momento: ticket.stato,
+    })
+    setLoading(false)
+    onSave()
+  }
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+        <h3 className="modal-title" style={{ marginBottom: 8 }}>💬 Aggiungi nota al ticket</h3>
+        <p style={{ fontSize: 13, color: '#666', marginBottom: 10 }}>{ticket.titolo}</p>
+        <textarea className="form-control" rows={4} value={testo} onChange={e => setTesto(e.target.value)} placeholder="La nota resta nello storico ed e visibile anche al membro" />
+        <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
+          <button className="btn" onClick={onClose}>Annulla</button>
+          <button className="btn btn-primary" onClick={save} disabled={loading || !testo.trim()}>{loading ? 'Salvataggio...' : 'Salva nota'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function TicketModal({ ticket, aziendaId, rischi, membri, onSave, onClose }) {
+  const { profilo } = useApp()
   const editing = !!ticket?.id
   const [form, setForm] = useState({
     titolo:      ticket?.titolo || '',
@@ -56,6 +85,12 @@ function TicketModal({ ticket, aziendaId, rischi, membri, onSave, onClose }) {
     if (editing) {
       const { error: err } = await supabase.from('ticket').update(payload).eq('id', ticketId)
       if (err) { setError(err.message); setLoading(false); return }
+      if (form.stato !== ticket.stato) {
+        await supabase.from('ticket_note').insert({
+          ticket_id: ticketId, autore: profilo?.nome || 'Consulente', ruolo: 'sistema',
+          testo: 'Stato: ' + ticket.stato + ' → ' + form.stato,
+        })
+      }
     } else {
       const { data, error: err } = await supabase.from('ticket').insert(payload).select().single()
       if (err) { setError(err.message); setLoading(false); return }
@@ -159,6 +194,7 @@ function TicketModal({ ticket, aziendaId, rischi, membri, onSave, onClose }) {
 
 export default function GestioneTicket() {
   const { azienda, profilo } = useApp()
+  const [notaModal, setNotaModal] = useState(null)
   const [tickets, setTickets]   = useState([])
   const [rischi, setRischi]     = useState([])
   const [membri, setMembri]     = useState([])
@@ -174,7 +210,7 @@ export default function GestioneTicket() {
   const load = useCallback(async () => {
     setLoading(true)
     const [{ data: t }, { data: r }, { data: m }] = await Promise.all([
-      supabase.from('ticket').select('*, membri(*), rischi(descrizione, categoria, probabilita, impatto), ticket_note(id, autore, testo, created_at)').eq('azienda_id', azienda.id).order('created_at', { ascending: false }),
+      supabase.from('ticket').select('*, membri(*), rischi(descrizione, categoria, probabilita, impatto), ticket_note(id, autore, ruolo, testo, created_at)').eq('azienda_id', azienda.id).order('created_at', { ascending: false }),
       supabase.from('rischi').select('id, descrizione, probabilita, impatto').eq('azienda_id', azienda.id),
       supabase.from('membri').select('*').eq('azienda_id', azienda.id).order('cognome'),
     ])
@@ -307,8 +343,8 @@ export default function GestioneTicket() {
                         <div style={{ marginTop: 8, padding: '8px 12px', background: '#F7F8FA', borderRadius: 6, fontSize: 12, color: '#555' }}>
                           <strong style={{ fontSize: 11, color: '#888', display: 'block', marginBottom: 4 }}>💬 STORICO AGGIORNAMENTI</strong>
                           {[...(t.ticket_note || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map(n => (
-                            <div key={n.id} style={{ marginBottom: 3, lineHeight: 1.5 }}>
-                              <span style={{ color: '#999' }}>{new Date(n.created_at).toLocaleDateString('it-IT')} {new Date(n.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</span> — <strong>{n.autore}</strong>: {n.testo}
+                            <div key={n.id} style={{ marginBottom: 3, lineHeight: 1.5, fontStyle: n.ruolo === 'sistema' ? 'italic' : 'normal', opacity: n.ruolo === 'sistema' ? 0.75 : 1 }}>
+                              <span style={{ color: '#999' }}>{new Date(n.created_at).toLocaleDateString('it-IT')} {new Date(n.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</span> — {n.ruolo === 'sistema' ? '🔄 ' : <strong>{n.ruolo === 'consulente' ? '👔 ' : ''}{n.autore}: </strong>}{n.testo}
                             </div>
                           ))}
                           {(!t.ticket_note || t.ticket_note.length === 0) && t.note_membro && <div>{t.note_membro}</div>}
@@ -316,6 +352,7 @@ export default function GestioneTicket() {
                       )}
                     </div>
                     <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      <button className="btn btn-sm btn-icon" title="Aggiungi nota" onClick={() => setNotaModal(t)}>💬</button>
                       <button className="btn btn-sm btn-icon" onClick={() => setModal(t)}>✏️</button>
                       <button className="btn btn-sm btn-icon btn-danger" onClick={() => setDelConfirm(t)}>🗑️</button>
                     </div>
@@ -335,6 +372,15 @@ export default function GestioneTicket() {
           membri={membri}
           onSave={() => { setModal(null); load() }}
           onClose={() => setModal(null)}
+        />
+      )}
+
+      {notaModal !== null && (
+        <NotaModal
+          ticket={notaModal}
+          autore={profilo?.nome || 'Consulente'}
+          onSave={() => { setNotaModal(null); load() }}
+          onClose={() => setNotaModal(null)}
         />
       )}
 

@@ -22,6 +22,12 @@ function AggiornaModal({ ticket, autore, onSave, onClose }) {
   async function save() {
     setLoading(true)
     await supabase.from('ticket').update({ stato }).eq('id', ticket.id)
+    if (stato !== ticket.stato) {
+      await supabase.from('ticket_note').insert({
+        ticket_id: ticket.id, autore, ruolo: 'sistema',
+        testo: 'Stato: ' + ticket.stato + ' → ' + stato,
+      })
+    }
     if (note.trim()) {
       await supabase.from('ticket_note').insert({
         ticket_id: ticket.id, autore, ruolo: 'membro',
@@ -95,8 +101,8 @@ function TicketCard({ t, onAggiorna }) {
             <div style={{ background: '#E8F4FD', borderRadius: 6, padding: '8px 14px', fontSize: 12, color: '#2B5FA5' }}>
               <strong style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>💬 STORICO AGGIORNAMENTI</strong>
               {[...(t.ticket_note || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map(n => (
-                <div key={n.id} style={{ marginBottom: 3, lineHeight: 1.5 }}>
-                  <span style={{ color: '#7A9CC4' }}>{new Date(n.created_at).toLocaleDateString('it-IT')} {new Date(n.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</span> — {n.testo}
+                <div key={n.id} style={{ marginBottom: 3, lineHeight: 1.5, fontStyle: n.ruolo === 'sistema' ? 'italic' : 'normal', opacity: n.ruolo === 'sistema' ? 0.75 : 1 }}>
+                  <span style={{ color: '#7A9CC4' }}>{new Date(n.created_at).toLocaleDateString('it-IT')} {new Date(n.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</span> — {n.ruolo === 'sistema' ? '🔄 ' : n.ruolo === 'consulente' ? <strong>👔 {n.autore}: </strong> : ''}{n.testo}
                 </div>
               ))}
               {(!t.ticket_note || t.ticket_note.length === 0) && t.note_membro && <div>{t.note_membro}</div>}
@@ -148,7 +154,7 @@ export default function IMieiTask() {
 
     const { data } = await supabase
       .from('ticket')
-      .select('*, rischi(descrizione, categoria), aziende(nome, id), ticket_note(id, autore, testo, created_at)')
+      .select('*, rischi(descrizione, categoria), aziende(nome, id), ticket_note(id, autore, ruolo, testo, created_at)')
       .in('membro_id', membroIds)
       .order('scadenza', { ascending: true, nullsLast: true })
 
