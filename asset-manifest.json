@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/toolkit-rischio-360/static/css/main.10af2273.css",
-    "main.js": "/toolkit-rischio-360/static/js/main.8854d32a.js",
+    "main.js": "/toolkit-rischio-360/static/js/main.dca3c9f8.js",
     "index.html": "/toolkit-rischio-360/index.html",
     "main.10af2273.css.map": "/toolkit-rischio-360/static/css/main.10af2273.css.map",
-    "main.8854d32a.js.map": "/toolkit-rischio-360/static/js/main.8854d32a.js.map"
+    "main.dca3c9f8.js.map": "/toolkit-rischio-360/static/js/main.dca3c9f8.js.map"
   },
   "entrypoints": [
     "static/css/main.10af2273.css",
-    "static/js/main.8854d32a.js"
+    "static/js/main.dca3c9f8.js"
   ]
 }
