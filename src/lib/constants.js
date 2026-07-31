@@ -276,6 +276,9 @@ export function getRischiDefault(settore) {
   return RISCHI_DEFAULT
 }
 
+// Suggerimenti di fallback per categoria (keyword -> azione). Popolabile in futuro.
+const SUGGERIMENTI_AZIONI = {}
+
 export function getSuggerimentoAzione(categoria, descrizione) {
   const desc = (descrizione || '').toLowerCase()
 
