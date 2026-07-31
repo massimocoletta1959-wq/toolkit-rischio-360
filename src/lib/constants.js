@@ -276,8 +276,53 @@ export function getRischiDefault(settore) {
   return RISCHI_DEFAULT
 }
 
-// Suggerimenti di fallback per categoria (keyword -> azione). Popolabile in futuro.
-const SUGGERIMENTI_AZIONI = {}
+// Suggerimenti di fallback per categoria: si attivano solo per rischi personalizzati
+// non coperti dai suggerimenti specifici. Chiave = parola contenuta nella descrizione.
+const SUGGERIMENTI_AZIONI = {
+  'IT / Cyber': {
+    'phishing': `Programma anti-phishing strutturato: simulazioni trimestrali con scenari differenziati per reparto, formazione mirata (non punitiva) per chi cade nella simulazione, regola di verifica fuori banda per richieste di pagamento o cambio IBAN (conferma telefonica a numero gia noto). Attivare SPF, DKIM e DMARC sul dominio email. KPI: tasso di click sotto il 5% entro 12 mesi.`,
+    'credenzial': `Governance delle identita: password manager aziendale, MFA su tutti i servizi esposti, revisione trimestrale dei privilegi (principio del minimo privilegio), disattivazione account entro 24 ore dalla cessazione del rapporto, utenze amministrative separate da quelle operative. Log degli accessi conservati 12 mesi con revisione mensile delle anomalie.`,
+    'obsolescen': `Censimento asset IT con data di fine supporto per ogni sistema. Piano di sostituzione pluriennale con budget dedicato, priorita ai sistemi esposti a internet. Per i legacy non sostituibili: segregazione di rete, accessi limitati, monitoraggio rafforzato. Aggiornare il censimento ogni 6 mesi.`,
+    'default': `Assessment cyber basato su CIS Controls (livello IG1) o Framework Nazionale Cybersecurity: gap analysis sulle misure essenziali, piano di rimedio a 12 mesi ordinato per rapporto costo/beneficio, con responsabile e budget per ogni intervento. Rivalutazione annuale e dopo ogni incidente. Valutare polizza cyber con copertura per interruzione attivita e data breach.`,
+  },
+  'Strategico': {
+    'concorren': `Analisi competitiva strutturata: monitoraggio trimestrale di prezzi, offerta e mosse dei 3-5 concorrenti principali (bilanci depositati, siti, fiere di settore). Identificare il vantaggio competitivo difendibile e concentrare li gli investimenti. Win/loss analysis scritta su ogni trattativa persa per leggere dove si sta spostando il mercato.`,
+    'tecnolog': `Roadmap di innovazione a 3 anni: mappare le tecnologie emergenti del settore e classificarle per impatto e maturita, budget annuale protetto per sperimentazioni anche piccole, partnership con universita o startup per competenze non presenti in azienda. Revisione della roadmap ogni 6 mesi in comitato di direzione.`,
+    'domanda': `Early warning commerciale: monitorare mensilmente 3-5 indicatori anticipatori della domanda (portafoglio ordini, richieste di offerta, indici di settore). Predisporre scenari base/contrazione/crescita con azioni gia decise per ciascuno. Struttura dei costi con quota flessibile in grado di assorbire una contrazione del 20%.`,
+    'default': `Risk assessment strategico annuale in sede di budget: per ogni obiettivo strategico identificare i 2-3 rischi che possono comprometterlo, con owner e indicatore misurabile. Revisione semestrale in comitato di direzione con decisioni verbalizzate. Collegare il registro rischi al piano industriale.`,
+  },
+  'Operativo': {
+    'difett': `Controlli qualita in-process: definire i punti di controllo critici, checklist con soglie di accettazione, registrazione delle non conformita con analisi delle cause (5 perche o Ishikawa) e azioni correttive tracciate. KPI mensili: tasso di difettosita, costi della non qualita, reclami. Audit interno semestrale.`,
+    'scorte': `Gestione scorte a doppio livello: scorta di sicurezza calcolata su variabilita della domanda e lead time per gli articoli di classe A, riordino automatico a punto fisso, inventario ciclico mensile. KPI: rotture di stock, indice di rotazione, obsolescenza. Ricalibrare i parametri ogni trimestre.`,
+    'default': `Analisi FMEA sul processo interessato: scomporlo in fasi e per ciascuna valutare gravita, probabilita e rilevabilita del guasto; priorita di intervento in base all'indice di rischio (RPN). Azioni di mitigazione con responsabile e scadenza. Ricalcolare l'RPN dopo ogni intervento per misurarne l'efficacia.`,
+  },
+  'Reputazionale': {
+    'social': `Presidio della reputazione digitale: alert automatici sulle menzioni del brand, procedura di risposta alle recensioni negative entro 48 ore con tono predefinito, escalation alla direzione per i casi sensibili, divieto di risposte a caldo. Report trimestrale sul sentiment con azioni correttive sui temi ricorrenti.`,
+    'default': `Mappa dei rischi reputazionali per stakeholder (clienti, dipendenti, comunita, media): per ciascuno individuare gli eventi scatenanti piu probabili e preparare in anticipo posizione e messaggi chiave. Portavoce unico designato. Monitoraggio delle menzioni e revisione annuale della mappa; ogni crisi chiusa con lesson learned scritta.`,
+  },
+  'Normativo / Compliance': {
+    'ambiental': `Compliance ambientale: scadenzario di autorizzazioni e adempimenti (MUD, registri carico/scarico rifiuti, FIR) con responsabile unico. Verificare iscrizione all'Albo Gestori dei trasportatori e destinazione finale dei rifiuti. Audit ambientale annuale; valutare ISO 14001 se la pressione normativa cresce.`,
+    'antiriciclaggio': `Presidio antiriciclaggio ex D.Lgs. 231/2007: verifica adeguata della controparte per operazioni rilevanti (titolare effettivo, provenienza fondi), divieto di contanti oltre soglia di legge, tracciabilita completa dei flussi, procedura per segnalazione operazioni sospette. Formazione ad amministrazione e commerciale sui segnali di allarme. Evidenze conservate 10 anni.`,
+    'default': `Compliance program dedicato: (1) censire gli obblighi applicabili con supporto specialistico, (2) gap analysis documentata, (3) piano di adeguamento con priorita sulle sanzioni piu gravi, (4) scadenzario adempimenti con alert e responsabile unico, (5) audit di conformita annuale. Presidiare le novita normative con una fonte dedicata (newsletter di categoria o consulente).`,
+  },
+  'Finanziario': {
+    'materie prime': `Gestione del rischio prezzo: clausole di revisione prezzi o indicizzazione nei contratti di vendita pluriennali, contratti quadro con prezzi bloccati 6-12 mesi sulle materie critiche, coperture fisiche (forward) per le esposizioni maggiori. Monitorare mensilmente l'incidenza dei costi sulle commesse aperte e rinegoziare oltre la soglia definita.`,
+    'cambio': `Rischio cambio: quantificare l'esposizione netta per valuta a 12 mesi, coprire con forward la quota certa dei flussi (ordini confermati), fatturare in euro dove il potere negoziale lo consente, conti in valuta per compensare naturalmente incassi e pagamenti. Politica di copertura scritta approvata dalla direzione, con divieto di posizioni speculative.`,
+    'tassi': `Rischio tasso: mappare i finanziamenti a tasso variabile e simulare l'impatto di +200 punti base sul conto economico. Se supera la soglia di tolleranza, valutare IRS o CAP sulla quota di debito a medio-lungo termine, o rinegoziare a tasso fisso. Rivedere la struttura del debito annualmente.`,
+    'default': `Presidio finanziario: cruscotto mensile con margini per commessa/linea, posizione finanziaria netta, DSO/DPO e covenant bancari. Budget con revisione trimestrale e analisi scostamenti scritta. Stress test sugli scenari peggiori (perdita del cliente principale, incassi ritardati di 60 giorni) con piani di risposta gia definiti.`,
+  },
+  'Terze Parti / Fornitori': {
+    'outsourcing': `Governance dell'outsourcing: contratto con SLA misurabili, penali, diritto di audit, exit plan e clausola di reversibilita (dati e know-how rientrano in azienda a fine rapporto). Referente interno che conserva la competenza per controllare il fornitore. Review formale delle performance ogni trimestre. Esternalizzare l'esecuzione, mai il controllo.`,
+    'subappalt': `Albo subappaltatori qualificati: verifica preventiva (visura, DURC, referenze, capacita tecnica), valutazione delle performance a fine lavoro che aggiorna l'albo, contratti scritti con SLA e responsabilita chiare, vigilanza sull'esecuzione con sopralluoghi documentati. Nessun affidamento a soggetti non qualificati, nemmeno in urgenza.`,
+    'default': `Vendor risk management proporzionato: classificare i fornitori per criticita (impatto sull'operativita se vengono meno); per i critici richiedere evidenze annuali (bilancio, certificazioni, coperture assicurative), qualificare un'alternativa e testarla periodicamente, monitorare i segnali di deterioramento (ritardi, calo qualita, richieste anomale di anticipi). Riclassificare ogni anno.`,
+  },
+  'Continuità Operativa': {
+    'incendio': `Prevenzione incendi oltre il minimo di legge: verificare che CPI/SCIA antincendio rispecchi l'attivita reale, manutenzione semestrale documentata di estintori e impianti, prova di evacuazione annuale con verbale, archivi e server separati dalle aree a rischio, copia offsite di dati e documenti vitali. Polizza incendio con valori assicurati aggiornati per evitare sottoassicurazione.`,
+    'alluvion': `Verificare l'esposizione della sede con le mappe di pericolosita idraulica (ISPRA/PAI). Misure fisiche proporzionate: barriere, server e archivi ai piani alti, materiali critici sollevati da terra. Polizza catastrofale (obbligo assicurativo imprese dal 2025). Smart working o sito alternativo come piano B, testato una volta l'anno.`,
+    'inagibil': `Piano di indisponibilita sede: definire come operare 30 giorni senza accesso ai locali - smart working immediato per le funzioni d'ufficio, sito alternativo o accordo di mutuo soccorso con azienda partner per le attivita fisiche, recapiti alternativi comunicati a clienti e fornitori entro 24 ore. Test annuale di una giornata di operativita fuori sede.`,
+    'default': `Business Impact Analysis mirata: per il processo interessato definire RTO (fermo massimo tollerabile) e risorse minime per ripartire (persone, sistemi, fornitori, dati). Strategia di continuita dimensionata sull'RTO, procedura di emergenza di una pagina (chi fa cosa nelle prime 4 ore), test annuale con verbale e azioni di miglioramento.`,
+  },
+}
 
 export function getSuggerimentoAzione(categoria, descrizione) {
   const desc = (descrizione || '').toLowerCase()
