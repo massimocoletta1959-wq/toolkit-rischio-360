@@ -2,12 +2,28 @@ import React, { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
 
+const SETTORI = ['Manifatturiero','Servizi','Commercio','Edilizia','Sanità','Tecnologia','Agricoltura','Trasporti','Altro']
+const DIMENSIONI = ['Micro (< 10 dipendenti)','Piccola (10-49)','Media (50-249)','Grande (250+)']
+
+function pivaValida(p) {
+  if (!/^[0-9]{11}$/.test(p)) return false
+  let s = 0
+  for (let i = 0; i < 11; i++) {
+    let n = p.charCodeAt(i) - 48
+    if (i % 2 === 1) { n *= 2; if (n > 9) n -= 9 }
+    s += n
+  }
+  return s % 10 === 0
+}
+
 export default function Impostazioni() {
   const { azienda, aziende, profilo, switchAzienda, reload, logout, onNuovaAzienda } = useApp()
   const [delConfirm, setDelConfirm] = useState(false)
   const [delNome, setDelNome]       = useState('')
   const [loading, setLoading]       = useState(false)
   const [error, setError]           = useState(null)
+  const [editMode, setEditMode]     = useState(false)
+  const [editForm, setEditForm]     = useState({ nome: '', piva: '', settore: '', dimensione: '' })
 
   async function eliminaAzienda() {
     if (delNome !== azienda.nome) { setError('Il nome inserito non corrisponde.'); return }
@@ -25,6 +41,36 @@ export default function Impostazioni() {
     const rimanenti = aziende.filter(a => a.id !== aid)
     if (rimanenti.length > 0) switchAzienda(rimanenti[0])
     else logout()
+  }
+
+  async function salvaModifiche() {
+    setLoading(true); setError(null)
+    const nomeClean = editForm.nome.trim()
+    const pivaClean = (editForm.piva || '').replace(/[^0-9]/g, '')
+    if (pivaClean && !pivaValida(pivaClean)) {
+      setError('Partita IVA non valida: controlla le 11 cifre.')
+      setLoading(false); return
+    }
+    if (pivaClean) {
+      const { data: dup } = await supabase.from('aziende').select('id, nome').eq('piva', pivaClean).neq('id', azienda.id).limit(1)
+      if (dup && dup.length > 0) {
+        setError('Hai gia un\'altra azienda con questa Partita IVA: "' + dup[0].nome + '".')
+        setLoading(false); return
+      }
+    }
+    if (nomeClean.toLowerCase() !== (azienda.nome || '').toLowerCase()) {
+      const { data: dupNome } = await supabase.from('aziende').select('id, nome').ilike('nome', nomeClean).neq('id', azienda.id).limit(1)
+      if (dupNome && dupNome.length > 0) {
+        const conferma = window.confirm('Hai gia un\'azienda chiamata "' + dupNome[0].nome + '". Vuoi davvero usare lo stesso nome?')
+        if (!conferma) { setLoading(false); return }
+      }
+    }
+    const { error: err } = await supabase.from('aziende')
+      .update({ nome: nomeClean, settore: editForm.settore || null, dimensione: editForm.dimensione || null, piva: pivaClean || null })
+      .eq('id', azienda.id)
+    if (err) { setError(err.message); setLoading(false); return }
+    setLoading(false); setEditMode(false)
+    await reload()
   }
 
   return (
@@ -73,13 +119,55 @@ export default function Impostazioni() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header"><span className="card-title">ℹ️ Dettagli azienda attiva</span></div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, fontSize: 14 }}>
-          <div><span style={{ color: '#888', fontSize: 12 }}>Nome</span><div style={{ fontWeight: 600 }}>{azienda?.nome}</div></div>
-          <div><span style={{ color: '#888', fontSize: 12 }}>Settore</span><div>{azienda?.settore || '—'}</div></div>
-          <div><span style={{ color: '#888', fontSize: 12 }}>Dimensione</span><div>{azienda?.dimensione || '—'}</div></div>
-          <div><span style={{ color: '#888', fontSize: 12 }}>ID</span><div style={{ fontSize: 11, color: '#aaa', fontFamily: 'monospace' }}>{azienda?.id?.slice(0,8)}...</div></div>
+        <div className="card-header">
+          <span className="card-title">ℹ️ Dettagli azienda attiva</span>
+          {!editMode && (
+            <button className="btn btn-sm" onClick={() => {
+              setEditForm({ nome: azienda?.nome || '', piva: azienda?.piva || '', settore: azienda?.settore || '', dimensione: azienda?.dimensione || '' })
+              setEditMode(true); setError(null)
+            }}>✏️ Modifica</button>
+          )}
         </div>
+        {!editMode ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, fontSize: 14 }}>
+            <div><span style={{ color: '#888', fontSize: 12 }}>Nome</span><div style={{ fontWeight: 600 }}>{azienda?.nome}</div></div>
+            <div><span style={{ color: '#888', fontSize: 12 }}>Partita IVA</span><div>{azienda?.piva || '—'}</div></div>
+            <div><span style={{ color: '#888', fontSize: 12 }}>Settore</span><div>{azienda?.settore || '—'}</div></div>
+            <div><span style={{ color: '#888', fontSize: 12 }}>Dimensione</span><div>{azienda?.dimensione || '—'}</div></div>
+          </div>
+        ) : (
+          <div>
+            {error && <div className="alert alert-error" style={{ marginBottom: 10 }}>{error}</div>}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="form-group">
+                <label className="form-label">Nome azienda</label>
+                <input className="form-control" value={editForm.nome} onChange={e => setEditForm({ ...editForm, nome: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Partita IVA</label>
+                <input className="form-control" value={editForm.piva} onChange={e => setEditForm({ ...editForm, piva: e.target.value })} maxLength={11} inputMode="numeric" placeholder="11 cifre" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Settore</label>
+                <select className="form-control" value={editForm.settore} onChange={e => setEditForm({ ...editForm, settore: e.target.value })}>
+                  <option value="">Seleziona...</option>
+                  {SETTORI.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Dimensione</label>
+                <select className="form-control" value={editForm.dimensione} onChange={e => setEditForm({ ...editForm, dimensione: e.target.value })}>
+                  <option value="">Seleziona...</option>
+                  {DIMENSIONI.map(d => <option key={d}>{d}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <button className="btn" onClick={() => { setEditMode(false); setError(null) }}>Annulla</button>
+              <button className="btn btn-primary" onClick={salvaModifiche} disabled={loading || !editForm.nome.trim()}>{loading ? 'Salvataggio...' : '💾 Salva modifiche'}</button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="card" style={{ border: '1px solid #FFAAAA' }}>
