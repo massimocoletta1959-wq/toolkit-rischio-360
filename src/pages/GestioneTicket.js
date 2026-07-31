@@ -174,7 +174,7 @@ export default function GestioneTicket() {
   const load = useCallback(async () => {
     setLoading(true)
     const [{ data: t }, { data: r }, { data: m }] = await Promise.all([
-      supabase.from('ticket').select('*, membri(*), rischi(descrizione, categoria, probabilita, impatto)').eq('azienda_id', azienda.id).order('created_at', { ascending: false }),
+      supabase.from('ticket').select('*, membri(*), rischi(descrizione, categoria, probabilita, impatto), ticket_note(id, autore, testo, created_at)').eq('azienda_id', azienda.id).order('created_at', { ascending: false }),
       supabase.from('rischi').select('id, descrizione, probabilita, impatto').eq('azienda_id', azienda.id),
       supabase.from('membri').select('*').eq('azienda_id', azienda.id).order('cognome'),
     ])
@@ -292,6 +292,7 @@ export default function GestioneTicket() {
                           </span>
                         )}
                         {t.email_inviata && <span style={{ fontSize: 11, color: '#27AE60' }}>✓ Email inviata</span>}
+                        {t.created_at && <span style={{ fontSize: 12, color: '#999' }}>🕓 Creato il {new Date(t.created_at).toLocaleDateString('it-IT')}</span>}
                       </div>
                       {t.rischi && (
                         <div style={{ marginTop: 6, fontSize: 12, color: '#888' }}>
@@ -302,9 +303,15 @@ export default function GestioneTicket() {
                           })()}
                         </div>
                       )}
-                      {t.note_membro && (
+                      {((t.ticket_note && t.ticket_note.length > 0) || t.note_membro) && (
                         <div style={{ marginTop: 8, padding: '8px 12px', background: '#F7F8FA', borderRadius: 6, fontSize: 12, color: '#555' }}>
-                          💬 <strong>Note del membro:</strong> {t.note_membro}
+                          <strong style={{ fontSize: 11, color: '#888', display: 'block', marginBottom: 4 }}>💬 STORICO AGGIORNAMENTI</strong>
+                          {[...(t.ticket_note || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map(n => (
+                            <div key={n.id} style={{ marginBottom: 3, lineHeight: 1.5 }}>
+                              <span style={{ color: '#999' }}>{new Date(n.created_at).toLocaleDateString('it-IT')} {new Date(n.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</span> — <strong>{n.autore}</strong>: {n.testo}
+                            </div>
+                          ))}
+                          {(!t.ticket_note || t.ticket_note.length === 0) && t.note_membro && <div>{t.note_membro}</div>}
                         </div>
                       )}
                     </div>

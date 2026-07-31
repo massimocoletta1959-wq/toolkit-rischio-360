@@ -14,14 +14,20 @@ const PRIOR_COLORS = {
   'Bassa': { bg: '#D5F5E3', color: '#27AE60' },
 }
 
-function AggiornaModal({ ticket, onSave, onClose }) {
+function AggiornaModal({ ticket, autore, onSave, onClose }) {
   const [stato, setStato] = useState(ticket.stato)
-  const [note, setNote]   = useState(ticket.note_membro || '')
+  const [note, setNote]   = useState('')
   const [loading, setLoading] = useState(false)
 
   async function save() {
     setLoading(true)
-    await supabase.from('ticket').update({ stato, note_membro: note }).eq('id', ticket.id)
+    await supabase.from('ticket').update({ stato }).eq('id', ticket.id)
+    if (note.trim()) {
+      await supabase.from('ticket_note').insert({
+        ticket_id: ticket.id, autore, ruolo: 'membro',
+        testo: note.trim(), stato_al_momento: stato,
+      })
+    }
     setLoading(false); onSave()
   }
 
@@ -43,7 +49,7 @@ function AggiornaModal({ ticket, onSave, onClose }) {
           </select>
         </div>
         <div className="form-group">
-          <label className="form-label">Note / Aggiornamenti</label>
+          <label className="form-label">Aggiungi una nota (resta nello storico del ticket)</label>
           <textarea className="form-control" value={note} onChange={e => setNote(e.target.value)}
             placeholder="Descrivi l'avanzamento, eventuali problemi o aggiornamenti..." />
         </div>
@@ -76,6 +82,7 @@ function TicketCard({ t, onAggiorna }) {
             <span className="badge" style={{ background: sc.bg, color: sc.color }}>{t.stato}</span>
             <span className="badge" style={{ background: pc.bg, color: pc.color }}>{t.priorita}</span>
             {t.scadenza && <span style={{ fontSize: 12, color: '#666' }}>📅 {new Date(t.scadenza).toLocaleDateString('it-IT')}</span>}
+            {t.created_at && <span style={{ fontSize: 12, color: '#999' }}>🕓 Creato il {new Date(t.created_at).toLocaleDateString('it-IT')}</span>}
           </div>
           {t.rischi && <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>🔗 {t.rischi.descrizione}</div>}
           {t.istruzioni && (
@@ -84,9 +91,15 @@ function TicketCard({ t, onAggiorna }) {
               {t.istruzioni}
             </div>
           )}
-          {t.note_membro && (
+          {((t.ticket_note && t.ticket_note.length > 0) || t.note_membro) && (
             <div style={{ background: '#E8F4FD', borderRadius: 6, padding: '8px 14px', fontSize: 12, color: '#2B5FA5' }}>
-              💬 <strong>Tue note:</strong> {t.note_membro}
+              <strong style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>💬 STORICO AGGIORNAMENTI</strong>
+              {[...(t.ticket_note || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map(n => (
+                <div key={n.id} style={{ marginBottom: 3, lineHeight: 1.5 }}>
+                  <span style={{ color: '#7A9CC4' }}>{new Date(n.created_at).toLocaleDateString('it-IT')} {new Date(n.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</span> — {n.testo}
+                </div>
+              ))}
+              {(!t.ticket_note || t.ticket_note.length === 0) && t.note_membro && <div>{t.note_membro}</div>}
             </div>
           )}
         </div>
@@ -135,7 +148,7 @@ export default function IMieiTask() {
 
     const { data } = await supabase
       .from('ticket')
-      .select('*, rischi(descrizione, categoria), aziende(nome, id)')
+      .select('*, rischi(descrizione, categoria), aziende(nome, id), ticket_note(id, autore, testo, created_at)')
       .in('membro_id', membroIds)
       .order('scadenza', { ascending: true, nullsLast: true })
 
@@ -243,7 +256,7 @@ export default function IMieiTask() {
       )}
 
       {modal && (
-        <AggiornaModal ticket={modal} onSave={() => { setModal(null); load() }} onClose={() => setModal(null)} />
+        <AggiornaModal ticket={modal} autore={profilo?.nome || session.user.email} onSave={() => { setModal(null); load() }} onClose={() => setModal(null)} />
       )}
     </div>
   )
