@@ -66,11 +66,23 @@ export default function Impostazioni() {
       }
     }
     const { error: err } = await supabase.from('aziende')
-      .update({ nome: nomeClean, settore: editForm.settore || null, dimensione: editForm.dimensione || null, piva: pivaClean || null })
+      .update({ nome: nomeClean, settore: editForm.settore || null, dimensione: editForm.dimensione || null, piva: pivaClean || null, logo_url: editForm.logo_url || null })
       .eq('id', azienda.id)
     if (err) { setError(err.message); setLoading(false); return }
     setLoading(false); setEditMode(false)
     await reload()
+  }
+
+  async function caricaLogo(file) {
+    if (!file) return
+    setError(null)
+    const ext = (file.name.split('.').pop() || 'png').toLowerCase()
+    if (!['png', 'jpg', 'jpeg', 'svg', 'webp'].includes(ext)) { setError('Formato logo non valido: usa PNG, JPG, SVG o WEBP.'); return }
+    const percorso = azienda.id + '/logo.' + ext
+    const { error: err } = await supabase.storage.from('loghi').upload(percorso, file, { upsert: true })
+    if (err) { setError('Upload logo: ' + err.message); return }
+    const { data } = supabase.storage.from('loghi').getPublicUrl(percorso)
+    setEditForm(f => ({ ...f, logo_url: data.publicUrl + '?v=' + Date.now() }))
   }
 
   return (
@@ -123,7 +135,7 @@ export default function Impostazioni() {
           <span className="card-title">ℹ️ Dettagli azienda attiva</span>
           {!editMode && (
             <button className="btn btn-sm" onClick={() => {
-              setEditForm({ nome: azienda?.nome || '', piva: azienda?.piva || '', settore: azienda?.settore || '', dimensione: azienda?.dimensione || '' })
+              setEditForm({ nome: azienda?.nome || '', piva: azienda?.piva || '', settore: azienda?.settore || '', dimensione: azienda?.dimensione || '', logo_url: azienda?.logo_url || '' })
               setEditMode(true); setError(null)
             }}>✏️ Modifica</button>
           )}
@@ -134,6 +146,7 @@ export default function Impostazioni() {
             <div><span style={{ color: '#888', fontSize: 12 }}>Partita IVA</span><div>{azienda?.piva || '—'}</div></div>
             <div><span style={{ color: '#888', fontSize: 12 }}>Settore</span><div>{azienda?.settore || '—'}</div></div>
             <div><span style={{ color: '#888', fontSize: 12 }}>Dimensione</span><div>{azienda?.dimensione || '—'}</div></div>
+            <div><span style={{ color: '#888', fontSize: 12 }}>Logo</span><div>{azienda?.logo_url ? <img src={azienda.logo_url} alt="logo" style={{ maxHeight: 36, marginTop: 2 }} /> : '—'}</div></div>
           </div>
         ) : (
           <div>
@@ -160,6 +173,14 @@ export default function Impostazioni() {
                   <option value="">Seleziona...</option>
                   {DIMENSIONI.map(d => <option key={d}>{d}</option>)}
                 </select>
+              </div>
+            </div>
+            <div className="form-group" style={{ marginTop: 4 }}>
+              <label className="form-label">Logo aziendale (per i documenti generati)</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {editForm.logo_url && <img src={editForm.logo_url} alt="logo" style={{ maxHeight: 44, maxWidth: 140, border: '1px solid #E0E0E0', borderRadius: 6, padding: 3 }} />}
+                <input type="file" accept="image/*" onChange={e => caricaLogo(e.target.files[0])} />
+                {editForm.logo_url && <button className="btn btn-sm" onClick={() => setEditForm(f => ({ ...f, logo_url: '' }))}>Rimuovi</button>}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>

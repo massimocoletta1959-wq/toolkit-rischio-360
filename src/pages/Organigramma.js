@@ -111,7 +111,7 @@ export default function Organigramma() {
         <div className="card-header">
           <span className="card-title">🏛️ Ruoli dell'azienda</span>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-sm" onClick={caricaStandard}>⬇️ Carica i 12 ruoli standard</button>
+            <button className="btn btn-sm" onClick={caricaStandard}>⬇️ Carica i ruoli standard</button>
             <button className="btn btn-sm btn-primary" onClick={() => { setNuovo({ sigla: '', nome: '' }); setError(null) }}>+ Ruolo</button>
           </div>
         </div>
@@ -131,7 +131,7 @@ export default function Organigramma() {
           <div className="empty-state"><p>Caricamento...</p></div>
         ) : ruoli.length === 0 ? (
           <div className="empty-state">
-            <p>Nessun ruolo definito. Parti dai <strong>12 ruoli standard</strong> del Manuale delle Procedure, poi personalizza.</p>
+            <p>Nessun ruolo definito. Parti dai <strong>ruoli standard</strong> del Manuale delle Procedure, poi personalizza.</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
