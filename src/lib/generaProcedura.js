@@ -1,9 +1,10 @@
 import { supabase } from './supabase'
 
 export async function generaProcedura(proc, azienda) {
-  const [tplRes, ruoliRes] = await Promise.all([
+  const [tplRes, ruoliRes, adozRes] = await Promise.all([
     supabase.from('procedure_template').select('*').eq('codice', proc.codice).single(),
     supabase.from('ruoli').select('sigla, nome, membri(nome, cognome)').eq('azienda_id', azienda.id),
+    supabase.from('procedure_azienda').select('id, data_emissione').eq('azienda_id', azienda.id).eq('codice', proc.codice).maybeSingle(),
   ])
   const tpl = tplRes.data
   if (!tpl) { alert('Template non trovato nel contenitore: ' + proc.codice); return }
@@ -11,7 +12,21 @@ export async function generaProcedura(proc, azienda) {
   const mappa = {}
   ;(ruoliRes.data || []).forEach(r => { mappa[r.sigla] = r })
 
+  const MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre']
+  let dataEmiss = adozRes.data?.data_emissione
+  if (!dataEmiss) {
+    const oggiISO = new Date().toISOString().slice(0, 10)
+    if (adozRes.data?.id) {
+      await supabase.from('procedure_azienda').update({ data_emissione: oggiISO }).eq('id', adozRes.data.id)
+    }
+    dataEmiss = oggiISO
+  }
+  const dE = new Date(dataEmiss)
+  const dataEmissLabel = MESI[dE.getMonth()] + ' ' + dE.getFullYear()
+
   let corpo = tpl.corpo_html.split('{{AZIENDA}}').join(azienda.nome)
+  corpo = corpo.split('{{SETTORE}}').join(azienda.settore || 'azienda')
+  corpo = corpo.split('{{DATA_EMISSIONE}}').join(dataEmissLabel)
   corpo = corpo.replace(/\{\{RUOLO:([A-Z0-9]+)\}\}/g, (m, sigla) => {
     const r = mappa[sigla]
     if (r && r.membri) return `${r.membri.nome} ${r.membri.cognome} — ${r.nome}`
@@ -20,7 +35,7 @@ export async function generaProcedura(proc, azienda) {
   })
 
   const oggi = new Date().toLocaleDateString('it-IT')
-  const logo = azienda.logo_url ? `<img src="${azienda.logo_url}" style="max-height:60px;max-width:180px" alt="logo" />` : ''
+  const logo = azienda.logo_url ? `<img src="${azienda.logo_url}" style="max-height:60px;max-width:180px;object-fit:contain" alt="" onerror="this.style.display='none'" />` : ''
 
   const w = window.open('', '_blank')
   if (!w) { alert('Il browser ha bloccato la finestra: consenti i popup per questo sito.'); return }

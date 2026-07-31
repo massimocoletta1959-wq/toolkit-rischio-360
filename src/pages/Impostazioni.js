@@ -82,7 +82,11 @@ export default function Impostazioni() {
     const { error: err } = await supabase.storage.from('loghi').upload(percorso, file, { upsert: true })
     if (err) { setError('Upload logo: ' + err.message); return }
     const { data } = supabase.storage.from('loghi').getPublicUrl(percorso)
-    setEditForm(f => ({ ...f, logo_url: data.publicUrl + '?v=' + Date.now() }))
+    const url = data.publicUrl + '?v=' + Date.now()
+    setEditForm(f => ({ ...f, logo_url: url }))
+    // Salvataggio immediato su DB, così il logo c'è anche senza premere Salva
+    await supabase.from('aziende').update({ logo_url: url }).eq('id', azienda.id)
+    await reload()
   }
 
   return (
