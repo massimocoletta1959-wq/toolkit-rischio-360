@@ -68,7 +68,12 @@ function MembroModal({ membro, aziendaId, onSave, onClose }) {
     const { error: err } = editing
       ? await supabase.from('membri').update(payload).eq('id', membro.id)
       : await supabase.from('membri').insert(payload)
-    if (err) { setError(err.message); setLoading(false); return }
+    if (err) {
+      setError(err.message.includes('membri_email_azienda_unici')
+        ? 'Esiste gia un membro con questa email in questa azienda.'
+        : err.message)
+      setLoading(false); return
+    }
     onSave()
   }
 

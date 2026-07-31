@@ -5,9 +5,21 @@ import { RISCHI_DEFAULT, RISCHI_PER_SETTORE, RISCHI_231_EDILIZIA, RISCHI_231_GEN
 const SETTORI = ['Manifatturiero','Servizi','Commercio','Edilizia','Sanità','Tecnologia','Agricoltura','Trasporti','Altro']
 const DIMENSIONI = ['Micro (< 10 dipendenti)','Piccola (10-49)','Media (50-249)','Grande (250+)']
 
+function pivaValida(p) {
+  if (!/^[0-9]{11}$/.test(p)) return false
+  let s = 0
+  for (let i = 0; i < 11; i++) {
+    let n = p.charCodeAt(i) - 48
+    if (i % 2 === 1) { n *= 2; if (n > 9) n -= 9 }
+    s += n
+  }
+  return s % 10 === 0
+}
+
 export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzienda = false }) {
   const [step, setStep]         = useState(1)
   const [nome, setNome]         = useState('')
+  const [piva, setPiva]         = useState('')
   const [settore, setSettore]   = useState('')
   const [dimensione, setDimensione] = useState('')
   const [nomeProfilo, setNomeProfilo] = useState('')
@@ -29,9 +41,28 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
     e.preventDefault()
     setLoading(true); setError(null)
 
+    // 0. Validazione P.IVA e controlli anti-duplicato
+    const pivaClean = piva.replace(/[^0-9]/g, '')
+    if (pivaClean && !pivaValida(pivaClean)) {
+      setError('Partita IVA non valida: controlla le 11 cifre.')
+      setLoading(false); return
+    }
+    if (pivaClean) {
+      const { data: dup } = await supabase.from('aziende').select('id, nome').eq('piva', pivaClean).limit(1)
+      if (dup && dup.length > 0) {
+        setError('Hai gia un\'azienda con questa Partita IVA: "' + dup[0].nome + '".')
+        setLoading(false); return
+      }
+    }
+    const { data: dupNome } = await supabase.from('aziende').select('id, nome').ilike('nome', nome.trim()).limit(1)
+    if (dupNome && dupNome.length > 0) {
+      const conferma = window.confirm('Hai gia un\'azienda chiamata "' + dupNome[0].nome + '". Vuoi crearne davvero un\'altra con lo stesso nome?')
+      if (!conferma) { setLoading(false); return }
+    }
+
     // 1. Crea l'azienda
     const { data: az, error: e1 } = await supabase.from('aziende')
-      .insert({ nome, settore, dimensione }).select().single()
+      .insert({ nome: nome.trim(), settore, dimensione, piva: pivaClean || null }).select().single()
     if (e1) { setError(e1.message); setLoading(false); return }
 
     // 2. Se è la prima azienda, crea anche il profilo utente
@@ -187,6 +218,10 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
           <div className="form-group">
             <label className="form-label">Nome azienda</label>
             <input className="form-control" value={nome} onChange={e => setNome(e.target.value)} required placeholder="Es. Rossi S.r.l." />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Partita IVA <span style={{ color: '#888', fontWeight: 400 }}>(consigliata — evita duplicati)</span></label>
+            <input className="form-control" value={piva} onChange={e => setPiva(e.target.value)} placeholder="11 cifre" maxLength={11} inputMode="numeric" />
           </div>
           <div className="grid-2">
             <div className="form-group">
