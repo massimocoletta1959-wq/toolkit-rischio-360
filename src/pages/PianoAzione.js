@@ -33,12 +33,10 @@ function AzioneModal({ azione, rischio, aziendaId, onSave, onClose, membri = [] 
     const respFinale = form.responsabile === '__custom' ? (form.responsabile_custom || '') : form.responsabile
     const { responsabile_custom, ...formClean } = form
     const payload = { ...formClean, responsabile: respFinale, rischio_id: rischio.id, azienda_id: aziendaId }
-    const { error: err } = editing
-      ? await supabase.from('azioni').update(payload).eq('id', azione.id)
-      : await supabase.from('azioni').insert(payload)
+    const { data: azioneSalvata, error: err } = editing
+      ? await supabase.from('azioni').update(payload).eq('id', azione.id).select().single()
+      : await supabase.from('azioni').insert(payload).select().single()
     if (err) { setError(err.message); setLoading(false); return }
-
-    console.log('membri:', membri.length, 'responsabile:', form.responsabile)
     if (form.responsabile && form.responsabile !== '__custom' && !editing) {
       const membroScelto = membri.find(m =>
         (m.nome + ' ' + m.cognome + (m.ruolo ? ' — ' + m.ruolo : '')) === form.responsabile ||
@@ -48,6 +46,8 @@ function AzioneModal({ azione, rischio, aziendaId, onSave, onClose, membri = [] 
         const ticketPayload = {
           azienda_id: aziendaId,
           membro_id: membroScelto.id,
+          rischio_id: rischio.id,
+          azione_id: azioneSalvata?.id || null,
           titolo: 'Azione: ' + form.azione.substring(0, 80) + (form.azione.length > 80 ? '...' : ''),
           istruzioni: form.azione,
           scadenza: null,
