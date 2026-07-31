@@ -174,7 +174,7 @@ export default function GestioneTicket() {
   const load = useCallback(async () => {
     setLoading(true)
     const [{ data: t }, { data: r }, { data: m }] = await Promise.all([
-      supabase.from('ticket').select('*, membri(*), rischi(descrizione, probabilita, impatto)').eq('azienda_id', azienda.id).order('created_at', { ascending: false }),
+      supabase.from('ticket').select('*, membri(*), rischi(descrizione, categoria, probabilita, impatto)').eq('azienda_id', azienda.id).order('created_at', { ascending: false }),
       supabase.from('rischi').select('id, descrizione, probabilita, impatto').eq('azienda_id', azienda.id),
       supabase.from('membri').select('*').eq('azienda_id', azienda.id).order('cognome'),
     ])
