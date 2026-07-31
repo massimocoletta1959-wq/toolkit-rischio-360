@@ -6,6 +6,7 @@ import Cruscotto from './pages/Cruscotto'
 import RegistroRischi from './pages/RegistroRischi'
 import PianoAzione from './pages/PianoAzione'
 import GestioneMembri from './pages/GestioneMembri'
+import Organigramma from './pages/Organigramma'
 import GestioneTicket from './pages/GestioneTicket'
 import Impostazioni from './pages/Impostazioni'
 import IMieiTask from './pages/IMieiTask'
@@ -210,6 +211,7 @@ export default function App() {
     piano:        <PianoAzione />,
     ticket:       <GestioneTicket />,
     membri:       <GestioneMembri />,
+    organigramma: <Organigramma />,
     impostazioni: <Impostazioni />,
     report: <Report />,
   }
