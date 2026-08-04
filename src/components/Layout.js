@@ -8,6 +8,7 @@ const NAV = [
   { id: 'ticket',    label: 'Ticket',           icon: '🎫' },
   { id: 'membri',    label: 'Membri',           icon: '👥' },
   { id: 'organigramma', label: 'Organigramma',    icon: '🏛️' },
+  { id: 'governance',   label: 'Governance',      icon: '⚖️' },
   { id: 'procedure', label: 'Procedure',           icon: '📘' },
   { id: 'impostazioni', label: 'Impostazioni',   icon: '⚙️' },
   { id: 'report',       label: 'Report',          icon: '📄' },

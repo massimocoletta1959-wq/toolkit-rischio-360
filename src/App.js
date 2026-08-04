@@ -12,6 +12,7 @@ import GestioneTicket from './pages/GestioneTicket'
 import Impostazioni from './pages/Impostazioni'
 import IMieiTask from './pages/IMieiTask'
 import Report from './pages/Report'
+import Governance from './pages/Governance'
 import Layout from './components/Layout'
 import LayoutMembro from './components/LayoutMembro'
 
@@ -213,6 +214,7 @@ export default function App() {
     ticket:       <GestioneTicket />,
     membri:       <GestioneMembri />,
     organigramma: <Organigramma />,
+    governance:   <Governance />,
     procedure:    <Procedure />,
     impostazioni: <Impostazioni />,
     report: <Report />,
