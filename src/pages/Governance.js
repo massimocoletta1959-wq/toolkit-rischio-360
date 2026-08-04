@@ -22,11 +22,12 @@ const nomeMembro = m => m ? `${m.nome || ''} ${m.cognome || ''}`.trim() || m.ema
 // ---------------------------------------------------------------------
 // Modale: nuovo organo
 // ---------------------------------------------------------------------
-function OrganoModal({ aziendaId, onSaved, onClose }) {
-  const [tipo, setTipo] = useState('cda')
-  const [nome, setNome] = useState('')
-  const [qPres, setQPres] = useState('')
-  const [qDelib, setQDelib] = useState('')
+function OrganoModal({ aziendaId, organo, onSaved, onClose }) {
+  const editing = !!organo?.id
+  const [tipo, setTipo] = useState(organo?.tipo || 'cda')
+  const [nome, setNome] = useState(organo?.nome || '')
+  const [qPres, setQPres] = useState(organo?.quorum_presenza ?? '')
+  const [qDelib, setQDelib] = useState(organo?.quorum_delibera ?? '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -35,14 +36,24 @@ function OrganoModal({ aziendaId, onSaved, onClose }) {
   async function salva() {
     if (!nome.trim()) { setError('Dai un nome all\'organo (es. "CdA", "Comitato Rischi").'); return }
     setLoading(true); setError(null)
-    const { error: err } = await supabase.from('organi').insert({
-      azienda_id: aziendaId,
-      tipo,
-      nome: nome.trim(),
-      monocratico: info.mono,
-      quorum_presenza: qPres === '' ? null : Number(qPres),
-      quorum_delibera: qDelib === '' ? null : Number(qDelib),
-    })
+    let err
+    if (editing) {
+      // In modifica cambiamo solo denominazione e quorum (il tipo resta invariato)
+      ;({ error: err } = await supabase.from('organi').update({
+        nome: nome.trim(),
+        quorum_presenza: qPres === '' ? null : Number(qPres),
+        quorum_delibera: qDelib === '' ? null : Number(qDelib),
+      }).eq('id', organo.id))
+    } else {
+      ;({ error: err } = await supabase.from('organi').insert({
+        azienda_id: aziendaId,
+        tipo,
+        nome: nome.trim(),
+        monocratico: info.mono,
+        quorum_presenza: qPres === '' ? null : Number(qPres),
+        quorum_delibera: qDelib === '' ? null : Number(qDelib),
+      }))
+    }
     setLoading(false)
     if (err) { setError(err.message); return }
     onSaved()
@@ -53,15 +64,19 @@ function OrganoModal({ aziendaId, onSaved, onClose }) {
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}>
       <div className="card" style={{ width: 460, maxWidth: '92%', margin: 0 }} onClick={e => e.stopPropagation()}>
         <div className="card-header">
-          <span className="card-title">Nuovo organo</span>
+          <span className="card-title">{editing ? 'Modifica organo' : 'Nuovo organo'}</span>
           <button className="btn btn-sm" onClick={onClose}>✕</button>
         </div>
 
         <div className="form-group">
           <label className="form-label">Tipo di organo</label>
-          <select className="form-control" value={tipo} onChange={e => setTipo(e.target.value)}>
-            {TIPI.map(t => <option key={t.id} value={t.id}>{t.icon}  {t.label}</option>)}
-          </select>
+          {editing ? (
+            <div className="form-control" style={{ background: '#F5F5F5', color: '#666' }}>{info.icon}  {info.label}</div>
+          ) : (
+            <select className="form-control" value={tipo} onChange={e => setTipo(e.target.value)}>
+              {TIPI.map(t => <option key={t.id} value={t.id}>{t.icon}  {t.label}</option>)}
+            </select>
+          )}
           {info.mono && <div style={{ fontSize: 11, color: '#666', marginTop: 5 }}>Organo monocratico: un solo componente.</div>}
         </div>
 
@@ -91,7 +106,7 @@ function OrganoModal({ aziendaId, onSaved, onClose }) {
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button className="btn" onClick={onClose}>Annulla</button>
-          <button className="btn btn-primary" onClick={salva} disabled={loading}>{loading ? 'Salvataggio…' : 'Crea organo'}</button>
+          <button className="btn btn-primary" onClick={salva} disabled={loading}>{loading ? 'Salvataggio…' : (editing ? 'Salva modifiche' : 'Crea organo')}</button>
         </div>
       </div>
     </div>
@@ -146,6 +161,7 @@ export default function Governance() {
   const [comp, setComp] = useState([])       // organo_membri con membri joinati
   const [loading, setLoading] = useState(true)
   const [showNuovo, setShowNuovo] = useState(false)
+  const [editOrg, setEditOrg] = useState(null)
 
   const load = useCallback(async () => {
     if (!azienda?.id) return
@@ -223,7 +239,10 @@ export default function Governance() {
                   <span className="badge" style={{ background: '#EBF4FC', color: '#2B5FA5', marginLeft: 8 }}>{info.label}</span>
                   {o.monocratico && <span className="badge" style={{ background: '#FEF9E7', color: '#856404', marginLeft: 6 }}>monocratico</span>}
                 </span>
-                <button className="btn btn-sm btn-danger" onClick={() => eliminaOrgano(o)}>Elimina</button>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="btn btn-sm" onClick={() => setEditOrg(o)}>Modifica</button>
+                  <button className="btn btn-sm btn-danger" onClick={() => eliminaOrgano(o)}>Elimina</button>
+                </div>
               </div>
 
               {(o.quorum_presenza != null || o.quorum_delibera != null) && (
@@ -270,6 +289,12 @@ export default function Governance() {
         <OrganoModal aziendaId={azienda.id}
           onSaved={() => { setShowNuovo(false); load() }}
           onClose={() => setShowNuovo(false)} />
+      )}
+
+      {editOrg && (
+        <OrganoModal aziendaId={azienda.id} organo={editOrg}
+          onSaved={() => { setEditOrg(null); load() }}
+          onClose={() => setEditOrg(null)} />
       )}
     </div>
   )

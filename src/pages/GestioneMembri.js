@@ -32,11 +32,13 @@ const QUALIFICHE = [
 function MembroModal({ membro, aziendaId, onSave, onClose }) {
   const editing = !!membro?.id
   const [form, setForm] = useState({
-    nome:     membro?.nome || '',
-    cognome:  membro?.cognome || '',
-    email:    membro?.email || '',
-    telefono: membro?.telefono || '',
-    ruolo:    membro?.ruolo || '',
+    nome:      membro?.nome || '',
+    cognome:   membro?.cognome || '',
+    email:     membro?.email || '',
+    pec:       membro?.pec || '',
+    telefono:  membro?.telefono || '',
+    cellulare: membro?.cellulare || '',
+    ruolo:     membro?.ruolo || '',
     qualifica_custom: '',
   })
   const [loading, setLoading] = useState(false)
@@ -61,7 +63,9 @@ function MembroModal({ membro, aziendaId, onSave, onClose }) {
       nome: form.nome,
       cognome: form.cognome,
       email: form.email,
+      pec: form.pec || null,
       telefono: form.telefono,
+      cellulare: form.cellulare || null,
       ruolo: ruoloFinale,
       azienda_id: aziendaId,
     }
@@ -97,31 +101,42 @@ function MembroModal({ membro, aziendaId, onSave, onClose }) {
           </div>
         </div>
 
-        <div className="form-group">
-          <label className="form-label">Email *</label>
-          <input className="form-control" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="mario.rossi@azienda.it" />
+        <div className="grid-2">
+          <div className="form-group">
+            <label className="form-label">Email *</label>
+            <input className="form-control" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="mario.rossi@azienda.it" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">PEC <span style={{ color: '#999', fontWeight: 400 }}>(comunicazioni ufficiali)</span></label>
+            <input className="form-control" type="email" value={form.pec} onChange={e => set('pec', e.target.value)} placeholder="mario.rossi@pec.it" />
+          </div>
         </div>
 
         <div className="grid-2">
           <div className="form-group">
-            <label className="form-label">Telefono</label>
-            <input className="form-control" value={form.telefono} onChange={e => set('telefono', e.target.value)} placeholder="+39 333 1234567" />
+            <label className="form-label">Telefono fisso</label>
+            <input className="form-control" value={form.telefono} onChange={e => set('telefono', e.target.value)} placeholder="+39 02 1234567" />
           </div>
           <div className="form-group">
-            <label className="form-label">Qualifica / Ruolo</label>
-            <select
-              className="form-control"
-              value={isCustom ? 'Altro' : form.ruolo}
-              onChange={e => {
-                set('ruolo', e.target.value)
-                if (e.target.value !== 'Altro') set('qualifica_custom', '')
-                if (isCustom) set('qualifica_custom', form.ruolo)
-              }}
-            >
-              <option value="">Seleziona qualifica...</option>
-              {QUALIFICHE.map(q => <option key={q}>{q}</option>)}
-            </select>
+            <label className="form-label">Cellulare</label>
+            <input className="form-control" value={form.cellulare} onChange={e => set('cellulare', e.target.value)} placeholder="+39 333 1234567" />
           </div>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Qualifica / Ruolo</label>
+          <select
+            className="form-control"
+            value={isCustom ? 'Altro' : form.ruolo}
+            onChange={e => {
+              set('ruolo', e.target.value)
+              if (e.target.value !== 'Altro') set('qualifica_custom', '')
+              if (isCustom) set('qualifica_custom', form.ruolo)
+            }}
+          >
+            <option value="">Seleziona qualifica...</option>
+            {QUALIFICHE.map(q => <option key={q}>{q}</option>)}
+          </select>
         </div>
 
         {(form.ruolo === 'Altro' || isCustom) && (
@@ -276,8 +291,14 @@ export default function GestioneMembri() {
                         ? <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 10, background: '#EBF4FC', color: '#2B5FA5' }}>{m.ruolo}</span>
                         : <span style={{ color: '#aaa', fontSize: 12 }}>—</span>}
                     </td>
-                    <td style={{ color: '#2B5FA5', fontSize: 13 }}>{m.email}</td>
-                    <td style={{ color: '#666', fontSize: 13 }}>{m.telefono || '—'}</td>
+                    <td style={{ fontSize: 13 }}>
+                      <div style={{ color: '#2B5FA5' }}>{m.email}</div>
+                      {m.pec && <div style={{ color: '#856404', fontSize: 11 }}>PEC: {m.pec}</div>}
+                    </td>
+                    <td style={{ color: '#666', fontSize: 13 }}>
+                      <div>{m.telefono || '—'}</div>
+                      {m.cellulare && <div style={{ fontSize: 11, color: '#999' }}>📱 {m.cellulare}</div>}
+                    </td>
                     <td style={{ textAlign: 'center' }}><TicketCount membroId={m.id} /></td>
                     <td style={{ textAlign: 'center' }}><InvioInvito membro={m} aziendaId={azienda.id} /></td>
                     <td>
