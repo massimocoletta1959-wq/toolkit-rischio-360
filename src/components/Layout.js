@@ -1,22 +1,48 @@
 import React, { useState } from 'react'
 import { useApp } from '../App'
 
-const NAV = [
-  { id: 'cruscotto', label: 'Cruscotto',       icon: '📊' },
-  { id: 'registro',  label: 'Registro Rischi', icon: '📋' },
-  { id: 'piano',     label: "Piano d'Azione",  icon: '✅' },
-  { id: 'ticket',    label: 'Ticket',           icon: '🎫' },
-  { id: 'membri',    label: 'Membri',           icon: '👥' },
-  { id: 'organigramma', label: 'Organigramma',    icon: '🏛️' },
-  { id: 'governance',   label: 'Governance',      icon: '⚖️' },
-  { id: 'procedure', label: 'Procedure',           icon: '📘' },
-  { id: 'impostazioni', label: 'Impostazioni',   icon: '⚙️' },
-  { id: 'report',       label: 'Report',          icon: '📄' },
+// Funzioni comuni, disponibili sia dalla Home sia dentro un modulo
+const COMUNI = [
+  { id: 'impostazioni', label: 'Impostazioni',  icon: '⚙️' },
+  { id: 'membri',       label: 'Membri',         icon: '👥' },
+  { id: 'organigramma', label: 'Organigramma',   icon: '🏛️' },
 ]
 
+// Menù specifico di ciascun modulo (colore + voci)
+const MODULI = {
+  rischi: {
+    label: 'Rischi', colore: '#378ADD',
+    voci: [
+      { id: 'cruscotto', label: 'Cruscotto',       icon: '📊' },
+      { id: 'registro',  label: 'Registro rischi', icon: '📋' },
+      { id: 'piano',     label: "Piano d'azione",  icon: '✅' },
+    ],
+  },
+  procedure: {
+    label: 'Procedure', colore: '#1D9E75',
+    voci: [
+      { id: 'procedure', label: 'Procedure', icon: '📘' },
+    ],
+  },
+  governance: {
+    label: 'Governance', colore: '#7F77DD',
+    voci: [
+      { id: 'governance', label: 'Organi', icon: '⚖️' },
+    ],
+  },
+}
+
 export default function Layout({ children }) {
-  const { azienda, aziende, profilo, page, setPage, logout, switchAzienda, onNuovaAzienda } = useApp()
+  const { azienda, aziende, profilo, page, setPage, logout, switchAzienda, onNuovaAzienda, modulo, tornaHome } = useApp()
   const [showSwitch, setShowSwitch] = useState(false)
+
+  const mod = modulo ? MODULI[modulo] : null
+
+  const NavItem = ({ item }) => (
+    <div className={`nav-item${page === item.id ? ' active' : ''}`} onClick={() => setPage(item.id)}>
+      <span>{item.icon}</span><span>{item.label}</span>
+    </div>
+  )
 
   return (
     <div className="app-layout">
@@ -55,11 +81,28 @@ export default function Layout({ children }) {
         </div>
 
         <nav className="sidebar-nav">
-          {NAV.map(n => (
-            <div key={n.id} className={`nav-item${page === n.id ? ' active' : ''}`} onClick={() => setPage(n.id)}>
-              <span>{n.icon}</span><span>{n.label}</span>
-            </div>
-          ))}
+          {mod ? (
+            <>
+              <div className="nav-item" onClick={tornaHome}>
+                <span>←</span><span>Torna alla Home</span>
+              </div>
+              {COMUNI.map(item => <NavItem key={item.id} item={item} />)}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '14px 0 6px', padding: '0 4px' }}>
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: mod.colore }} />
+                <span style={{ fontSize: 11, letterSpacing: 0.5, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>{mod.label}</span>
+              </div>
+              {mod.voci.map(item => <NavItem key={item.id} item={item} />)}
+            </>
+          ) : (
+            <>
+              <div className={`nav-item${page === 'home' ? ' active' : ''}`} onClick={() => setPage('home')}>
+                <span>🏠</span><span>Home</span>
+              </div>
+              {COMUNI.map(item => <NavItem key={item.id} item={item} />)}
+            </>
+          )}
+
           <div className="nav-item" style={{ marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 12 }} onClick={() => onNuovaAzienda()}>
             <span>🏢</span><span>+ Nuova azienda</span>
           </div>

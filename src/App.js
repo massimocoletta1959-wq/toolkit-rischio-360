@@ -13,6 +13,7 @@ import Impostazioni from './pages/Impostazioni'
 import IMieiTask from './pages/IMieiTask'
 import Report from './pages/Report'
 import Governance from './pages/Governance'
+import Home from './pages/Home'
 import Layout from './components/Layout'
 import LayoutMembro from './components/LayoutMembro'
 
@@ -24,7 +25,8 @@ export default function App() {
   const [profilo, setProfilo]      = useState(null)
   const [aziende, setAziende]      = useState([])
   const [azienda, setAziendaState] = useState(null)
-  const [page, setPage]            = useState('cruscotto')
+  const [page, setPage]            = useState('home')
+  const [modulo, setModulo]        = useState(null)   // null = Home; 'rischi' | 'procedure' | 'governance'
   const [showSetup, setShowSetup]  = useState(false)
 
   // Leggi token invito dall'URL e salvalo in localStorage per sopravvivere al redirect
@@ -136,7 +138,19 @@ export default function App() {
   function switchAzienda(az) {
     setAziendaState(az)
     localStorage.setItem('azienda_attiva', az.id)
-    setPage('cruscotto')
+    setModulo(null)
+    setPage('home')
+  }
+
+  // Entra in un modulo: imposta il modulo attivo e la sua pagina di default
+  function entraModulo(m) {
+    const defaultPage = { rischi: 'cruscotto', procedure: 'procedure', governance: 'governance' }[m]
+    setModulo(m)
+    setPage(defaultPage || 'home')
+  }
+  function tornaHome() {
+    setModulo(null)
+    setPage('home')
   }
 
   async function logout() {
@@ -192,6 +206,7 @@ export default function App() {
     switchAzienda,
     reload: () => loadDati(session.user.id),
     page, setPage, logout,
+    modulo, entraModulo, tornaHome,
     onNuovaAzienda: () => setShowSetup(true),
   }
 
@@ -208,6 +223,7 @@ export default function App() {
 
   // ── Vista CONSULENTE ────────────────────────────────────────────────────
   const pages = {
+    home:         <Home />,
     cruscotto:    <Cruscotto />,
     registro:     <RegistroRischi />,
     piano:        <PianoAzione />,
@@ -222,7 +238,7 @@ export default function App() {
 
   return (
     <AppContext.Provider value={ctx}>
-      <Layout>{pages[page] || <Cruscotto />}</Layout>
+      <Layout>{pages[page] || <Home />}</Layout>
     </AppContext.Provider>
   )
 }
