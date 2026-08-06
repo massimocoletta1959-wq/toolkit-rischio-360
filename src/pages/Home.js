@@ -75,7 +75,7 @@ export default function Home() {
               <circle cx={m.cx} cy={m.cy} r="60" fill="#fff" stroke="#EFEFEF" strokeWidth="10" />
               <circle cx={m.cx} cy={m.cy} r="60" fill="none" stroke={on ? m.colore : '#D8D8D8'} strokeWidth="10"
                 strokeLinecap="round" strokeDasharray={on ? undefined : '4 9'} />
-              <text x={m.cx} y={m.cy - 4} textAnchor="middle" style={{ fontSize: 30, fontWeight: 700, fill: on ? '#1A3A5C' : '#B8B8B8' }}>{numero(m)}</text>
+              <text x={m.cx} y={m.cy - 4} textAnchor="middle" style={{ fontSize: 30, fontWeight: 700, fill: on ? '#1A3A5C' : '#B8B8B8' }}>{numero(m.id)}</text>
               <text x={m.cx} y={m.cy + 18} textAnchor="middle" style={{ fontSize: 12, fill: '#9A9A9A' }}>{m.subNum}</text>
               <text x={m.cx} y={m.cy + 92} textAnchor="middle" style={{ fontSize: 15, fontWeight: 600, fill: on ? '#1A3A5C' : '#B8B8B8' }}>{m.label}</text>
               <text x={m.cx} y={m.cy + 111} textAnchor="middle" style={{ fontSize: 12, fill: '#9A9A9A' }}>{on ? m.sub : 'non attivo · attiva in Impostazioni'}</text>
