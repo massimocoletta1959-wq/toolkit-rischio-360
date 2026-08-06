@@ -16,18 +16,21 @@ const MODULI = {
       { id: 'cruscotto', label: 'Cruscotto',       icon: '📊' },
       { id: 'registro',  label: 'Registro rischi', icon: '📋' },
       { id: 'piano',     label: "Piano d'azione",  icon: '✅' },
+      { id: 'ticket',    label: 'Ticket',           icon: '🎫' },
     ],
   },
   procedure: {
     label: 'Procedure', colore: '#1D9E75',
     voci: [
       { id: 'procedure', label: 'Procedure', icon: '📘' },
+      { id: 'ticket',    label: 'Ticket',    icon: '🎫' },
     ],
   },
   governance: {
     label: 'Governance', colore: '#7F77DD',
     voci: [
       { id: 'governance', label: 'Organi', icon: '⚖️' },
+      { id: 'ticket',     label: 'Ticket', icon: '🎫' },
     ],
   },
 }

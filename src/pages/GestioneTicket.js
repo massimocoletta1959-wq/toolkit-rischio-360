@@ -6,6 +6,14 @@ import { getTier } from '../lib/constants'
 const PRIORITA = ['Alta', 'Media', 'Bassa']
 const STATI    = ['Aperto', 'In lavorazione', 'Completato', 'Scaduto']
 
+// Classifica un ticket nel modulo di appartenenza in base ai collegamenti e al tipo.
+// I ticket manuali/senza collegamento restano nei Rischi (dov'erano storicamente).
+function moduloDiTicket(t) {
+  if (t.procedura_id || t.tipo === 'presa_visione') return 'procedure'
+  if (t.organo_id || t.riunione_id || t.tipo === 'parere' || t.tipo === 'delibera') return 'governance'
+  return 'rischi'
+}
+
 const STATO_COLORS = {
   'Aperto':        { bg: '#E6F1FB', color: '#1A3A5C' },
   'In lavorazione':{ bg: '#FEF9E7', color: '#856404' },
@@ -193,7 +201,7 @@ function TicketModal({ ticket, aziendaId, rischi, membri, onSave, onClose }) {
 }
 
 export default function GestioneTicket() {
-  const { azienda, profilo } = useApp()
+  const { azienda, profilo, modulo } = useApp()
   const [notaModal, setNotaModal] = useState(null)
   const [tickets, setTickets]   = useState([])
   const [rischi, setRischi]     = useState([])
@@ -228,6 +236,7 @@ export default function GestioneTicket() {
   }
 
   const filtered = tickets.filter(t => {
+    if (modulo && moduloDiTicket(t) !== modulo) return false
     if (tab === 'miei' && t.membri?.email !== profilo?.email) return false
     if (filterStato && t.stato !== filterStato) return false
     if (filterPriorita && t.priorita !== filterPriorita) return false
