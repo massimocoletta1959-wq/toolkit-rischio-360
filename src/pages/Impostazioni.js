@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
 
@@ -17,13 +17,31 @@ function pivaValida(p) {
 }
 
 export default function Impostazioni() {
-  const { azienda, aziende, profilo, switchAzienda, reload, logout, onNuovaAzienda } = useApp()
+  const { azienda, aziende, profilo, session, switchAzienda, reload, logout, onNuovaAzienda } = useApp()
   const [delConfirm, setDelConfirm] = useState(false)
   const [delNome, setDelNome]       = useState('')
   const [loading, setLoading]       = useState(false)
   const [error, setError]           = useState(null)
   const [editMode, setEditMode]     = useState(false)
   const [editForm, setEditForm]     = useState({ nome: '', piva: '', settore: '', dimensione: '' })
+  const [lic, setLic]               = useState(null)
+  const [modLoading, setModLoading] = useState(null)
+
+  useEffect(() => {
+    if (!session?.user?.id) return
+    supabase.from('gestori')
+      .select('incl_rischi,incl_procedure,incl_governance')
+      .eq('user_id', session.user.id).maybeSingle()
+      .then(({ data }) => setLic(data || null))
+  }, [session])
+
+  async function toggleModulo(campo, incluso) {
+    if (!incluso) return
+    setModLoading(campo)
+    await supabase.from('aziende').update({ [campo]: !azienda[campo] }).eq('id', azienda.id)
+    await reload()
+    setModLoading(null)
+  }
 
   async function eliminaAzienda() {
     if (delNome !== azienda.nome) { setError('Il nome inserito non corrisponde.'); return }
@@ -193,6 +211,41 @@ export default function Impostazioni() {
             </div>
           </div>
         )}
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-header"><span className="card-title">🧩 Moduli attivi</span></div>
+        <p style={{ fontSize: 13, color: '#666', marginBottom: 14 }}>
+          Attiva o disattiva i moduli per <strong>{azienda?.nome}</strong>. Puoi attivare solo i moduli inclusi nella tua licenza.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {[
+            { campo: 'mod_rischi',     incl: 'incl_rischi',     label: 'Gestione Rischi', desc: "Registro rischi, piano d'azione, cruscotto", colore: '#378ADD' },
+            { campo: 'mod_procedure',  incl: 'incl_procedure',  label: 'Procedure',       desc: 'Catalogo, adozione e presa visione',        colore: '#1D9E75' },
+            { campo: 'mod_governance', incl: 'incl_governance', label: 'Governance',      desc: 'Organi, riunioni, delibere e verbali',      colore: '#7F77DD' },
+          ].map(m => {
+            const incluso = lic ? !!lic[m.incl] : true
+            const on = !!azienda?.[m.campo]
+            return (
+              <div key={m.campo} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: 8, background: '#F7F8FA', border: '1px solid #E0E0E0', opacity: incluso ? 1 : 0.6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: on ? m.colore : '#C8C8C8' }} />
+                  <div>
+                    <div style={{ fontWeight: 600, color: '#333' }}>{m.label}</div>
+                    <div style={{ fontSize: 12, color: '#888' }}>{incluso ? m.desc : 'Non incluso nella licenza'}</div>
+                  </div>
+                </div>
+                <button
+                  className={`btn btn-sm${on ? ' btn-primary' : ''}`}
+                  disabled={!incluso || modLoading === m.campo}
+                  onClick={() => toggleModulo(m.campo, incluso)}
+                >
+                  {modLoading === m.campo ? '…' : on ? '✓ Attivo' : 'Attiva'}
+                </button>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       <div className="card" style={{ border: '1px solid #FFAAAA' }}>
