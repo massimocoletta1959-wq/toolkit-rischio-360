@@ -21,9 +21,13 @@ export default function Home() {
 
   const load = useCallback(async () => {
     if (!azienda?.id) return
-    const q = t => supabase.from(t).select('*', { count: 'exact', head: true }).eq('azienda_id', azienda.id)
+    const q = t => supabase.from(t).select('id').eq('azienda_id', azienda.id)
     const [r, p, o] = await Promise.all([q('rischi'), q('procedure_adottate'), q('organi')])
-    setConteggi({ rischi: r.count || 0, procedure: p.count || 0, governance: o.count || 0 })
+    setConteggi({
+      rischi: r.data?.length || 0,
+      procedure: p.data?.length || 0,
+      governance: o.data?.length || 0,
+    })
     if (session?.user?.id) {
       const { data } = await supabase.from('gestori')
         .select('ragione_sociale,piano,data_scadenza').eq('user_id', session.user.id).maybeSingle()
