@@ -113,7 +113,7 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
             azienda_id: az.id,
             nome: c.nome || '',
             cognome: c.cognome || '',
-            email: c.pec || '',
+            email: c.pec || null,
             pec: c.pec || null,
             ruolo: c.ruolo || 'Amministratore',
           }).select().single()

@@ -49,8 +49,8 @@ function MembroModal({ membro, aziendaId, onSave, onClose }) {
   const isCustom = form.ruolo && !QUALIFICHE.includes(form.ruolo) && form.ruolo !== 'Altro'
 
   async function save() {
-    if (!form.nome || !form.cognome || !form.email) {
-      setError('Nome, cognome ed email sono obbligatori')
+    if (!form.nome || !form.cognome) {
+      setError('Nome e cognome sono obbligatori')
       return
     }
     const ruoloFinale = form.ruolo === 'Altro' ? form.qualifica_custom : form.ruolo
@@ -62,7 +62,7 @@ function MembroModal({ membro, aziendaId, onSave, onClose }) {
     const payload = {
       nome: form.nome,
       cognome: form.cognome,
-      email: form.email,
+      email: form.email.trim() || null,
       pec: form.pec || null,
       telefono: form.telefono,
       cellulare: form.cellulare || null,
@@ -103,7 +103,7 @@ function MembroModal({ membro, aziendaId, onSave, onClose }) {
 
         <div className="grid-2">
           <div className="form-group">
-            <label className="form-label">Email *</label>
+            <label className="form-label">Email <span style={{ color: '#999', fontWeight: 400 }}>(facoltativa)</span></label>
             <input className="form-control" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="mario.rossi@azienda.it" />
           </div>
           <div className="form-group">
@@ -162,6 +162,8 @@ function MembroModal({ membro, aziendaId, onSave, onClose }) {
 
 function InvioInvito({ membro, aziendaId }) {
   const [stato, setStato] = React.useState(null) // null | 'loading' | 'ok' | 'error'
+
+  if (!membro?.email) return <span style={{ color: '#bbb', fontSize: 12 }}>—</span>
 
   async function invia() {
     setStato('loading')
