@@ -166,8 +166,27 @@ export default function Impostazioni() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, fontSize: 14 }}>
             <div><span style={{ color: '#888', fontSize: 12 }}>Nome</span><div style={{ fontWeight: 600 }}>{azienda?.nome}</div></div>
             <div><span style={{ color: '#888', fontSize: 12 }}>Partita IVA</span><div>{azienda?.piva || '—'}</div></div>
+            {azienda?.codice_fiscale && <div><span style={{ color: '#888', fontSize: 12 }}>Codice fiscale</span><div>{azienda.codice_fiscale}</div></div>}
+            {azienda?.forma_giuridica && <div><span style={{ color: '#888', fontSize: 12 }}>Forma giuridica</span><div>{azienda.forma_giuridica}</div></div>}
             <div><span style={{ color: '#888', fontSize: 12 }}>Settore</span><div>{azienda?.settore || '—'}</div></div>
             <div><span style={{ color: '#888', fontSize: 12 }}>Dimensione</span><div>{azienda?.dimensione || '—'}</div></div>
+            {azienda?.rea && <div><span style={{ color: '#888', fontSize: 12 }}>REA</span><div>{azienda.rea}</div></div>}
+            {azienda?.pec && <div><span style={{ color: '#888', fontSize: 12 }}>PEC</span><div>{azienda.pec}</div></div>}
+            {azienda?.ateco && <div><span style={{ color: '#888', fontSize: 12 }}>ATECO</span><div>{azienda.ateco}{azienda?.attivita ? ' · ' + azienda.attivita : ''}</div></div>}
+            {azienda?.capitale_sociale && <div><span style={{ color: '#888', fontSize: 12 }}>Capitale sociale</span><div>{azienda.capitale_sociale}</div></div>}
+            {azienda?.data_costituzione && <div><span style={{ color: '#888', fontSize: 12 }}>Costituzione</span><div>{new Date(azienda.data_costituzione).toLocaleDateString('it-IT')}</div></div>}
+            {(azienda?.sede_via || azienda?.sede_comune) && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <span style={{ color: '#888', fontSize: 12 }}>Sede legale</span>
+                <div>{[azienda.sede_via, [azienda.sede_cap, azienda.sede_comune].filter(Boolean).join(' '), azienda.sede_provincia ? '(' + azienda.sede_provincia + ')' : ''].filter(Boolean).join(', ')}</div>
+              </div>
+            )}
+            {azienda?.oggetto_sociale && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <span style={{ color: '#888', fontSize: 12 }}>Oggetto sociale</span>
+                <div style={{ fontSize: 13, color: '#555', lineHeight: 1.5 }}>{azienda.oggetto_sociale}</div>
+              </div>
+            )}
             <div><span style={{ color: '#888', fontSize: 12 }}>Logo</span><div>{azienda?.logo_url ? <img src={azienda.logo_url} alt="logo" style={{ maxHeight: 36, marginTop: 2 }} /> : '—'}</div></div>
           </div>
         ) : (
