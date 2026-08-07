@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
+import { CATALOGO_PROCEDURE } from '../lib/procedure'
 
 const TIER = [
   { key: 't1', label: 'Critici',      col: '#E5484D' },
@@ -11,7 +12,7 @@ const TIER = [
 
 const DEFAULT = {
   rischi:     { n: 0, tiers: { t1: 0, t2: 0, t3: 0, t4: 0 }, azioni: 0 },
-  procedure:  { n: 0, catalogo: 0, daFirmare: 0 },
+  procedure:  { n: 0, catalogo: 0, personalizzate: 0 },
   governance: { n: 0, organi: [], componenti: 0, prossima: null },
 }
 
@@ -31,15 +32,14 @@ export default function Home() {
     const A = azienda.id
     const res = await Promise.allSettled([
       supabase.from('rischi').select('probabilita,impatto').eq('azienda_id', A),
-      supabase.from('procedure_adottate').select('stato').eq('azienda_id', A),
+      supabase.from('procedure_azienda').select('stato').eq('azienda_id', A),
       supabase.from('organi').select('id,nome,tipo').eq('azienda_id', A),
       supabase.from('azioni').select('id').eq('azienda_id', A),
       supabase.from('riunioni').select('data_riunione').eq('azienda_id', A),
-      supabase.from('procedure_template').select('id'),
     ])
     const val = i => (res[i].status === 'fulfilled' ? (res[i].value.data || []) : [])
     const rischiRows = val(0), procRows = val(1), organi = val(2)
-    const azioniRows = val(3), riunioniRows = val(4), templateRows = val(5)
+    const azioniRows = val(3), riunioniRows = val(4)
 
     const tiers = { t1: 0, t2: 0, t3: 0, t4: 0 }
     rischiRows.forEach(r => {
@@ -60,7 +60,7 @@ export default function Home() {
 
     setD({
       rischi:     { n: rischiRows.length, tiers, azioni: azioniRows.length },
-      procedure:  { n: procRows.length, catalogo: templateRows.length, daFirmare: procRows.filter(p => p.stato === 'distribuita').length },
+      procedure:  { n: procRows.filter(p => p.stato && p.stato !== 'Non applicabile').length, catalogo: CATALOGO_PROCEDURE.length, personalizzate: procRows.filter(p => p.stato === 'Personalizzata').length },
       governance: { n: organi.length, organi, componenti, prossima: prossime[0] || null },
     })
 
@@ -172,7 +172,7 @@ export default function Home() {
                 <div style={{ height: '100%', width: `${d.procedure.catalogo ? Math.min(100, (d.procedure.n / d.procedure.catalogo) * 100) : 0}%`, background: 'linear-gradient(90deg,#37C79C,#128A66)', borderRadius: 5 }} />
               </div>
               <div style={{ fontSize: 12.5, color: '#5B6673', marginTop: 10 }}><strong style={{ color: '#12233A' }}>{d.procedure.catalogo}</strong> nel catalogo</div>
-              <div style={{ fontSize: 12.5, color: '#5B6673', marginTop: 4 }}><strong style={{ color: '#12233A' }}>{d.procedure.daFirmare}</strong> da firmare</div>
+              <div style={{ fontSize: 12.5, color: '#5B6673', marginTop: 4 }}><strong style={{ color: '#12233A' }}>{d.procedure.personalizzate}</strong> personalizzate</div>
               <div className="cta" style={{ color: '#128A66' }}>Apri le procedure →</div>
             </div>
           ) : (
