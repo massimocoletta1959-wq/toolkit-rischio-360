@@ -27,6 +27,9 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
   const [error, setError]       = useState(null)
   const [aziendaId, setAziendaId] = useState(null)
   const [scelta, setScelta]     = useState(null)
+  const [visuraData, setVisuraData]       = useState(null)
+  const [visuraLoading, setVisuraLoading] = useState(false)
+  const [visuraError, setVisuraError]     = useState(null)
 
   const haSettore  = !!(RISCHI_PER_SETTORE[settore]?.length)
   const ha231Edil  = settore === 'Edilizia'
@@ -60,9 +63,25 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
       if (!conferma) { setLoading(false); return }
     }
 
-    // 1. Crea l'azienda
+    // 1. Crea l'azienda (con i campi della visura, se importata)
+    const a = visuraData?.azienda || {}
     const { data: az, error: e1 } = await supabase.from('aziende')
-      .insert({ nome: nome.trim(), settore, dimensione, piva: pivaClean || null }).select().single()
+      .insert({
+        nome: nome.trim(), settore, dimensione, piva: pivaClean || null,
+        codice_fiscale: a.codice_fiscale || null,
+        forma_giuridica: a.forma_giuridica || null,
+        rea: a.rea || null,
+        pec: a.pec || null,
+        sede_via: a.sede_via || null,
+        sede_comune: a.sede_comune || null,
+        sede_provincia: a.sede_provincia || null,
+        sede_cap: a.sede_cap || null,
+        capitale_sociale: a.capitale_sociale || null,
+        data_costituzione: a.data_costituzione || null,
+        ateco: a.ateco || null,
+        attivita: a.attivita || null,
+        oggetto_sociale: a.oggetto_sociale || null,
+      }).select().single()
     if (e1) { setError(e1.message); setLoading(false); return }
 
     // 2. Se è la prima azienda, crea anche il profilo utente
@@ -79,9 +98,65 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
       setError(e3.message); setLoading(false); return
     }
 
+    // 4. Se import da visura: crea l'organo e i suoi componenti (best-effort)
+    if (visuraData?.componenti?.length) {
+      try {
+        const org = visuraData.organo || {}
+        const { data: organo } = await supabase.from('organi').insert({
+          azienda_id: az.id,
+          tipo: org.tipo || 'cda',
+          nome: org.nome || 'Consiglio di Amministrazione',
+          monocratico: org.tipo === 'amministratore_unico',
+        }).select().single()
+        for (const c of visuraData.componenti) {
+          const { data: m } = await supabase.from('membri').insert({
+            azienda_id: az.id,
+            nome: c.nome || '',
+            cognome: c.cognome || '',
+            email: c.pec || '',
+            pec: c.pec || null,
+            ruolo: c.ruolo || 'Amministratore',
+          }).select().single()
+          if (organo && m) {
+            await supabase.from('organo_membri').insert({
+              organo_id: organo.id, membro_id: m.id, ruolo: c.ruolo || 'Componente',
+            })
+          }
+        }
+      } catch (gErr) {
+        console.error('Import governance da visura:', gErr)
+      }
+    }
+
     setAziendaId(az.id)
     setLoading(false)
     setStep(2)
+  }
+
+  async function importaVisura(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setVisuraLoading(true); setVisuraError(null)
+    try {
+      const b64 = await new Promise((res, rej) => {
+        const r = new FileReader()
+        r.onload = () => res(String(r.result).split(',')[1])
+        r.onerror = () => rej(new Error('lettura del file fallita'))
+        r.readAsDataURL(file)
+      })
+      const { data, error: err } = await supabase.functions.invoke('extract-visura', { body: { pdf_base64: b64 } })
+      if (err) throw err
+      if (data?.error) throw new Error(data.error)
+      const a = data.azienda || {}
+      setNome(a.denominazione || '')
+      setPiva((a.partita_iva || '').replace(/[^0-9]/g, ''))
+      setSettore(a.settore_suggerito === 'edilizia' ? 'Edilizia' : 'Servizi')
+      setVisuraData(data)
+    } catch (err) {
+      setVisuraError('Non sono riuscito a leggere la visura: ' + (err.message || String(err)))
+    } finally {
+      setVisuraLoading(false)
+    }
   }
 
   async function carica() {
@@ -215,6 +290,26 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
               <input className="form-control" value={nomeProfilo} onChange={e => setNomeProfilo(e.target.value)} required placeholder="Es. Mario Rossi" />
             </div>
           )}
+
+          <div style={{ background: '#F4F9FF', border: '1px dashed #B9D4F0', borderRadius: 12, padding: 16, marginBottom: 18 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A3A5C', marginBottom: 4 }}>📄 Importa da visura camerale</div>
+            <div style={{ fontSize: 12, color: '#6B7683', marginBottom: 12, lineHeight: 1.5 }}>
+              Carica il PDF della visura: compileremo l'anagrafica e creeremo l'organo amministrativo con i suoi componenti. Controlla e correggi i campi prima di salvare.
+            </div>
+            <label className="btn btn-sm" style={{ cursor: visuraLoading ? 'default' : 'pointer', background: '#2B5FA5', color: '#fff' }}>
+              {visuraLoading ? 'Lettura in corso…' : '📎 Scegli il PDF della visura'}
+              <input type="file" accept="application/pdf" style={{ display: 'none' }} disabled={visuraLoading} onChange={importaVisura} />
+            </label>
+            {visuraError && <div style={{ fontSize: 12, color: '#C0392B', marginTop: 10 }}>{visuraError}</div>}
+            {visuraData && (
+              <div style={{ fontSize: 12, color: '#0F6E56', marginTop: 10, lineHeight: 1.5 }}>
+                ✓ Dati estratti dalla visura.
+                {visuraData.componenti?.length ? ` Al salvataggio verranno creati l'organo “${visuraData.organo?.nome || 'organo'}” e ${visuraData.componenti.length} componenti.` : ''}
+                {' '}Controlla i campi qui sotto.
+              </div>
+            )}
+          </div>
+
           <div className="form-group">
             <label className="form-label">Nome azienda</label>
             <input className="form-control" value={nome} onChange={e => setNome(e.target.value)} required placeholder="Es. Rossi S.r.l." />
