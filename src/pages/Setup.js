@@ -120,6 +120,7 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
           if (organo && m) {
             await supabase.from('organo_membri').insert({
               organo_id: organo.id, membro_id: m.id, ruolo: c.ruolo || 'Componente',
+              data_nomina: c.data_nomina || null,
             })
           }
         }

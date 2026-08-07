@@ -190,6 +190,10 @@ export default function Governance() {
     await supabase.from('organo_membri').delete().eq('id', id)
     load()
   }
+  async function cambiaRuolo(id, ruolo) {
+    await supabase.from('organo_membri').update({ ruolo }).eq('id', id)
+    load()
+  }
 
   const compDi = organoId => comp.filter(c => c.organo_id === organoId)
 
@@ -262,8 +266,15 @@ export default function Governance() {
                       {membriOrgano.map(c => (
                         <tr key={c.id}>
                           <td>{nomeMembro(c.membri)}</td>
-                          <td><span className="badge" style={{ background: '#EBF4FC', color: '#2B5FA5' }}>{c.ruolo}</span></td>
-                          <td style={{ color: '#666', fontSize: 12 }}>{c.data_nomina || '—'}</td>
+                          <td>
+                            <select className="form-control" style={{ width: 'auto', minWidth: 150, padding: '4px 8px', fontSize: 13 }}
+                              value={RUOLI.includes(c.ruolo) ? c.ruolo : '__altro__'}
+                              onChange={e => e.target.value !== '__altro__' && cambiaRuolo(c.id, e.target.value)}>
+                              {!RUOLI.includes(c.ruolo) && <option value="__altro__">{c.ruolo}</option>}
+                              {RUOLI.map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
+                          </td>
+                          <td style={{ color: '#666', fontSize: 12 }}>{c.data_nomina ? new Date(c.data_nomina + 'T00:00:00').toLocaleDateString('it-IT') : '—'}</td>
                           <td style={{ textAlign: 'right' }}>
                             <button className="btn btn-sm btn-danger" onClick={() => rimuoviComponente(c.id)}>Rimuovi</button>
                           </td>
