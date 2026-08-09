@@ -148,19 +148,12 @@ export default function IMieiTask() {
   const load = useCallback(async () => {
     setLoading(true)
 
-    // Trova tutti i record membri collegati a questo utente (per user_id O per email)
-    const { data: membriUtente } = await supabase
-      .from('membri').select('id, azienda_id, user_id')
-      .or('user_id.eq.' + session.user.id + ',email.eq.' + session.user.email)
-
+    // Recupera TUTTI i miei record membro (per email, in ogni azienda) e li
+    // collega all'account, superando la RLS via funzione SECURITY DEFINER.
     let membroIds = []
-    if (membriUtente && membriUtente.length > 0) {
-      membroIds = membriUtente.map(m => m.id)
-      // Auto-aggancio: collega l'account ai record trovati solo via email
-      const daAgganciare = membriUtente.filter(m => !m.user_id).map(m => m.id)
-      if (daAgganciare.length > 0) {
-        await supabase.from('membri').update({ user_id: session.user.id }).in('id', daAgganciare)
-      }
+    const { data: idRows } = await supabase.rpc('miei_membri_ids')
+    if (idRows && idRows.length > 0) {
+      membroIds = idRows.map(r => r.id)
     } else {
       // Fallback: usa membro_id dal profilo
       const { data: prof } = await supabase

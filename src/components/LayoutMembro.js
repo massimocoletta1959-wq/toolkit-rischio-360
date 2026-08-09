@@ -3,7 +3,6 @@ import { useApp } from '../App'
 
 export default function LayoutMembro({ children }) {
   const { azienda, profilo, logout } = useApp()
-  const eGestore = profilo?.ruolo && profilo.ruolo !== 'membro'
 
   return (
     <div className="app-layout">
@@ -25,15 +24,6 @@ export default function LayoutMembro({ children }) {
         <div className="sidebar-footer">
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>{profilo?.email}</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>Membro operativo</div>
-          {eGestore && (
-            <button
-              className="btn btn-sm"
-              style={{ width: '100%', justifyContent: 'center', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.15)', marginBottom: 8 }}
-              onClick={() => { window.location.href = window.location.pathname }}
-            >
-              🏢 Vista Gestore
-            </button>
-          )}
           <button
             className="btn btn-sm"
             style={{ width: '100%', justifyContent: 'center', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)' }}
