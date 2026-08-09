@@ -30,12 +30,19 @@ function AggiornaModal({ ticket, autore, onSave, onClose }) {
 
   async function save() {
     setLoading(true)
-    await supabase.from('ticket').update({ stato }).eq('id', ticket.id)
+    // Aggiorna solo se il ticket è ancora nello stato di partenza:
+    // così due conferme ravvicinate non scrivono la transizione due volte.
+    let cambiato = false
     if (stato !== ticket.stato) {
-      await supabase.from('ticket_note').insert({
-        ticket_id: ticket.id, autore, ruolo: 'sistema',
-        testo: 'Stato: ' + ticket.stato + ' → ' + stato,
-      })
+      const { data: upd } = await supabase.from('ticket')
+        .update({ stato }).eq('id', ticket.id).eq('stato', ticket.stato).select('id')
+      cambiato = !!(upd && upd.length > 0)
+      if (cambiato) {
+        await supabase.from('ticket_note').insert({
+          ticket_id: ticket.id, autore, ruolo: 'sistema',
+          testo: 'Stato: ' + ticket.stato + ' → ' + stato,
+        })
+      }
     }
     if (note.trim()) {
       await supabase.from('ticket_note').insert({
