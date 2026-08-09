@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
+import { generaProcedura } from '../lib/generaProcedura'
+import { CATALOGO_PROCEDURE } from '../lib/procedure'
+
+// Estrae il codice procedura (es. PRO-AMM-004) da un ticket di presa visione
+function codiceDaTicket(t) {
+  const src = `${t.procedura_id || ''} ${t.istruzioni || ''} ${t.titolo || ''}`
+  const m = src.match(/PRO-[A-Z0-9]+-\d+/)
+  return m ? m[0] : null
+}
 
 const STATO_COLORS = {
   'Aperto':        { bg: '#E6F1FB', color: '#1A3A5C' },
@@ -71,6 +80,7 @@ function AggiornaModal({ ticket, autore, onSave, onClose }) {
 function TicketCard({ t, onAggiorna }) {
   const sc = STATO_COLORS[t.stato] || STATO_COLORS['Aperto']
   const pc = PRIOR_COLORS[t.priorita] || PRIOR_COLORS['Media']
+  const codiceProc = (t.tipo === 'presa_visione' || t.procedura_id) ? codiceDaTicket(t) : null
   const scadenzaDate = t.scadenza ? new Date(t.scadenza) : null
   const oggi = new Date()
   const giorniMancanti = scadenzaDate ? Math.ceil((scadenzaDate - oggi) / (1000*60*60*24)) : null
@@ -109,9 +119,17 @@ function TicketCard({ t, onAggiorna }) {
             </div>
           )}
         </div>
-        <button className="btn btn-sm btn-primary" style={{ flexShrink: 0 }} onClick={() => onAggiorna(t)} disabled={t.stato === 'Completato'}>
-          {t.stato === 'Completato' ? '✓ Fatto' : 'Aggiorna'}
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+          {codiceProc && (
+            <button className="btn btn-sm" style={{ background: '#EBF4FC', color: '#2B5FA5', whiteSpace: 'nowrap' }}
+              onClick={() => generaProcedura(CATALOGO_PROCEDURE.find(p => p.codice === codiceProc) || { codice: codiceProc }, t.aziende || {})}>
+              📄 Apri la procedura
+            </button>
+          )}
+          <button className="btn btn-sm btn-primary" onClick={() => onAggiorna(t)} disabled={t.stato === 'Completato'}>
+            {t.stato === 'Completato' ? '✓ Fatto' : 'Aggiorna'}
+          </button>
+        </div>
       </div>
     </div>
   )
