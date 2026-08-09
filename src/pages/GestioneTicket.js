@@ -201,7 +201,7 @@ function TicketModal({ ticket, aziendaId, rischi, membri, onSave, onClose }) {
 }
 
 export default function GestioneTicket() {
-  const { azienda, profilo, modulo } = useApp()
+  const { azienda, profilo, session, modulo } = useApp()
   const [notaModal, setNotaModal] = useState(null)
   const [tickets, setTickets]   = useState([])
   const [rischi, setRischi]     = useState([])
@@ -235,9 +235,20 @@ export default function GestioneTicket() {
     setDelConfirm(null); load()
   }
 
+  // I record membro che appartengono all'utente loggato (anche se e' Gestore):
+  // riconosciuti per account collegato o per email. Serve a "I miei ticket".
+  const mieiIds = new Set(
+    membri
+      .filter(m =>
+        (session?.user && (m.user_id === session.user.id || (m.email && m.email === session.user.email))) ||
+        (profilo?.email && m.email === profilo.email)
+      )
+      .map(m => m.id)
+  )
+
   const filtered = tickets.filter(t => {
     if (modulo && moduloDiTicket(t) !== modulo) return false
-    if (tab === 'miei' && t.membri?.email !== profilo?.email) return false
+    if (tab === 'miei' && !mieiIds.has(t.membro_id)) return false
     if (filterStato && t.stato !== filterStato) return false
     if (filterPriorita && t.priorita !== filterPriorita) return false
     if (filterMembro && t.membro_id !== filterMembro) return false
