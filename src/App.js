@@ -224,6 +224,7 @@ export default function App() {
   // ── Vista CONSULENTE ────────────────────────────────────────────────────
   const pages = {
     home:         <Home />,
+    imiei:        <IMieiTask />,
     cruscotto:    <Cruscotto />,
     registro:     <RegistroRischi />,
     piano:        <PianoAzione />,

@@ -3,6 +3,7 @@ import { useApp } from '../App'
 
 // Funzioni comuni, disponibili sia dalla Home sia dentro un modulo
 const COMUNI = [
+  { id: 'imiei',        label: 'I miei task',    icon: '✅' },
   { id: 'impostazioni', label: 'Impostazioni',  icon: '⚙️' },
   { id: 'membri',       label: 'Membri',         icon: '👥' },
   { id: 'organigramma', label: 'Organigramma',   icon: '🏛️' },
