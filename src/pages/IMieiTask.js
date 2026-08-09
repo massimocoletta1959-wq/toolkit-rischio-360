@@ -148,28 +148,10 @@ export default function IMieiTask() {
   const load = useCallback(async () => {
     setLoading(true)
 
-    // Recupera TUTTI i miei record membro (per email, in ogni azienda) e li
-    // collega all'account, superando la RLS via funzione SECURITY DEFINER.
-    let membroIds = []
-    const { data: idRows } = await supabase.rpc('miei_membri_ids')
-    if (idRows && idRows.length > 0) {
-      membroIds = idRows.map(r => r.id)
-    } else {
-      // Fallback: usa membro_id dal profilo
-      const { data: prof } = await supabase
-        .from('profili').select('membro_id').eq('id', profilo.id).single()
-      if (prof?.membro_id) membroIds = [prof.membro_id]
-    }
-
-    if (membroIds.length === 0) { setTickets([]); setLoading(false); return }
-
-    const { data } = await supabase
-      .from('ticket')
-      .select('*, rischi(descrizione, categoria), aziende(nome, id), ticket_note(id, autore, ruolo, testo, created_at)')
-      .in('membro_id', membroIds)
-      .order('scadenza', { ascending: true, nullsLast: true })
-
-    const allTickets = data || []
+    // Carica tutti i miei ticket via funzione SECURITY DEFINER: aggancia i
+    // miei record membro e restituisce i ticket scavalcando la RLS.
+    const { data: ticketJson } = await supabase.rpc('miei_ticket')
+    const allTickets = Array.isArray(ticketJson) ? ticketJson : []
     setTickets(allTickets)
 
     // Estrai aziende uniche
