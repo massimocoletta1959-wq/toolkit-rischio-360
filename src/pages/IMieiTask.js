@@ -30,19 +30,12 @@ function AggiornaModal({ ticket, autore, onSave, onClose }) {
 
   async function save() {
     setLoading(true)
-    // Aggiorna solo se il ticket è ancora nello stato di partenza:
-    // così due conferme ravvicinate non scrivono la transizione due volte.
-    let cambiato = false
+    await supabase.from('ticket').update({ stato }).eq('id', ticket.id)
     if (stato !== ticket.stato) {
-      const { data: upd } = await supabase.from('ticket')
-        .update({ stato }).eq('id', ticket.id).eq('stato', ticket.stato).select('id')
-      cambiato = !!(upd && upd.length > 0)
-      if (cambiato) {
-        await supabase.from('ticket_note').insert({
-          ticket_id: ticket.id, autore, ruolo: 'sistema',
-          testo: 'Stato: ' + ticket.stato + ' → ' + stato,
-        })
-      }
+      await supabase.from('ticket_note').insert({
+        ticket_id: ticket.id, autore, ruolo: 'sistema',
+        testo: 'Stato: ' + ticket.stato + ' → ' + stato,
+      })
     }
     if (note.trim()) {
       await supabase.from('ticket_note').insert({
@@ -84,14 +77,35 @@ function AggiornaModal({ ticket, autore, onSave, onClose }) {
   )
 }
 
-function TicketCard({ t, onAggiorna }) {
+function TicketCard({ t, onAggiorna, autore, onReload }) {
   const sc = STATO_COLORS[t.stato] || STATO_COLORS['Aperto']
   const pc = PRIOR_COLORS[t.priorita] || PRIOR_COLORS['Media']
   const codiceProc = (t.tipo === 'presa_visione' || t.procedura_id) ? codiceDaTicket(t) : null
+  const presaVisione = t.tipo === 'presa_visione' || !!t.procedura_id
+  const giaPresa = t.stato === 'Completato'
+  const [conf, setConf] = React.useState({ loading: false, err: null })
   const scadenzaDate = t.scadenza ? new Date(t.scadenza) : null
   const oggi = new Date()
   const giorniMancanti = scadenzaDate ? Math.ceil((scadenzaDate - oggi) / (1000*60*60*24)) : null
   const inScadenza = giorniMancanti !== null && giorniMancanti <= 3 && giorniMancanti >= 0 && t.stato !== 'Completato'
+
+  async function confermaPresa() {
+    setConf({ loading: true, err: null })
+    const now = new Date().toISOString()
+    // Aggiorna solo se il ticket è ancora nello stato attuale, e VERIFICA che
+    // il salvataggio sia avvenuto (niente nota se lo stato non è cambiato).
+    const { data: upd } = await supabase.from('ticket')
+      .update({ stato: 'Completato', data_presa_visione: now })
+      .eq('id', t.id).eq('stato', t.stato).select('id')
+    if (!upd || upd.length === 0) {
+      setConf({ loading: false, err: 'Non salvato — ricarica e riprova' })
+      return
+    }
+    await supabase.from('ticket_note').insert({
+      ticket_id: t.id, autore: autore || 'membro', ruolo: 'sistema', testo: 'Presa visione confermata',
+    })
+    if (onReload) onReload()
+  }
 
   return (
     <div className="card" style={{ borderLeft: `4px solid ${sc.color}`, marginBottom: 0, background: inScadenza ? '#FFFDF5' : 'white' }}>
@@ -126,16 +140,30 @@ function TicketCard({ t, onAggiorna }) {
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0, alignItems: 'stretch' }}>
           {codiceProc && (
             <button className="btn btn-sm" style={{ background: '#EBF4FC', color: '#2B5FA5', whiteSpace: 'nowrap' }}
               onClick={() => generaProcedura(CATALOGO_PROCEDURE.find(p => p.codice === codiceProc) || { codice: codiceProc }, t.aziende || {})}>
               📄 Apri la procedura
             </button>
           )}
-          <button className="btn btn-sm btn-primary" onClick={() => onAggiorna(t)} disabled={t.stato === 'Completato'}>
-            {t.stato === 'Completato' ? '✓ Fatto' : 'Aggiorna'}
-          </button>
+          {presaVisione ? (
+            giaPresa ? (
+              <span style={{ fontSize: 12, color: '#27AE60', textAlign: 'center', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                ✓ Presa visione{t.data_presa_visione ? ' · ' + new Date(t.data_presa_visione).toLocaleDateString('it-IT') : ''}
+              </span>
+            ) : (
+              <button className="btn btn-sm" style={{ background: '#27AE60', color: '#fff', whiteSpace: 'nowrap' }}
+                disabled={conf.loading} onClick={confermaPresa}>
+                {conf.loading ? 'Salvataggio…' : '✓ Confermo la presa visione'}
+              </button>
+            )
+          ) : (
+            <button className="btn btn-sm btn-primary" onClick={() => onAggiorna(t)} disabled={t.stato === 'Completato'}>
+              {t.stato === 'Completato' ? '✓ Fatto' : 'Aggiorna'}
+            </button>
+          )}
+          {conf.err && <div style={{ fontSize: 11, color: '#C0392B', textAlign: 'right' }}>{conf.err}</div>}
         </div>
       </div>
     </div>
@@ -251,12 +279,12 @@ export default function IMieiTask() {
                   <span style={{ fontSize: 12, color: '#888', background: '#F0F0F0', padding: '2px 8px', borderRadius: 10 }}>{tasks.length} task</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {tasks.map(t => <TicketCard key={t.id} t={t} onAggiorna={setModal} />)}
+                  {tasks.map(t => <TicketCard key={t.id} t={t} onAggiorna={setModal} autore={profilo?.nome || session.user.email} onReload={load} />)}
                 </div>
               </div>
             ))
           ) : (
-            filtered.map(t => <TicketCard key={t.id} t={t} onAggiorna={setModal} />)
+            filtered.map(t => <TicketCard key={t.id} t={t} onAggiorna={setModal} autore={profilo?.nome || session.user.email} onReload={load} />)
           )}
         </div>
       )}
