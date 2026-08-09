@@ -22,6 +22,7 @@ function DistribuzioneModal({ proc, defaultMembroId, membri, aziendaId, onClose,
   })
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState(null)
+  const [avvisaEmail, setAvvisaEmail] = useState(true)
 
   const nomeMembro = m => `${m.nome || ''} ${m.cognome || ''}`.trim() || m.email || '—'
   const toggle = id => setSel(s => ({ ...s, [id]: !s[id] }))
@@ -41,14 +42,29 @@ function DistribuzioneModal({ proc, defaultMembroId, membri, aziendaId, onClose,
       priorita: 'Media',
       stato: 'Aperto',
     }))
-    let { error } = await supabase.from('ticket').insert(righe)
+    let { data: creati, error } = await supabase.from('ticket').insert(righe).select('id')
     if (error && /procedura_id|column|type|invalid|uuid/i.test(error.message)) {
       // ripiego: alcune installazioni hanno procedura_id non testuale
       const righe2 = righe.map(({ procedura_id, ...r }) => r)
-      ;({ error } = await supabase.from('ticket').insert(righe2))
+      ;({ data: creati, error } = await supabase.from('ticket').insert(righe2).select('id'))
     }
+    if (error) { setLoading(false); setErr(error.message); return }
+
+    // Avvisa via email (stesso meccanismo dei ticket manuali)
+    if (avvisaEmail && creati?.length) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        await Promise.all(creati.map(t =>
+          fetch('https://vwbixmbbcutjcplskjvg.supabase.co/functions/v1/invia-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+            body: JSON.stringify({ ticket_id: t.id, tipo: 'assegnazione' }),
+          }).catch(() => {})
+        ))
+      } catch (e) { /* l'email e' best-effort */ }
+    }
+
     setLoading(false)
-    if (error) { setErr(error.message); return }
     onDone(dest.length)
   }
 
@@ -77,6 +93,12 @@ function DistribuzioneModal({ proc, defaultMembroId, membri, aziendaId, onClose,
           </div>
         )}
         {err && <div style={{ background: '#FADBD8', color: '#C0392B', padding: '8px 10px', borderRadius: 8, fontSize: 12, marginBottom: 12 }}>{err}</div>}
+        {membri.length > 0 && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#555', marginBottom: 12 }}>
+            <input type="checkbox" checked={avvisaEmail} onChange={e => setAvvisaEmail(e.target.checked)} />
+            Avvisa via email chi ha un indirizzo
+          </label>
+        )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button className="btn" onClick={onClose}>Annulla</button>
           <button className="btn btn-primary" onClick={invia} disabled={loading || nSel === 0}>{loading ? 'Invio…' : `Invia ${nSel || ''} prese visione`}</button>
