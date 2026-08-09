@@ -3,7 +3,6 @@ import { useApp } from '../App'
 
 // Funzioni comuni, disponibili sia dalla Home sia dentro un modulo
 const COMUNI = [
-  { id: 'imiei',        label: 'I miei task',    icon: '✅' },
   { id: 'impostazioni', label: 'Impostazioni',  icon: '⚙️' },
   { id: 'membri',       label: 'Membri',         icon: '👥' },
   { id: 'organigramma', label: 'Organigramma',   icon: '🏛️' },
@@ -114,6 +113,10 @@ export default function Layout({ children }) {
 
         <div className="sidebar-footer">
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>{profilo?.email}</div>
+          <button className="btn btn-sm" style={{ width: '100%', justifyContent: 'center', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.15)', marginBottom: 8 }}
+            onClick={() => { window.location.href = window.location.pathname + '?vista=membro' }}>
+            ✅ La mia vista Membro
+          </button>
           <button className="btn btn-sm" style={{ width: '100%', justifyContent: 'center', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)' }} onClick={logout}>
             Esci
           </button>

@@ -34,6 +34,7 @@ export default function App() {
   const tokenDaUrl = urlParams.get('invito')
   if (tokenDaUrl) localStorage.setItem('token_invito', tokenDaUrl)
   const tokenInvito = tokenDaUrl || localStorage.getItem('token_invito')
+  const vistaMembro = urlParams.get('vista') === 'membro'
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -211,7 +212,7 @@ export default function App() {
   }
 
   // ── Vista MEMBRO OPERATIVO ──────────────────────────────────────────────
-  if (profilo.ruolo === 'membro') {
+  if (vistaMembro || profilo.ruolo === 'membro') {
     return (
       <AppContext.Provider value={ctx}>
         <LayoutMembro>
@@ -224,7 +225,6 @@ export default function App() {
   // ── Vista CONSULENTE ────────────────────────────────────────────────────
   const pages = {
     home:         <Home />,
-    imiei:        <IMieiTask />,
     cruscotto:    <Cruscotto />,
     registro:     <RegistroRischi />,
     piano:        <PianoAzione />,
