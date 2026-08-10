@@ -11,6 +11,11 @@ function codiceDaTicket(t) {
   return m ? m[0] : null
 }
 
+// Un ticket è una "presa visione" se è di quel tipo o è legato a una procedura
+function isPresaVisione(t) {
+  return t.tipo === 'presa_visione' || !!t.procedura_id
+}
+
 const STATO_COLORS = {
   'Aperto':        { bg: '#E6F1FB', color: '#1A3A5C' },
   'In lavorazione':{ bg: '#FEF9E7', color: '#856404' },
@@ -170,6 +175,49 @@ function TicketCard({ t, onAggiorna, autore, onReload }) {
   )
 }
 
+// Rende una lista di ticket divisa in due sezioni: Prese visione / Task operativi
+function ListaTicketDivisa({ tasks, onAggiorna, autore, onReload }) {
+  const ordina = arr => [...arr].sort((a, b) => (a.stato === 'Completato' ? 1 : 0) - (b.stato === 'Completato' ? 1 : 0))
+  const prese = ordina(tasks.filter(isPresaVisione))
+  const operativi = ordina(tasks.filter(t => !isPresaVisione(t)))
+
+  const Header = ({ icona, titolo, colore, n }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 10px' }}>
+      <span style={{ fontSize: 13, fontWeight: 700, color: colore }}>{icona} {titolo}</span>
+      <span style={{ fontSize: 11, color: '#888', background: '#F0F0F0', padding: '2px 8px', borderRadius: 10 }}>{n}</span>
+    </div>
+  )
+
+  return (
+    <>
+      {prese.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <Header icona="📋" titolo="Prese visione" colore="#2B5FA5" n={prese.length} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {prese.map(t => (
+              <div key={t.id} style={{ opacity: t.stato === 'Completato' ? 0.6 : 1 }}>
+                <TicketCard t={t} onAggiorna={onAggiorna} autore={autore} onReload={onReload} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {operativi.length > 0 && (
+        <div>
+          <Header icona="✅" titolo="Task operativi" colore="#155724" n={operativi.length} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {operativi.map(t => (
+              <div key={t.id} style={{ opacity: t.stato === 'Completato' ? 0.6 : 1 }}>
+                <TicketCard t={t} onAggiorna={onAggiorna} autore={autore} onReload={onReload} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 export default function IMieiTask() {
   const { profilo, session } = useApp()
   const [tickets, setTickets]       = useState([])
@@ -278,13 +326,11 @@ export default function IMieiTask() {
                   <span style={{ fontSize: 14, fontWeight: 700, color: '#1A3A5C' }}>🏢 {nomeAz}</span>
                   <span style={{ fontSize: 12, color: '#888', background: '#F0F0F0', padding: '2px 8px', borderRadius: 10 }}>{tasks.length} task</span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {tasks.map(t => <TicketCard key={t.id} t={t} onAggiorna={setModal} autore={profilo?.nome || session.user.email} onReload={load} />)}
-                </div>
+                <ListaTicketDivisa tasks={tasks} onAggiorna={setModal} autore={profilo?.nome || session.user.email} onReload={load} />
               </div>
             ))
           ) : (
-            filtered.map(t => <TicketCard key={t.id} t={t} onAggiorna={setModal} autore={profilo?.nome || session.user.email} onReload={load} />)
+            <ListaTicketDivisa tasks={filtered} onAggiorna={setModal} autore={profilo?.nome || session.user.email} onReload={load} />
           )}
         </div>
       )}
