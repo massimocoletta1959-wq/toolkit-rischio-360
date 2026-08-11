@@ -27,6 +27,7 @@ export default function App() {
   const [azienda, setAziendaState] = useState(null)
   const [page, setPage]            = useState('home')
   const [modulo, setModulo]        = useState(null)   // null = Home; 'rischi' | 'procedure' | 'governance'
+  const [pagMembro, setPagMembro]  = useState('task') // vista membro: 'task' | 'procedure'
   const [showSetup, setShowSetup]  = useState(false)
 
   // Leggi token invito dall'URL e salvalo in localStorage per sopravvivere al redirect
@@ -214,8 +215,8 @@ export default function App() {
   if (profilo.ruolo === 'membro') {
     return (
       <AppContext.Provider value={ctx}>
-        <LayoutMembro>
-          <IMieiTask />
+        <LayoutMembro page={pagMembro} setPage={setPagMembro}>
+          <IMieiTask key={pagMembro} modo={pagMembro} />
         </LayoutMembro>
       </AppContext.Provider>
     )

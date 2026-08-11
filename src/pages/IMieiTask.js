@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
 import { generaProcedura } from '../lib/generaProcedura'
-import { CATALOGO_PROCEDURE } from '../lib/procedure'
+import { CATALOGO_PROCEDURE, AREE_PROCEDURE } from '../lib/procedure'
 
 // Estrae il codice procedura (es. PRO-AMM-004) da un ticket di presa visione
 function codiceDaTicket(t) {
@@ -14,6 +14,14 @@ function codiceDaTicket(t) {
 // Un ticket è una "presa visione" se è di quel tipo o è legato a una procedura
 function isPresaVisione(t) {
   return t.tipo === 'presa_visione' || !!t.procedura_id
+}
+
+// Ricava l'area (es. AMM) di una presa visione, dal codice procedura → catalogo
+function areaDaTicket(t) {
+  const cod = codiceDaTicket(t)
+  if (!cod) return null
+  const p = CATALOGO_PROCEDURE.find(x => x.codice === cod)
+  return p ? p.area : null
 }
 
 const STATO_COLORS = {
@@ -175,50 +183,22 @@ function TicketCard({ t, onAggiorna, autore, onReload }) {
   )
 }
 
-// Rende una lista di ticket divisa in due sezioni: Prese visione / Task operativi
-function ListaTicketDivisa({ tasks, onAggiorna, autore, onReload }) {
-  const ordina = arr => [...arr].sort((a, b) => (a.stato === 'Completato' ? 1 : 0) - (b.stato === 'Completato' ? 1 : 0))
-  const prese = ordina(tasks.filter(isPresaVisione))
-  const operativi = ordina(tasks.filter(t => !isPresaVisione(t)))
-
-  const Header = ({ icona, titolo, colore, n }) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 10px' }}>
-      <span style={{ fontSize: 13, fontWeight: 700, color: colore }}>{icona} {titolo}</span>
-      <span style={{ fontSize: 11, color: '#888', background: '#F0F0F0', padding: '2px 8px', borderRadius: 10 }}>{n}</span>
-    </div>
-  )
-
+// Lista piatta di ticket: i completati scendono in fondo, sbiaditi.
+function ListaTicket({ tasks, onAggiorna, autore, onReload }) {
+  const ordinati = [...tasks].sort((a, b) => (a.stato === 'Completato' ? 1 : 0) - (b.stato === 'Completato' ? 1 : 0))
   return (
-    <>
-      {prese.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <Header icona="📋" titolo="Prese visione" colore="#2B5FA5" n={prese.length} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {prese.map(t => (
-              <div key={t.id} style={{ opacity: t.stato === 'Completato' ? 0.6 : 1 }}>
-                <TicketCard t={t} onAggiorna={onAggiorna} autore={autore} onReload={onReload} />
-              </div>
-            ))}
-          </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {ordinati.map(t => (
+        <div key={t.id} style={{ opacity: t.stato === 'Completato' ? 0.6 : 1 }}>
+          <TicketCard t={t} onAggiorna={onAggiorna} autore={autore} onReload={onReload} />
         </div>
-      )}
-      {operativi.length > 0 && (
-        <div>
-          <Header icona="✅" titolo="Task operativi" colore="#155724" n={operativi.length} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {operativi.map(t => (
-              <div key={t.id} style={{ opacity: t.stato === 'Completato' ? 0.6 : 1 }}>
-                <TicketCard t={t} onAggiorna={onAggiorna} autore={autore} onReload={onReload} />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </>
+      ))}
+    </div>
   )
 }
 
-export default function IMieiTask() {
+export default function IMieiTask({ modo = 'task' }) {
+  const proceduraView = modo === 'procedure'
   const { profilo, session } = useApp()
   const [tickets, setTickets]       = useState([])
   const [aziendeFiltro, setAziendeFiltro] = useState([]) // aziende disponibili
@@ -227,6 +207,7 @@ export default function IMieiTask() {
   const [modal, setModal]           = useState(null)
   const [filterStato, setFilterStato] = useState('')
   const [filterCategoria, setFilterCategoria] = useState('')
+  const [filterArea, setFilterArea] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -252,31 +233,36 @@ export default function IMieiTask() {
 
   useEffect(() => { load() }, [load])
 
-  // Filtra per azienda e stato
-  const filtered = tickets.filter(t => {
+  // Ticket del modo corrente: task operativi oppure prese visione
+  const ticketsModo = tickets.filter(t => proceduraView ? isPresaVisione(t) : !isPresaVisione(t))
+
+  // Filtra per azienda, stato e (categoria rischio | area procedura)
+  const filtered = ticketsModo.filter(t => {
     if (aziendaSelezionata !== 'tutte' && t.aziende?.id !== aziendaSelezionata) return false
     if (filterStato && t.stato !== filterStato) return false
-    if (filterCategoria && t.rischi?.categoria !== filterCategoria) return false
+    if (!proceduraView && filterCategoria && t.rischi?.categoria !== filterCategoria) return false
+    if (proceduraView && filterArea && areaDaTicket(t) !== filterArea) return false
     return true
   })
 
-  const aperti     = tickets.filter(t => t.stato === 'Aperto').length
-  const inLav      = tickets.filter(t => t.stato === 'In lavorazione').length
-  const completati = tickets.filter(t => t.stato === 'Completato').length
+  const aperti     = ticketsModo.filter(t => t.stato === 'Aperto').length
+  const inLav      = ticketsModo.filter(t => t.stato === 'In lavorazione').length
+  const completati = ticketsModo.filter(t => t.stato === 'Completato').length
   const multiAz    = aziendeFiltro.length > 1
+  const areeDisponibili = [...new Set(ticketsModo.map(areaDaTicket).filter(Boolean))].sort()
 
   return (
     <div>
       <div className="page-header">
-        <h2>I miei task</h2>
-        <p>Tutti i task assegnati a te{multiAz ? ` — ${aziendeFiltro.length} aziende` : ''}</p>
+        <h2>{proceduraView ? 'Le mie procedure' : 'I miei task'}</h2>
+        <p>{proceduraView ? 'Procedure da prendere in visione' : 'Task operativi assegnati a te'}{multiAz ? ` — ${aziendeFiltro.length} aziende` : ''}</p>
       </div>
 
       <div className="stats-grid">
-        <div className="stat-card"><div className="stat-num">{tickets.length}</div><div className="stat-label">Totali</div></div>
-        <div className="stat-card"><div className="stat-num" style={{ color: '#1A3A5C' }}>{aperti}</div><div className="stat-label">Da fare</div></div>
+        <div className="stat-card"><div className="stat-num">{ticketsModo.length}</div><div className="stat-label">Totali</div></div>
+        <div className="stat-card"><div className="stat-num" style={{ color: '#1A3A5C' }}>{aperti}</div><div className="stat-label">{proceduraView ? 'Da leggere' : 'Da fare'}</div></div>
         <div className="stat-card"><div className="stat-num" style={{ color: '#856404' }}>{inLav}</div><div className="stat-label">In lavorazione</div></div>
-        <div className="stat-card"><div className="stat-num" style={{ color: '#27AE60' }}>{completati}</div><div className="stat-label">Completati</div></div>
+        <div className="stat-card"><div className="stat-num" style={{ color: '#27AE60' }}>{completati}</div><div className="stat-label">{proceduraView ? 'Prese in visione' : 'Completati'}</div></div>
       </div>
 
       {/* Filtri */}
@@ -293,25 +279,37 @@ export default function IMieiTask() {
         {[['','Tutti'],['Aperto','Da fare'],['In lavorazione','In lavorazione'],['Completato','Completati']].map(([v,l]) => (
           <button key={v} className={`btn btn-sm${filterStato === v ? ' btn-primary' : ''}`} onClick={() => setFilterStato(v)}>{l}</button>
         ))}
-        <select className="form-control" style={{ maxWidth: 220 }} value={filterCategoria} onChange={e => setFilterCategoria(e.target.value)}>
-          <option value="">Tutte le categorie rischio</option>
-          {[...new Set(tickets.map(t => t.rischi?.categoria).filter(Boolean))].sort().map(cat => (
-            <option key={cat} value={cat}>{cat}</option>
-          ))}
-        </select>
-        {filterCategoria && <button className="btn btn-sm" onClick={() => setFilterCategoria('')}>✕</button>}
+        {!proceduraView && (
+          <select className="form-control" style={{ maxWidth: 220 }} value={filterCategoria} onChange={e => setFilterCategoria(e.target.value)}>
+            <option value="">Tutte le categorie rischio</option>
+            {[...new Set(ticketsModo.map(t => t.rischi?.categoria).filter(Boolean))].sort().map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        )}
+        {proceduraView && areeDisponibili.length > 0 && (
+          <select className="form-control" style={{ maxWidth: 260 }} value={filterArea} onChange={e => setFilterArea(e.target.value)}>
+            <option value="">Tutte le aree</option>
+            {areeDisponibili.map(a => (
+              <option key={a} value={a}>{a} — {AREE_PROCEDURE[a] || a}</option>
+            ))}
+          </select>
+        )}
+        {!proceduraView && filterCategoria && <button className="btn btn-sm" onClick={() => setFilterCategoria('')}>✕</button>}
+        {proceduraView && filterArea && <button className="btn btn-sm" onClick={() => setFilterArea('')}>✕</button>}
       </div>
 
       {loading ? <div className="spinner" /> : filtered.length === 0 ? (
         <div className="card">
           <div className="empty-state">
-            <div style={{ fontSize: 36 }}>✅</div>
-            <p>{tickets.length === 0 ? 'Nessun task assegnato al momento.' : 'Nessun task con questo filtro.'}</p>
+            <div style={{ fontSize: 36 }}>{proceduraView ? '📋' : '✅'}</div>
+            <p>{ticketsModo.length === 0
+              ? (proceduraView ? 'Nessuna procedura da prendere in visione.' : 'Nessun task assegnato al momento.')
+              : (proceduraView ? 'Nessuna procedura con questo filtro.' : 'Nessun task con questo filtro.')}</p>
           </div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {/* Se tutte le aziende, mostra header azienda */}
           {aziendaSelezionata === 'tutte' && multiAz ? (
             Object.entries(
               filtered.reduce((acc, t) => {
@@ -324,13 +322,13 @@ export default function IMieiTask() {
               <div key={nomeAz} style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: '#1A3A5C' }}>🏢 {nomeAz}</span>
-                  <span style={{ fontSize: 12, color: '#888', background: '#F0F0F0', padding: '2px 8px', borderRadius: 10 }}>{tasks.length} task</span>
+                  <span style={{ fontSize: 12, color: '#888', background: '#F0F0F0', padding: '2px 8px', borderRadius: 10 }}>{tasks.length}</span>
                 </div>
-                <ListaTicketDivisa tasks={tasks} onAggiorna={setModal} autore={profilo?.nome || session.user.email} onReload={load} />
+                <ListaTicket tasks={tasks} onAggiorna={setModal} autore={profilo?.nome || session.user.email} onReload={load} />
               </div>
             ))
           ) : (
-            <ListaTicketDivisa tasks={filtered} onAggiorna={setModal} autore={profilo?.nome || session.user.email} onReload={load} />
+            <ListaTicket tasks={filtered} onAggiorna={setModal} autore={profilo?.nome || session.user.email} onReload={load} />
           )}
         </div>
       )}

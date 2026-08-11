@@ -1,8 +1,12 @@
 import React from 'react'
 import { useApp } from '../App'
 
-export default function LayoutMembro({ children }) {
+export default function LayoutMembro({ children, page = 'task', setPage }) {
   const { azienda, profilo, logout } = useApp()
+  const voci = [
+    { id: 'task',      icona: '🎫', label: 'I miei task' },
+    { id: 'procedure', icona: '📋', label: 'Le mie procedure' },
+  ]
 
   return (
     <div className="app-layout">
@@ -13,13 +17,15 @@ export default function LayoutMembro({ children }) {
         </div>
         <div className="sidebar-azienda">
           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Area personale</span>
-          <strong style={{ fontSize: 13 }}>I miei task</strong>
+          <strong style={{ fontSize: 13 }}>{page === 'procedure' ? 'Le mie procedure' : 'I miei task'}</strong>
         </div>
         <nav className="sidebar-nav">
-          <div className="nav-item active">
-            <span>🎫</span>
-            <span>I miei task</span>
-          </div>
+          {voci.map(v => (
+            <div key={v.id} className={`nav-item${page === v.id ? ' active' : ''}`} style={{ cursor: 'pointer' }} onClick={() => setPage && setPage(v.id)}>
+              <span>{v.icona}</span>
+              <span>{v.label}</span>
+            </div>
+          ))}
         </nav>
         <div className="sidebar-footer">
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>{profilo?.email}</div>
