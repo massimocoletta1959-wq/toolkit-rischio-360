@@ -91,9 +91,9 @@ function TicketModal({ ticket, aziendaId, rischi, membri, onSave, onClose }) {
 
     let ticketId = ticket?.id
     if (editing) {
-      const { error: err } = await supabase.from('ticket').update(payload).eq('id', ticketId)
+      const { data: upd, error: err } = await supabase.from('ticket').update(payload).eq('id', ticketId).select('id')
       if (err) { setError(err.message); setLoading(false); return }
-      if (form.stato !== ticket.stato) {
+      if (upd && upd.length > 0 && form.stato !== ticket.stato) {
         await supabase.from('ticket_note').insert({
           ticket_id: ticketId, autore: profilo?.nome || 'Consulente', ruolo: 'sistema',
           testo: 'Stato: ' + ticket.stato + ' → ' + form.stato,

@@ -43,12 +43,16 @@ function AggiornaModal({ ticket, autore, onSave, onClose }) {
 
   async function save() {
     setLoading(true)
-    await supabase.from('ticket').update({ stato }).eq('id', ticket.id)
+    // Scrive la nota di transizione solo se l'update dello stato è andato a buon fine.
     if (stato !== ticket.stato) {
-      await supabase.from('ticket_note').insert({
-        ticket_id: ticket.id, autore, ruolo: 'sistema',
-        testo: 'Stato: ' + ticket.stato + ' → ' + stato,
-      })
+      const { data: upd } = await supabase.from('ticket')
+        .update({ stato }).eq('id', ticket.id).eq('stato', ticket.stato).select('id')
+      if (upd && upd.length > 0) {
+        await supabase.from('ticket_note').insert({
+          ticket_id: ticket.id, autore, ruolo: 'sistema',
+          testo: 'Stato: ' + ticket.stato + ' → ' + stato,
+        })
+      }
     }
     if (note.trim()) {
       await supabase.from('ticket_note').insert({
