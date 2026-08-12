@@ -22,8 +22,9 @@ const MODULI = {
   procedure: {
     label: 'Procedure', colore: '#1D9E75',
     voci: [
-      { id: 'procedure', label: 'Procedure', icon: '📘' },
-      { id: 'ticket',    label: 'Ticket',    icon: '🎫' },
+      { id: 'procedure',    label: 'Procedure',    icon: '📘' },
+      { id: 'tracciamento', label: 'Tracciamento', icon: '📊' },
+      { id: 'ticket',       label: 'Ticket',       icon: '🎫' },
     ],
   },
   governance: {

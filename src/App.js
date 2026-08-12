@@ -8,6 +8,7 @@ import PianoAzione from './pages/PianoAzione'
 import GestioneMembri from './pages/GestioneMembri'
 import Organigramma from './pages/Organigramma'
 import Procedure from './pages/Procedure'
+import TracciamentoProcedure from './pages/TracciamentoProcedure'
 import GestioneTicket from './pages/GestioneTicket'
 import Impostazioni from './pages/Impostazioni'
 import IMieiTask from './pages/IMieiTask'
@@ -233,6 +234,7 @@ export default function App() {
     organigramma: <Organigramma />,
     governance:   <Governance />,
     procedure:    <Procedure />,
+    tracciamento: <TracciamentoProcedure />,
     impostazioni: <Impostazioni />,
     report: <Report />,
   }
