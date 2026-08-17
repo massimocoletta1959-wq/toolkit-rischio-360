@@ -2,12 +2,15 @@ import { supabase } from './supabase'
 
 export async function generaProcedura(proc, azienda) {
   const [tplRes, ruoliRes, adozRes] = await Promise.all([
-    supabase.from('procedure_template').select('*').eq('codice', proc.codice).single(),
+    supabase.from('procedure_template').select('*').eq('codice', proc.codice)
+      .in('settore', [azienda.settore, 'generico'].filter(Boolean)),
     supabase.from('ruoli').select('sigla, nome, membri(nome, cognome)').eq('azienda_id', azienda.id),
     supabase.from('procedure_azienda').select('id, data_emissione').eq('azienda_id', azienda.id).eq('codice', proc.codice).maybeSingle(),
   ])
-  const tpl = tplRes.data
-  if (!tpl) { alert('Template non trovato nel contenitore: ' + proc.codice); return }
+  // Preferisci il template del settore dell'azienda, poi il generico
+  const tplList = tplRes.data || []
+  const tpl = tplList.find(t => t.settore === azienda.settore) || tplList.find(t => t.settore === 'generico') || null
+  if (!tpl) { alert('Template non ancora disponibile per questa procedura: ' + proc.codice); return }
 
   const mappa = {}
   ;(ruoliRes.data || []).forEach(r => { mappa[r.sigla] = r })
