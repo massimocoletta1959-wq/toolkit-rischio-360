@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
-import { CATALOGO_PROCEDURE, AREE_PROCEDURE, MAPPA_SIGLE } from '../lib/procedure'
+import { AREE_PROCEDURE, MAPPA_SIGLE } from '../lib/procedure'
 import { generaProcedura } from '../lib/generaProcedura'
 
 const STATI = ['Adottata', 'Personalizzata', 'Non applicabile']
@@ -110,6 +110,7 @@ function DistribuzioneModal({ proc, defaultMembroId, membri, aziendaId, onClose,
 
 export default function Procedure() {
   const { azienda } = useApp()
+  const [catalogo, setCatalogo] = useState([])   // procedure del settore + generico
   const [adozioni, setAdozioni] = useState({})   // codice -> record procedure_azienda
   const [ruoli, setRuoli]       = useState([])
   const [membri, setMembri]     = useState([])
@@ -121,16 +122,19 @@ export default function Procedure() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [p, r, m] = await Promise.all([
+    const [p, r, m, c] = await Promise.all([
       supabase.from('procedure_azienda').select('*').eq('azienda_id', azienda.id),
       supabase.from('ruoli').select('id, sigla, nome, membro_id').eq('azienda_id', azienda.id).order('sigla'),
       supabase.from('membri').select('id, nome, cognome, email').eq('azienda_id', azienda.id).order('cognome'),
+      supabase.from('procedure_catalogo').select('codice, area, titolo, funzioni')
+        .in('settore', [azienda.settore, 'generico'].filter(Boolean)).eq('attivo', true).order('codice'),
     ])
     const map = {}
     ;(p.data || []).forEach(x => { map[x.codice] = x })
     setAdozioni(map)
     setRuoli(r.data || [])
     setMembri(m.data || [])
+    setCatalogo(c.data || [])
     setLoading(false)
   }, [azienda.id])
 
@@ -157,7 +161,7 @@ export default function Procedure() {
 
   async function adottaTutte() {
     setError(null); setLoading(true)
-    const mancanti = CATALOGO_PROCEDURE.filter(p => !adozioni[p.codice]).map(p => ({
+    const mancanti = catalogo.filter(p => !adozioni[p.codice]).map(p => ({
       azienda_id: azienda.id, codice: p.codice, stato: 'Adottata', ruolo_id: ruoloSuggerito(p),
     }))
     if (mancanti.length > 0) {
@@ -167,8 +171,8 @@ export default function Procedure() {
     load()
   }
 
-  const lista = CATALOGO_PROCEDURE.filter(p => !areaSel || p.area === areaSel)
-  const tot = CATALOGO_PROCEDURE.length
+  const lista = catalogo.filter(p => !areaSel || p.area === areaSel)
+  const tot = catalogo.length
   const nAdott = Object.values(adozioni).filter(a => a.stato === 'Adottata').length
   const nPers  = Object.values(adozioni).filter(a => a.stato === 'Personalizzata').length
   const nNA    = Object.values(adozioni).filter(a => a.stato === 'Non applicabile').length
