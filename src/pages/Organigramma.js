@@ -21,6 +21,61 @@ export const RUOLI_STANDARD = [
   { sigla: 'IT',     nome: 'Information Technology' },
 ]
 
+// Ruoli standard per il settore SERVIZI
+const RUOLI_SERVIZI = [
+  { sigla: 'CdA',  nome: 'Consiglio di Amministrazione' },
+  { sigla: 'DL',   nome: 'Direzione / Datore di Lavoro' },
+  { sigla: 'AMM',  nome: 'Amministrazione' },
+  { sigla: 'CG',   nome: 'Contabilità Generale' },
+  { sigla: 'DC',   nome: 'Direzione Commerciale' },
+  { sigla: 'ACQ',  nome: 'Acquisti e Fornitori' },
+  { sigla: 'DTS',  nome: 'Direzione Tecnica / Operativa' },
+  { sigla: 'RC',   nome: 'Responsabile Commessa / Progetto' },
+  { sigla: 'HR',   nome: 'Responsabile Risorse Umane' },
+  { sigla: 'IT',   nome: 'Information Technology' },
+  { sigla: 'RSGI', nome: 'Responsabile Sistema di Gestione Integrato' },
+  { sigla: 'RSPP', nome: 'Responsabile Servizio Prevenzione e Protezione' },
+  { sigla: 'DPO',  nome: 'Responsabile Protezione Dati (Privacy)' },
+  { sigla: 'MC',   nome: 'Medico Competente (esterno)' },
+  { sigla: 'RLS',  nome: 'Rappresentante dei Lavoratori per la Sicurezza' },
+]
+
+// Ruoli standard per il settore HOTEL
+const RUOLI_HOTEL = [
+  { sigla: 'DG',    nome: 'Direttore Generale' },
+  { sigla: 'VD',    nome: 'Vice Direttore' },
+  { sigla: 'DL',    nome: 'Direzione / Datore di Lavoro' },
+  { sigla: 'AMM',   nome: 'Amministrazione & Finanza' },
+  { sigla: 'HR',    nome: 'Responsabile Risorse Umane' },
+  { sigla: 'IT',    nome: 'Information Technology' },
+  { sigla: 'RSGI',  nome: 'Responsabile Qualità / SGI' },
+  { sigla: 'RSPP',  nome: 'Responsabile Sicurezza (RSPP)' },
+  { sigla: 'DPO',   nome: 'Responsabile Protezione Dati (Privacy)' },
+  { sigla: 'RD',    nome: 'Rooms Division Manager' },
+  { sigla: 'FOM',   nome: 'Front Office Manager' },
+  { sigla: 'GOV',   nome: 'Governante / Executive Housekeeper' },
+  { sigla: 'NIGHT', nome: 'Night Auditor' },
+  { sigla: 'FBM',   nome: 'F&B Manager' },
+  { sigla: 'CHEF',  nome: 'Executive Chef' },
+  { sigla: 'MTR',   nome: 'Maître / Responsabile Sala' },
+  { sigla: 'HACCP', nome: 'Responsabile HACCP' },
+  { sigla: 'SPA',   nome: 'Spa Manager' },
+  { sigla: 'MICE',  nome: 'Responsabile Eventi & Banqueting' },
+  { sigla: 'REV',   nome: 'Revenue Manager' },
+  { sigla: 'MAINT', nome: 'Responsabile Manutenzione & Impianti' },
+  { sigla: 'SEC',   nome: 'Responsabile Security & Antincendio' },
+  { sigla: 'GRM',   nome: 'Guest Relations Manager' },
+  { sigla: 'MC',    nome: 'Medico Competente (esterno)' },
+  { sigla: 'RLS',   nome: 'Rappresentante dei Lavoratori per la Sicurezza' },
+]
+
+// Set di ruoli standard in base al settore dell'azienda
+export const RUOLI_STANDARD_PER_SETTORE = {
+  Edilizia: RUOLI_STANDARD,
+  Servizi:  RUOLI_SERVIZI,
+  Hotel:    RUOLI_HOTEL,
+}
+
 export default function Organigramma() {
   const { azienda } = useApp()
   const [ruoli, setRuoli]     = useState([])
@@ -46,7 +101,8 @@ export default function Organigramma() {
   async function caricaStandard() {
     setLoading(true); setError(null)
     const esistenti = new Set(ruoli.map(r => r.sigla))
-    const payload = RUOLI_STANDARD.filter(r => !esistenti.has(r.sigla)).map(r => ({ ...r, azienda_id: azienda.id }))
+    const setRuoliStd = RUOLI_STANDARD_PER_SETTORE[azienda.settore] || RUOLI_STANDARD
+    const payload = setRuoliStd.filter(r => !esistenti.has(r.sigla)).map(r => ({ ...r, azienda_id: azienda.id }))
     if (payload.length > 0) {
       const { error: err } = await supabase.from('ruoli').insert(payload)
       if (err) setError(err.message)
