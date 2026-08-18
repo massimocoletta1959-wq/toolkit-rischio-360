@@ -207,7 +207,9 @@ export default function Procedure() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <select className="form-control" style={{ width: 260 }} value={areaSel} onChange={e => setAreaSel(e.target.value)}>
               <option value="">Tutte le aree</option>
-              {Object.entries(AREE_PROCEDURE).map(([sigla, nome]) => <option key={sigla} value={sigla}>{sigla} — {nome}</option>)}
+              {[...new Set(catalogo.map(p => p.area))].sort().map(sigla => (
+                <option key={sigla} value={sigla}>{AREE_PROCEDURE[sigla] ? `${sigla} — ${AREE_PROCEDURE[sigla]}` : sigla}</option>
+              ))}
             </select>
             <button className="btn btn-sm btn-primary" onClick={adottaTutte}>✓ Adotta tutte</button>
           </div>

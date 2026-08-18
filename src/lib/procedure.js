@@ -8,6 +8,17 @@ export const AREE_PROCEDURE = {
   QUA: 'Qualità & Compliance — SGI',
   SIC: 'Sicurezza sul Lavoro — D.Lgs. 81/08',
   CS:  'Customer Service — Post-Consegna',
+  GDPR: 'Privacy & Protezione Dati',
+  FO:   'Front Office',
+  HK:   'Housekeeping',
+  FB:   'Food & Beverage',
+  MICE: 'Sala Conferenze & Eventi',
+  SPA:  'Centro Benessere',
+  PARK: 'Parcheggio',
+  MAINT:'Manutenzione & Impianti',
+  SEC:  'Sicurezza & Antincendio',
+  REV:  'Revenue & Distribuzione',
+  GUEST:'Guest Experience',
 }
 
 // La sigla CL (Contabilità Lavori) confluisce in ACQ, come da organigramma ufficiale
