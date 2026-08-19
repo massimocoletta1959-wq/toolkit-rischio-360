@@ -1,36 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
+import { RUOLI_STANDARD_PER_SETTORE } from './Organigramma'
 
-const QUALIFICHE = [
-  'Amministratore Delegato (AD)',
-  'Direttore Generale (DG)',
-  'Direttore Operativo (COO)',
-  'Direttore Finanziario (CFO)',
-  'Direttore Commerciale',
-  'Direttore Marketing',
-  'Direttore HR / Risorse Umane',
-  'Responsabile IT',
-  'Responsabile Qualità',
-  'Responsabile Produzione',
-  'Responsabile Logistica',
-  'Responsabile Amministrativo',
-  'Responsabile Acquisti',
-  'RSPP (Responsabile Sicurezza)',
-  'RLS (Rappresentante Lavoratori)',
-  'DPO (Data Protection Officer)',
-  'Consulente Legale / Compliance',
-  'Consulente Finanziario',
-  'Auditor Interno',
-  'Project Manager',
-  'Team Leader',
+// Qualifiche generiche valide per ogni settore (in coda ai ruoli del settore)
+const QUALIFICHE_GENERICHE = [
   'Dipendente / Operativo',
   'Collaboratore Esterno',
   'Altro',
 ]
 
 function MembroModal({ membro, aziendaId, onSave, onClose }) {
+  const { azienda } = useApp()
   const editing = !!membro?.id
+  const ruoliSettore = RUOLI_STANDARD_PER_SETTORE[azienda?.settore] || RUOLI_STANDARD_PER_SETTORE.Edilizia || []
+  const opzioniQualifica = [
+    ...ruoliSettore.map(r => `${r.nome} (${r.sigla})`),
+    ...QUALIFICHE_GENERICHE,
+  ]
   const [form, setForm] = useState({
     nome:      membro?.nome || '',
     cognome:   membro?.cognome || '',
@@ -45,8 +32,8 @@ function MembroModal({ membro, aziendaId, onSave, onClose }) {
   const [error, setError]     = useState(null)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  // Se il ruolo attuale non è nella lista predefinita, è custom
-  const isCustom = form.ruolo && !QUALIFICHE.includes(form.ruolo) && form.ruolo !== 'Altro'
+  // Se il ruolo attuale non è tra le opzioni, è una qualifica personalizzata
+  const isCustom = form.ruolo && !opzioniQualifica.includes(form.ruolo) && form.ruolo !== 'Altro'
 
   async function save() {
     if (!form.nome || !form.cognome) {
@@ -135,7 +122,7 @@ function MembroModal({ membro, aziendaId, onSave, onClose }) {
             }}
           >
             <option value="">Seleziona qualifica...</option>
-            {QUALIFICHE.map(q => <option key={q}>{q}</option>)}
+            {opzioniQualifica.map(q => <option key={q}>{q}</option>)}
           </select>
         </div>
 
