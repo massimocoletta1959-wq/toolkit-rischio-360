@@ -4,8 +4,10 @@ import { useApp } from '../App'
 import { AREE_PROCEDURE, MAPPA_SIGLE } from '../lib/procedure'
 import { generaProcedura } from '../lib/generaProcedura'
 
-const STATI = ['Adottata', 'Personalizzata', 'Non applicabile']
+const STATI = ['Bozza', 'Approvata', 'Adottata', 'Personalizzata', 'Non applicabile']
 const STATO_STYLE = {
+  'Bozza':           { bg: '#FCF3E3', color: '#B7791F' },
+  'Approvata':       { bg: '#D1F2EB', color: '#0E6655' },
   'Adottata':        { bg: '#D5F5E3', color: '#155724' },
   'Personalizzata':  { bg: '#D6E8F7', color: '#1A3A5C' },
   'Non applicabile': { bg: '#EEE',    color: '#777' },
@@ -151,7 +153,7 @@ export default function Procedure() {
     const payload = {
       azienda_id: azienda.id,
       codice: proc.codice,
-      stato: campo === 'stato' ? valore : (esistente?.stato || 'Adottata'),
+      stato: campo === 'stato' ? valore : (esistente?.stato || 'Bozza'),
       ruolo_id: campo === 'ruolo_id' ? (valore || null) : (esistente?.ruolo_id ?? ruoloSuggerito(proc)),
     }
     const { error: err } = await supabase.from('procedure_azienda').upsert(payload, { onConflict: 'azienda_id,codice' })
@@ -173,11 +175,13 @@ export default function Procedure() {
 
   const lista = catalogo.filter(p => !areaSel || p.area === areaSel)
   const tot = catalogo.length
-  const nAdott = Object.values(adozioni).filter(a => a.stato === 'Adottata').length
-  const nPers  = Object.values(adozioni).filter(a => a.stato === 'Personalizzata').length
-  const nNA    = Object.values(adozioni).filter(a => a.stato === 'Non applicabile').length
-  const daVal  = tot - nAdott - nPers - nNA
-  const senzaResp = Object.values(adozioni).filter(a => a.stato !== 'Non applicabile' && !a.ruolo_id).length
+  const statoEff = p => adozioni[p.codice]?.stato || 'Bozza'
+  const nBozza  = catalogo.filter(p => statoEff(p) === 'Bozza').length
+  const nApprov = catalogo.filter(p => statoEff(p) === 'Approvata').length
+  const nAdott  = catalogo.filter(p => statoEff(p) === 'Adottata').length
+  const nPers   = catalogo.filter(p => statoEff(p) === 'Personalizzata').length
+  const nNA     = catalogo.filter(p => statoEff(p) === 'Non applicabile').length
+  const senzaResp = catalogo.filter(p => { const a = adozioni[p.codice]; return ['Approvata','Adottata','Personalizzata'].includes(a?.stato) && !a?.ruolo_id }).length
 
   return (
     <div>
@@ -186,9 +190,10 @@ export default function Procedure() {
         <p>Il Manuale delle Procedure ({tot}) applicato all'azienda: adozione e responsabilità</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 18 }}>
         {[
-          ['Da valutare', daVal, daVal > 0 ? '#B7791F' : '#27AE60'],
+          ['Bozze', nBozza, nBozza > 0 ? '#B7791F' : '#27AE60'],
+          ['Approvate', nApprov, '#0E6655'],
           ['Adottate', nAdott, '#27AE60'],
           ['Personalizzate', nPers, '#2B5FA5'],
           ['Non applicabili', nNA, '#888'],
@@ -229,8 +234,8 @@ export default function Procedure() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {lista.map(p => {
               const a = adozioni[p.codice]
-              const st = a?.stato
-              const stile = st ? STATO_STYLE[st] : { bg: '#FDF6E7', color: '#B7791F' }
+              const st = a?.stato || 'Bozza'
+              const stile = STATO_STYLE[st] || { bg: '#FDF6E7', color: '#B7791F' }
               return (
                 <div key={p.codice} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: '#FBFCFD', border: '1px solid #E8EAED', opacity: st === 'Non applicabile' ? 0.55 : 1 }}>
                   <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: '#1A3A5C', minWidth: 96 }}>{p.codice}</span>
@@ -239,8 +244,7 @@ export default function Procedure() {
                     <div style={{ fontSize: 11, color: '#999' }}>{p.funzioni.join(' + ')}</div>
                   </div>
                   <select className="form-control" style={{ width: 150, background: stile.bg, color: stile.color, fontWeight: 600, fontSize: 12 }}
-                          value={st || ''} onChange={e => setCampo(p, 'stato', e.target.value)}>
-                    <option value="" disabled>Da valutare</option>
+                          value={st} onChange={e => setCampo(p, 'stato', e.target.value)}>
                     {STATI.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                   <select className="form-control" style={{ width: 200, fontSize: 12 }} disabled={st === 'Non applicabile'}
@@ -249,10 +253,10 @@ export default function Procedure() {
                     {ruoli.map(r => <option key={r.id} value={r.id}>{r.sigla} — {r.nome}</option>)}
                   </select>
                   <button className="btn btn-sm btn-icon" title="Genera documento personalizzato"
-                          disabled={!st || st === 'Non applicabile'}
+                          disabled={st === 'Non applicabile'}
                           onClick={() => generaProcedura(p, azienda)}>📄</button>
                   <button className="btn btn-sm btn-icon" title="Distribuisci per presa visione"
-                          disabled={!st || st === 'Non applicabile'}
+                          disabled={st === 'Non applicabile'}
                           onClick={() => setDistProc({ proc: p, defaultMembroId: ruoli.find(r => r.id === a?.ruolo_id)?.membro_id || null })}>📤</button>
                 </div>
               )
