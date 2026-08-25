@@ -31,20 +31,26 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
   const [visuraLoading, setVisuraLoading] = useState(false)
   const [visuraError, setVisuraError]     = useState(null)
 
+  // moduli (passo 2) — di default tutti attivi
+  const [modRischi, setModRischi]         = useState(true)
+  const [modProcedure, setModProcedure]   = useState(true)
+  const [modGovernance, setModGovernance] = useState(true)
+  // passo 3 — procedure: caricare la lista del settore?
+  const [caricaProc, setCaricaProc]       = useState(true)
+
   const haSettore  = !!(RISCHI_PER_SETTORE[settore]?.length)
   const ha231Edil  = settore === 'Edilizia'
-  const ha231      = true  // disponibile per tutti i settori
   const rischi231  = ha231Edil ? RISCHI_231_EDILIZIA : RISCHI_231_GENERICO
   const num231     = rischi231.length
   const label231   = ha231Edil ? 'Edilizia (D.Lgs. 231/01)' : 'PMI Generiche (D.Lgs. 231/01)'
   const numStd     = RISCHI_DEFAULT.length
   const numSet     = RISCHI_PER_SETTORE[settore]?.length || 0
 
+  // -------- PASSO 1: crea l'azienda (senza governance: spostata al passo 3) --------
   async function handleStep1(e) {
     e.preventDefault()
     setLoading(true); setError(null)
 
-    // 0. Validazione P.IVA e controlli anti-duplicato
     const pivaClean = piva.replace(/[^0-9]/g, '')
     if (pivaClean && !pivaValida(pivaClean)) {
       setError('Partita IVA non valida: controlla le 11 cifre.')
@@ -63,7 +69,6 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
       if (!conferma) { setLoading(false); return }
     }
 
-    // 1. Crea l'azienda (con i campi della visura, se importata)
     const a = visuraData?.azienda || {}
     const { data: az, error: e1 } = await supabase.from('aziende')
       .insert({
@@ -84,49 +89,16 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
       }).select().single()
     if (e1) { setError(e1.message); setLoading(false); return }
 
-    // 2. Se è la prima azienda, crea anche il profilo utente
     if (!nuovaAzienda) {
       const { error: e2 } = await supabase.from('profili')
         .insert({ id: userId, email: userEmail, nome: nomeProfilo, azienda_id: az.id })
       if (e2) { setError(e2.message); setLoading(false); return }
     }
 
-    // 3. Collega utente <-> azienda nella tabella di join
     const { error: e3 } = await supabase.from('utente_aziende')
       .insert({ utente_id: userId, azienda_id: az.id })
     if (e3 && !e3.message.includes('unique')) {
       setError(e3.message); setLoading(false); return
-    }
-
-    // 4. Se import da visura: crea l'organo e i suoi componenti (best-effort)
-    if (visuraData?.componenti?.length) {
-      try {
-        const org = visuraData.organo || {}
-        const { data: organo } = await supabase.from('organi').insert({
-          azienda_id: az.id,
-          tipo: org.tipo || 'cda',
-          nome: org.nome || 'Consiglio di Amministrazione',
-          monocratico: org.tipo === 'amministratore_unico',
-        }).select().single()
-        for (const c of visuraData.componenti) {
-          const { data: m } = await supabase.from('membri').insert({
-            azienda_id: az.id,
-            nome: c.nome || '',
-            cognome: c.cognome || '',
-            email: c.pec || null,
-            pec: c.pec || null,
-            ruolo: c.ruolo || 'Amministratore',
-          }).select().single()
-          if (organo && m) {
-            await supabase.from('organo_membri').insert({
-              organo_id: organo.id, membro_id: m.id, ruolo: c.ruolo || 'Componente',
-              data_nomina: c.data_nomina || null,
-            })
-          }
-        }
-      } catch (gErr) {
-        console.error('Import governance da visura:', gErr)
-      }
     }
 
     setAziendaId(az.id)
@@ -160,22 +132,66 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
     }
   }
 
-  async function carica() {
-    if (scelta === 'nessuno') { onDone(); return }
-    setLoading(true)
-    let lista = []
-    if (scelta === 'standard') lista = [...RISCHI_DEFAULT]
-    if (scelta === 'settore')  lista = [...(RISCHI_PER_SETTORE[settore] || [])]
-    if (scelta === 'tutti')    lista = [...RISCHI_DEFAULT, ...(RISCHI_PER_SETTORE[settore] || [])]
-    if (scelta === 'tutti231') lista = [...RISCHI_DEFAULT, ...(RISCHI_PER_SETTORE[settore] || []), ...rischi231]
-    if (scelta === 'solo231')  lista = [...rischi231]
-    if (lista.length > 0) {
-      const payload = lista.map(r => ({ ...r, azienda_id: aziendaId }))
-      const { error: err } = await supabase.from('rischi').insert(payload)
-      if (err) { setError(err.message); setLoading(false); return }
+  // -------- PASSO 3: applica moduli + dati di default, poi entra --------
+  async function finalizza() {
+    setLoading(true); setError(null)
+    try {
+      // 1) salva i moduli attivi sull'azienda
+      const moduli = []
+      if (modRischi) moduli.push('rischi')
+      if (modProcedure && caricaProc) moduli.push('procedure')  // "no carica" = non attivo ora (attivabile dopo)
+      if (modGovernance) moduli.push('governance')
+      const { error: eM } = await supabase.from('aziende').update({ moduli }).eq('id', aziendaId)
+      if (eM) throw eM
+
+      // 2) RISCHI: carica la lista scelta (se il modulo e' attivo)
+      if (modRischi && scelta && scelta !== 'nessuno') {
+        let lista = []
+        if (scelta === 'standard') lista = [...RISCHI_DEFAULT]
+        if (scelta === 'settore')  lista = [...(RISCHI_PER_SETTORE[settore] || [])]
+        if (scelta === 'tutti')    lista = [...RISCHI_DEFAULT, ...(RISCHI_PER_SETTORE[settore] || [])]
+        if (scelta === 'tutti231') lista = [...RISCHI_DEFAULT, ...(RISCHI_PER_SETTORE[settore] || []), ...rischi231]
+        if (scelta === 'solo231')  lista = [...rischi231]
+        if (lista.length > 0) {
+          const payload = lista.map(r => ({ ...r, azienda_id: aziendaId }))
+          const { error: eR } = await supabase.from('rischi').insert(payload)
+          if (eR) throw eR
+        }
+      }
+
+      // 3) GOVERNANCE: se attivo e c'e' la visura, crea organo + componenti (dati reali dalla visura)
+      if (modGovernance && visuraData?.componenti?.length) {
+        try {
+          const org = visuraData.organo || {}
+          const { data: organo } = await supabase.from('organi').insert({
+            azienda_id: aziendaId,
+            tipo: org.tipo || 'cda',
+            nome: org.nome || 'Consiglio di Amministrazione',
+            monocratico: org.tipo === 'amministratore_unico',
+          }).select().single()
+          for (const c of visuraData.componenti) {
+            const { data: m } = await supabase.from('membri').insert({
+              azienda_id: aziendaId,
+              nome: c.nome || '', cognome: c.cognome || '',
+              email: c.pec || null, pec: c.pec || null,
+              ruolo: c.ruolo || 'Amministratore',
+            }).select().single()
+            if (organo && m) {
+              await supabase.from('organo_membri').insert({
+                organo_id: organo.id, membro_id: m.id, ruolo: c.ruolo || 'Componente',
+                data_nomina: c.data_nomina || null,
+              })
+            }
+          }
+        } catch (gErr) { console.error('Governance da visura:', gErr) }
+      }
+
+      setLoading(false)
+      onDone()
+    } catch (e2) {
+      setError(e2.message || 'Errore nel completamento.')
+      setLoading(false)
     }
-    setLoading(false)
-    onDone()
   }
 
   const preview = scelta === 'standard' ? RISCHI_DEFAULT
@@ -185,96 +201,150 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
     : scelta === 'solo231'  ? rischi231
     : []
 
-  if (step === 2) return (
-    <div className="login-page">
-      <div className="login-card" style={{ maxWidth: 560 }}>
-        <div className="login-logo">
-          <div style={{ fontSize: 36, marginBottom: 8 }}>🛡️</div>
-          <h1>Carica i rischi iniziali</h1>
-          <p>Scegli da quale punto partire con la mappatura</p>
-        </div>
-        {error && <div className="alert alert-error">{error}</div>}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-
-          <div onClick={() => setScelta('standard')} style={{ cursor: 'pointer', padding: '14px 16px', border: `2px solid ${scelta === 'standard' ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'standard' ? '#EBF4FC' : 'white' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontWeight: 600, color: '#1A3A5C', fontSize: 14 }}>📋 Solo rischi standard</div>
-                <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>I {numStd} rischi generici validi per qualsiasi azienda</div>
-              </div>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#2B5FA5', background: '#EBF4FC', padding: '3px 10px', borderRadius: 20 }}>{numStd} rischi</span>
-            </div>
-          </div>
-
-          {haSettore && (
-            <div onClick={() => setScelta('settore')} style={{ cursor: 'pointer', padding: '14px 16px', border: `2px solid ${scelta === 'settore' ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'settore' ? '#EBF4FC' : 'white' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontWeight: 600, color: '#1A3A5C', fontSize: 14 }}>🏗️ Solo rischi {settore}</div>
-                  <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Rischi specifici per il settore {settore}</div>
-                </div>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#2B5FA5', background: '#EBF4FC', padding: '3px 10px', borderRadius: 20 }}>{numSet} rischi</span>
-              </div>
-            </div>
-          )}
-
-          {haSettore && (
-            <div onClick={() => setScelta('tutti')} style={{ cursor: 'pointer', padding: '14px 16px', border: `2px solid ${scelta === 'tutti' ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'tutti' ? '#EBF4FC' : 'white' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontWeight: 600, color: '#1A3A5C', fontSize: 14 }}>✅ Tutti — standard + {settore}</div>
-                  <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Copertura completa: {numStd} generici + {numSet} specifici</div>
-                </div>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#27AE60', background: '#D5F5E3', padding: '3px 10px', borderRadius: 20 }}>{numStd + numSet} rischi</span>
-              </div>
-            </div>
-          )}
-
-          <div onClick={() => setScelta('solo231')} style={{ cursor: 'pointer', padding: '14px 16px', border: `2px solid ${scelta === 'solo231' ? '#856404' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'solo231' ? '#FEF9E7' : 'white' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontWeight: 600, color: '#856404', fontSize: 14 }}>⚖️ Solo Rischi 231 — D.Lgs. 231/2001</div>
-                  <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Reati presupposto per {label231} (PA, sicurezza, ambiente, lavoro, societario)</div>
-                </div>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#856404', background: '#FEF9E7', padding: '3px 10px', borderRadius: 20 }}>{num231} rischi</span>
-              </div>
-            </div>
-
-          <div onClick={() => setScelta('tutti231')} style={{ cursor: 'pointer', padding: '14px 16px', border: `2px solid ${scelta === 'tutti231' ? '#856404' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'tutti231' ? '#FEF9E7' : 'white' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontWeight: 600, color: '#856404', fontSize: 14 }}>🏆 Copertura completa — Standard + {haSettore ? 'Settore + ' : ''}231</div>
-                  <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{numStd} standard{haSettore ? ` + ${numSet} settore` : ''} + {num231} rischi D.Lgs. 231/01</div>
-                </div>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#856404', background: '#FEF9E7', padding: '3px 10px', borderRadius: 20 }}>{numStd + numSet + num231} rischi</span>
-              </div>
-            </div>
-
-          <div onClick={() => setScelta('nessuno')} style={{ cursor: 'pointer', padding: '12px 16px', border: `2px solid ${scelta === 'nessuno' ? '#aaa' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'nessuno' ? '#F5F5F5' : 'white' }}>
-            <div style={{ fontWeight: 500, color: '#888', fontSize: 13 }}>Parto da zero — inserirò i rischi manualmente</div>
-          </div>
-        </div>
-
-        {preview.length > 0 && (
-          <div style={{ background: '#F7F8FA', borderRadius: 8, padding: '10px 14px', maxHeight: 180, overflowY: 'auto', marginBottom: 16 }}>
-            {preview.slice(0, 8).map((r, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid #EEE', fontSize: 12 }}>
-                <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: '#E6F1FB', color: '#0C447C', flexShrink: 0 }}>{r.categoria}</span>
-                <span style={{ color: '#444' }}>{r.descrizione}</span>
-              </div>
-            ))}
-            {preview.length > 8 && <div style={{ fontSize: 11, color: '#888', textAlign: 'center', paddingTop: 6 }}>+ altri {preview.length - 8} rischi...</div>}
-          </div>
-        )}
-
-        <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={carica} disabled={!scelta || loading}>
-          {loading ? 'Caricamento...' : scelta === 'nessuno' ? 'Inizia senza rischi →' : scelta ? `Carica ${preview.length} rischi e inizia →` : 'Seleziona un\'opzione'}
-        </button>
+  const cardModulo = (attivo, setAttivo, icona, titolo, desc) => (
+    <div onClick={() => setAttivo(!attivo)} style={{ cursor: 'pointer', padding: '14px 16px', border: `2px solid ${attivo ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: attivo ? '#EBF4FC' : 'white', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${attivo ? '#2B5FA5' : '#CBD5E0'}`, background: attivo ? '#2B5FA5' : 'white', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>{attivo ? '✓' : ''}</div>
+      <div>
+        <div style={{ fontWeight: 600, color: '#1A3A5C', fontSize: 14 }}>{icona} {titolo}</div>
+        <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{desc}</div>
       </div>
     </div>
   )
 
+  // ============ PASSO 2: SCELTA MODULI ============
+  if (step === 2) return (
+    <div className="login-page">
+      <div className="login-card" style={{ maxWidth: 560 }}>
+        <div className="login-logo">
+          <div style={{ fontSize: 36, marginBottom: 8 }}>🧩</div>
+          <h1>Quali moduli vuoi attivare?</h1>
+          <p>Attiva solo ciò che serve a <strong>{nome}</strong>. Potrai cambiare in seguito.</p>
+        </div>
+        {error && <div className="alert alert-error">{error}</div>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+          {cardModulo(modRischi, setModRischi, '🛡️', 'Rischi', 'Mappatura e valutazione dei rischi, azioni, registro.')}
+          {cardModulo(modProcedure, setModProcedure, '📋', 'Procedure', 'Catalogo procedure per settore, approvazione e personalizzazione.')}
+          {cardModulo(modGovernance, setModGovernance, '⚖️', 'Governance', 'Organi, componenti, riunioni e delibere.')}
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setStep(1)}>← Indietro</button>
+          <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}
+                  disabled={!modRischi && !modProcedure && !modGovernance}
+                  onClick={() => setStep(3)}>Avanti →</button>
+        </div>
+      </div>
+    </div>
+  )
+
+  // ============ PASSO 3: DATI DI DEFAULT PER MODULO ============
+  if (step === 3) return (
+    <div className="login-page">
+      <div className="login-card" style={{ maxWidth: 560 }}>
+        <div className="login-logo">
+          <div style={{ fontSize: 36, marginBottom: 8 }}>📦</div>
+          <h1>Dati iniziali</h1>
+          <p>Per ogni modulo attivo, scegli se partire con i dati di default</p>
+        </div>
+        {error && <div className="alert alert-error">{error}</div>}
+
+        {/* --- RISCHI --- */}
+        {modRischi && (
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ fontWeight: 700, color: '#1A3A5C', marginBottom: 8 }}>🛡️ Rischi</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div onClick={() => setScelta('standard')} style={{ cursor: 'pointer', padding: '12px 14px', border: `2px solid ${scelta === 'standard' ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'standard' ? '#EBF4FC' : 'white' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontWeight: 600, color: '#1A3A5C', fontSize: 13 }}>📋 Solo rischi standard</div>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#2B5FA5', background: '#EBF4FC', padding: '2px 8px', borderRadius: 20 }}>{numStd}</span>
+                </div>
+              </div>
+              {haSettore && (
+                <div onClick={() => setScelta('settore')} style={{ cursor: 'pointer', padding: '12px 14px', border: `2px solid ${scelta === 'settore' ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'settore' ? '#EBF4FC' : 'white' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontWeight: 600, color: '#1A3A5C', fontSize: 13 }}>🏗️ Solo rischi {settore}</div>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#2B5FA5', background: '#EBF4FC', padding: '2px 8px', borderRadius: 20 }}>{numSet}</span>
+                  </div>
+                </div>
+              )}
+              {haSettore && (
+                <div onClick={() => setScelta('tutti')} style={{ cursor: 'pointer', padding: '12px 14px', border: `2px solid ${scelta === 'tutti' ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'tutti' ? '#EBF4FC' : 'white' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontWeight: 600, color: '#1A3A5C', fontSize: 13 }}>✅ Tutti — standard + {settore}</div>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#27AE60', background: '#D5F5E3', padding: '2px 8px', borderRadius: 20 }}>{numStd + numSet}</span>
+                  </div>
+                </div>
+              )}
+              <div onClick={() => setScelta('solo231')} style={{ cursor: 'pointer', padding: '12px 14px', border: `2px solid ${scelta === 'solo231' ? '#856404' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'solo231' ? '#FEF9E7' : 'white' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontWeight: 600, color: '#856404', fontSize: 13 }}>⚖️ Solo Rischi 231 — {label231}</div>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#856404', background: '#FEF9E7', padding: '2px 8px', borderRadius: 20 }}>{num231}</span>
+                </div>
+              </div>
+              <div onClick={() => setScelta('tutti231')} style={{ cursor: 'pointer', padding: '12px 14px', border: `2px solid ${scelta === 'tutti231' ? '#856404' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'tutti231' ? '#FEF9E7' : 'white' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontWeight: 600, color: '#856404', fontSize: 13 }}>🏆 Copertura completa + 231</div>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#856404', background: '#FEF9E7', padding: '2px 8px', borderRadius: 20 }}>{numStd + numSet + num231}</span>
+                </div>
+              </div>
+              <div onClick={() => setScelta('nessuno')} style={{ cursor: 'pointer', padding: '10px 14px', border: `2px solid ${scelta === 'nessuno' ? '#aaa' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'nessuno' ? '#F5F5F5' : 'white' }}>
+                <div style={{ fontWeight: 500, color: '#888', fontSize: 12 }}>Parto da zero — inserirò i rischi manualmente</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- PROCEDURE --- */}
+        {modProcedure && (
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ fontWeight: 700, color: '#1A3A5C', marginBottom: 8 }}>📋 Procedure</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div onClick={() => setCaricaProc(true)} style={{ cursor: 'pointer', padding: '12px 14px', border: `2px solid ${caricaProc ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: caricaProc ? '#EBF4FC' : 'white' }}>
+                <div style={{ fontWeight: 600, color: '#1A3A5C', fontSize: 13 }}>✅ Carica le procedure standard del settore {settore || ''}</div>
+                <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Compariranno nel catalogo, pronte da valutare e approvare.</div>
+              </div>
+              <div onClick={() => setCaricaProc(false)} style={{ cursor: 'pointer', padding: '12px 14px', border: `2px solid ${!caricaProc ? '#aaa' : '#E0E0E0'}`, borderRadius: 8, background: !caricaProc ? '#F5F5F5' : 'white' }}>
+                <div style={{ fontWeight: 500, color: '#888', fontSize: 12 }}>No, non ora — le attiverò in seguito dallo standard di settore o dalle generiche.</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- GOVERNANCE --- */}
+        {modGovernance && (
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ fontWeight: 700, color: '#1A3A5C', marginBottom: 8 }}>⚖️ Governance</div>
+            {visuraData?.componenti?.length ? (
+              <div className="alert alert-info" style={{ margin: 0 }}>
+                ✓ I dati di governance verranno creati dalla visura: organo “{visuraData.organo?.nome || 'organo'}” e {visuraData.componenti.length} componenti reali.
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: '#666', background: '#F7F8FA', borderRadius: 8, padding: '10px 14px' }}>
+                Nessuna visura importata: il modulo sarà attivo e potrai inserire organi e componenti manualmente dalla sezione Governance.
+              </div>
+            )}
+          </div>
+        )}
+
+        {(modRischi && scelta && scelta !== 'nessuno' && preview.length > 0) && (
+          <div style={{ background: '#F7F8FA', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: '#666', marginBottom: 16 }}>
+            Verranno caricati {preview.length} rischi.
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setStep(2)} disabled={loading}>← Indietro</button>
+          <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}
+                  disabled={loading || (modRischi && !scelta)}
+                  onClick={finalizza}>
+            {loading ? 'Completamento…' : 'Completa e inizia →'}
+          </button>
+        </div>
+        {modRischi && !scelta && <div style={{ fontSize: 11, color: '#C0392B', marginTop: 8, textAlign: 'center' }}>Scegli un'opzione per i Rischi (anche "parto da zero").</div>}
+      </div>
+    </div>
+  )
+
+  // ============ PASSO 1: DATI AZIENDA ============
   return (
     <div className="login-page">
       <div className="login-card" style={{ maxWidth: 480 }}>
@@ -295,7 +365,7 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
           <div style={{ background: '#F4F9FF', border: '1px dashed #B9D4F0', borderRadius: 12, padding: 16, marginBottom: 18 }}>
             <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A3A5C', marginBottom: 4 }}>📄 Importa da visura camerale</div>
             <div style={{ fontSize: 12, color: '#6B7683', marginBottom: 12, lineHeight: 1.5 }}>
-              Carica il PDF della visura: compileremo l'anagrafica e creeremo l'organo amministrativo con i suoi componenti. Controlla e correggi i campi prima di salvare.
+              Carica il PDF della visura: compileremo l'anagrafica e, se attivi la Governance, creeremo l'organo amministrativo con i suoi componenti.
             </div>
             <label className="btn btn-sm" style={{ cursor: visuraLoading ? 'default' : 'pointer', background: '#2B5FA5', color: '#fff' }}>
               {visuraLoading ? 'Lettura in corso…' : '📎 Scegli il PDF della visura'}
@@ -305,7 +375,7 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
             {visuraData && (
               <div style={{ fontSize: 12, color: '#0F6E56', marginTop: 10, lineHeight: 1.5 }}>
                 ✓ Dati estratti dalla visura.
-                {visuraData.componenti?.length ? ` Al salvataggio verranno creati l'organo “${visuraData.organo?.nome || 'organo'}” e ${visuraData.componenti.length} componenti.` : ''}
+                {visuraData.componenti?.length ? ` Trovati ${visuraData.componenti.length} componenti (creati se attivi la Governance).` : ''}
                 {' '}Controlla i campi qui sotto.
               </div>
             )}
@@ -337,7 +407,7 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
           </div>
           {haSettore && (
             <div className="alert alert-info" style={{ marginBottom: 14 }}>
-              🏗️ Per il settore <strong>{settore}</strong> abbiamo rischi specifici — potrai scegliere al passo successivo.
+              🏗️ Per il settore <strong>{settore}</strong> ci sono rischi e procedure specifici — sceglierai al passo dei dati iniziali.
             </div>
           )}
           <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
