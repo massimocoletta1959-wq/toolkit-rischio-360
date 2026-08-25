@@ -198,7 +198,7 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
       }
 
       setLoading(false)
-      onDone()
+      onDone(aziendaId)
     } catch (e2) {
       setError(e2.message || 'Errore nel completamento.')
       setLoading(false)

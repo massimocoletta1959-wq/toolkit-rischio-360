@@ -71,7 +71,7 @@ export async function generaProcedura(proc, azienda) {
 </div>
 <button class="no-print" onclick="window.print()" style="padding:8px 16px;background:#2B5FA5;color:#fff;border:none;border-radius:6px;cursor:pointer;margin-bottom:14px">🖨️ Stampa / Salva PDF</button>
 ${corpo}
-<div class="piede">${azienda.nome} — Documento generato da Rischio 360° il ${oggi} · Riservato — uso interno</div>
+<div class="piede">${azienda.nome} — Documento generato da Pmi 360° il ${oggi} · Riservato — uso interno</div>
 </body></html>`)
   w.document.close()
 }

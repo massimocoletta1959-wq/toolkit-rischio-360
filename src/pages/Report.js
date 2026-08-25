@@ -281,7 +281,7 @@ export default function Report() {
 
             {/* Footer */}
             <div style={{ marginTop: 24, fontSize: 10, color: '#aaa', textAlign: 'center', borderTop: '1px solid #E0E0E0', paddingTop: 8 }}>
-              Rischi 360° — Report generato il {oggi} — {azienda.nome}
+              Pmi 360° — Report generato il {oggi} — {azienda.nome}
             </div>
           </div>
         </div>

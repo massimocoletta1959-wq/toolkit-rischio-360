@@ -121,7 +121,7 @@ export default function Cruscotto() {
       {rischi.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 48 }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>🛡️</div>
-          <h3 style={{ color: '#1A3A5C', marginBottom: 8 }}>Benvenuto nel Toolkit Rischio 360°</h3>
+          <h3 style={{ color: '#1A3A5C', marginBottom: 8 }}>Benvenuto nel Toolkit Pmi 360°</h3>
           <p style={{ color: '#666', marginBottom: 20 }}>Inizia aggiungendo i rischi della tua azienda nel Registro Rischi.</p>
           <button className="btn btn-primary" onClick={() => setPage('registro')}>Vai al Registro Rischi →</button>
         </div>

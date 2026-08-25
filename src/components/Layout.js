@@ -52,7 +52,7 @@ export default function Layout({ children }) {
     <div className="app-layout">
       <aside className="sidebar">
         <div className="sidebar-logo">
-          <h1>🛡️ Rischio 360°</h1>
+          <h1>🛡️ Pmi 360°</h1>
           <p>Toolkit multiaziendale</p>
         </div>
 

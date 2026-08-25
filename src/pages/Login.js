@@ -27,7 +27,7 @@ export default function Login() {
       <div className="login-card">
         <div className="login-logo">
           <div style={{ fontSize: 40, marginBottom: 8 }}>🛡️</div>
-          <h1>Toolkit Rischio 360°</h1>
+          <h1>Toolkit Pmi 360°</h1>
           <p>Sistema di gestione rischi aziendali</p>
         </div>
         {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}

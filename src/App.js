@@ -160,9 +160,12 @@ export default function App() {
     setSession(null); setProfilo(null); setAziende([]); setAziendaState(null)
   }
 
-  async function onNuovaAziendaDone() {
+  async function onNuovaAziendaDone(newId) {
     setShowSetup(false)
+    if (newId) localStorage.setItem('azienda_attiva', newId)
     if (session) await loadDati(session.user.id)
+    setModulo(null)
+    setPage('home')
   }
 
   if (session === undefined) return (

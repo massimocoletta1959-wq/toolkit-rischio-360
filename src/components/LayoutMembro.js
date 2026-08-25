@@ -12,7 +12,7 @@ export default function LayoutMembro({ children, page = 'task', setPage }) {
     <div className="app-layout">
       <aside className="sidebar">
         <div className="sidebar-logo">
-          <h1>🛡️ Rischio 360°</h1>
+          <h1>🛡️ Pmi 360°</h1>
           <p>Area personale</p>
         </div>
         <div className="sidebar-azienda">
