@@ -12,18 +12,6 @@ export async function generaProcedura(proc, azienda) {
   const tpl = tplList.find(t => t.settore === azienda.settore) || tplList.find(t => t.settore === 'generico') || null
   if (!tpl) { alert('Template non ancora disponibile per questa procedura: ' + proc.codice); return }
 
-  // === SENSORE DIAGNOSTICO TEMPORANEO (da rimuovere dopo) ===
-  alert(
-    'DIAGNOSTICA STAMPA\n\n' +
-    'Azienda in uso (id): ' + azienda.id + '\n' +
-    'Azienda (nome): ' + azienda.nome + '\n' +
-    'Codice richiesto: [' + proc.codice + ']\n' +
-    'Riga trovata? ' + (adozRes.data ? 'SI' : 'NO') + '\n' +
-    'Stato letto: [' + (adozRes.data?.stato ?? 'NESSUNO') + ']\n' +
-    'Errore lettura: ' + (adozRes.error?.message || 'nessuno')
-  )
-  // === FINE SENSORE ===
-
   const mappa = {}
   ;(ruoliRes.data || []).forEach(r => { mappa[r.sigla] = r })
 
