@@ -5,12 +5,15 @@ export async function generaProcedura(proc, azienda) {
     supabase.from('procedure_template').select('*').eq('codice', proc.codice)
       .in('settore', [azienda.settore, 'generico'].filter(Boolean)),
     supabase.from('ruoli').select('sigla, nome, membri(nome, cognome)').eq('azienda_id', azienda.id),
-    supabase.from('procedure_azienda').select('id, data_emissione, stato').eq('azienda_id', azienda.id).eq('codice', proc.codice).maybeSingle(),
+    supabase.from('procedure_azienda').select('id, data_emissione, stato, corpo_html, titolo').eq('azienda_id', azienda.id).eq('codice', proc.codice).maybeSingle(),
   ])
   // Preferisci il template del settore dell'azienda, poi il generico
   const tplList = tplRes.data || []
   const tpl = tplList.find(t => t.settore === azienda.settore) || tplList.find(t => t.settore === 'generico') || null
   if (!tpl) { alert('Template non ancora disponibile per questa procedura: ' + proc.codice); return }
+
+  // LIBRERIA + COPIA PERSONALE: se l'azienda ha una sua copia, usa quella; altrimenti lo standard
+  const corpoBase = (adozRes.data?.corpo_html && adozRes.data.corpo_html.trim()) ? adozRes.data.corpo_html : tpl.corpo_html
 
   const mappa = {}
   ;(ruoliRes.data || []).forEach(r => { mappa[r.sigla] = r })
@@ -27,10 +30,13 @@ export async function generaProcedura(proc, azienda) {
   const dE = new Date(dataEmiss)
   const dataEmissLabel = MESI[dE.getMonth()] + ' ' + dE.getFullYear()
 
-  let corpo = tpl.corpo_html.split('{{AZIENDA}}').join(azienda.nome)
+  let corpo = corpoBase.split('{{AZIENDA}}').join(azienda.nome)
   corpo = corpo.split('{{SETTORE}}').join(azienda.settore || 'azienda')
   corpo = corpo.split('{{DATA_EMISSIONE}}').join(dataEmissLabel)
-  corpo = corpo.split('{{STATO}}').join(adozRes.data?.stato || 'Bozza')
+  const statoDoc = adozRes.data?.stato || 'Bozza'
+  const versioneDoc = statoDoc === 'Bozza' ? '0.1' : '1.0'
+  corpo = corpo.split('{{STATO}}').join(statoDoc)
+  corpo = corpo.split('{{VERSIONE}}').join(versioneDoc)
   corpo = corpo.replace(/\{\{RUOLO:([A-Z0-9]+)\}\}/g, (m, sigla) => {
     const r = mappa[sigla]
     if (r && r.membri) return `${r.membri.nome} ${r.membri.cognome} — ${r.nome}`
@@ -59,7 +65,7 @@ export async function generaProcedura(proc, azienda) {
 <div class="testata">
   <div>
     <div style="font-weight:700;font-size:18px;color:#1A3A5C">${azienda.nome}</div>
-    <div style="font-size:12px;color:#666">Manuale delle Procedure Aziendali — ${tpl.codice} · versione ${tpl.versione}</div>
+    <div style="font-size:12px;color:#666">Manuale delle Procedure Aziendali — ${tpl.codice} · versione ${versioneDoc}</div>
   </div>
   ${logo}
 </div>
