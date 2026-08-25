@@ -5,7 +5,7 @@ export async function generaProcedura(proc, azienda) {
     supabase.from('procedure_template').select('*').eq('codice', proc.codice)
       .in('settore', [azienda.settore, 'generico'].filter(Boolean)),
     supabase.from('ruoli').select('sigla, nome, membri(nome, cognome)').eq('azienda_id', azienda.id),
-    supabase.from('procedure_azienda').select('id, data_emissione').eq('azienda_id', azienda.id).eq('codice', proc.codice).maybeSingle(),
+    supabase.from('procedure_azienda').select('id, data_emissione, stato').eq('azienda_id', azienda.id).eq('codice', proc.codice).maybeSingle(),
   ])
   // Preferisci il template del settore dell'azienda, poi il generico
   const tplList = tplRes.data || []
@@ -30,6 +30,7 @@ export async function generaProcedura(proc, azienda) {
   let corpo = tpl.corpo_html.split('{{AZIENDA}}').join(azienda.nome)
   corpo = corpo.split('{{SETTORE}}').join(azienda.settore || 'azienda')
   corpo = corpo.split('{{DATA_EMISSIONE}}').join(dataEmissLabel)
+  corpo = corpo.split('{{STATO}}').join(adozRes.data?.stato || 'Bozza')
   corpo = corpo.replace(/\{\{RUOLO:([A-Z0-9]+)\}\}/g, (m, sigla) => {
     const r = mappa[sigla]
     if (r && r.membri) return `${r.membri.nome} ${r.membri.cognome} — ${r.nome}`
