@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { RISCHI_DEFAULT, RISCHI_PER_SETTORE, RISCHI_231_EDILIZIA, RISCHI_231_GENERICO } from '../lib/constants'
 
@@ -31,12 +31,24 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
   const [visuraLoading, setVisuraLoading] = useState(false)
   const [visuraError, setVisuraError]     = useState(null)
 
-  // moduli (passo 2) — di default tutti attivi
+  // moduli (passo 2)
   const [modRischi, setModRischi]         = useState(true)
   const [modProcedure, setModProcedure]   = useState(true)
   const [modGovernance, setModGovernance] = useState(true)
-  // passo 3 — procedure: caricare la lista del settore?
-  const [caricaProc, setCaricaProc]       = useState(true)
+  // licenza: undefined=caricamento, null=nessuna, oggetto=licenza registrata
+  const [lic, setLic] = useState(undefined)
+  useEffect(() => {
+    if (!userId) { setLic(null); return }
+    supabase.from('gestori').select('incl_rischi,incl_procedure,incl_governance')
+      .eq('user_id', userId).maybeSingle()
+      .then(({ data }) => setLic(data || null))
+  }, [userId])
+  const incl = m => (lic ? !!lic['incl_' + m] : true)   // nessuna licenza registrata = tutto consentito
+  useEffect(() => {
+    if (lic === undefined) return
+    setModRischi(incl('rischi')); setModProcedure(incl('procedure')); setModGovernance(incl('governance'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lic])
 
   const haSettore  = !!(RISCHI_PER_SETTORE[settore]?.length)
   const ha231Edil  = settore === 'Edilizia'
@@ -136,12 +148,12 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
   async function finalizza() {
     setLoading(true); setError(null)
     try {
-      // 1) salva i moduli attivi sull'azienda
-      const moduli = []
-      if (modRischi) moduli.push('rischi')
-      if (modProcedure && caricaProc) moduli.push('procedure')  // "no carica" = non attivo ora (attivabile dopo)
-      if (modGovernance) moduli.push('governance')
-      const { error: eM } = await supabase.from('aziende').update({ moduli }).eq('id', aziendaId)
+      // 1) salva i moduli attivi sull'azienda (stesse colonne usate dalle Impostazioni)
+      const { error: eM } = await supabase.from('aziende').update({
+        mod_rischi:     modRischi && incl('rischi'),
+        mod_procedure:  modProcedure && incl('procedure'),
+        mod_governance: modGovernance && incl('governance'),
+      }).eq('id', aziendaId)
       if (eM) throw eM
 
       // 2) RISCHI: carica la lista scelta (se il modulo e' attivo)
@@ -201,12 +213,12 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
     : scelta === 'solo231'  ? rischi231
     : []
 
-  const cardModulo = (attivo, setAttivo, icona, titolo, desc) => (
-    <div onClick={() => setAttivo(!attivo)} style={{ cursor: 'pointer', padding: '14px 16px', border: `2px solid ${attivo ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: attivo ? '#EBF4FC' : 'white', display: 'flex', alignItems: 'center', gap: 12 }}>
-      <div style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${attivo ? '#2B5FA5' : '#CBD5E0'}`, background: attivo ? '#2B5FA5' : 'white', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>{attivo ? '✓' : ''}</div>
+  const cardModulo = (attivo, setAttivo, icona, titolo, desc, abilitato = true) => (
+    <div onClick={() => abilitato && setAttivo(!attivo)} style={{ cursor: abilitato ? 'pointer' : 'not-allowed', opacity: abilitato ? 1 : 0.55, padding: '14px 16px', border: `2px solid ${attivo && abilitato ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: attivo && abilitato ? '#EBF4FC' : 'white', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${attivo && abilitato ? '#2B5FA5' : '#CBD5E0'}`, background: attivo && abilitato ? '#2B5FA5' : 'white', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>{attivo && abilitato ? '✓' : ''}</div>
       <div>
         <div style={{ fontWeight: 600, color: '#1A3A5C', fontSize: 14 }}>{icona} {titolo}</div>
-        <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{desc}</div>
+        <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{abilitato ? desc : 'Non incluso nella licenza'}</div>
       </div>
     </div>
   )
@@ -222,9 +234,9 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
         </div>
         {error && <div className="alert alert-error">{error}</div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-          {cardModulo(modRischi, setModRischi, '🛡️', 'Rischi', 'Mappatura e valutazione dei rischi, azioni, registro.')}
-          {cardModulo(modProcedure, setModProcedure, '📋', 'Procedure', 'Catalogo procedure per settore, approvazione e personalizzazione.')}
-          {cardModulo(modGovernance, setModGovernance, '⚖️', 'Governance', 'Organi, componenti, riunioni e delibere.')}
+          {cardModulo(modRischi, setModRischi, '🛡️', 'Rischi', 'Mappatura e valutazione dei rischi, azioni, registro.', incl('rischi'))}
+          {cardModulo(modProcedure, setModProcedure, '📋', 'Procedure', 'Catalogo procedure per settore, approvazione e personalizzazione.', incl('procedure'))}
+          {cardModulo(modGovernance, setModGovernance, '⚖️', 'Governance', 'Organi, componenti, riunioni e delibere.', incl('governance'))}
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setStep(1)}>← Indietro</button>
@@ -297,14 +309,8 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
         {modProcedure && (
           <div style={{ marginBottom: 22 }}>
             <div style={{ fontWeight: 700, color: '#1A3A5C', marginBottom: 8 }}>📋 Procedure</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div onClick={() => setCaricaProc(true)} style={{ cursor: 'pointer', padding: '12px 14px', border: `2px solid ${caricaProc ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: caricaProc ? '#EBF4FC' : 'white' }}>
-                <div style={{ fontWeight: 600, color: '#1A3A5C', fontSize: 13 }}>✅ Carica le procedure standard del settore {settore || ''}</div>
-                <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Compariranno nel catalogo, pronte da valutare e approvare.</div>
-              </div>
-              <div onClick={() => setCaricaProc(false)} style={{ cursor: 'pointer', padding: '12px 14px', border: `2px solid ${!caricaProc ? '#aaa' : '#E0E0E0'}`, borderRadius: 8, background: !caricaProc ? '#F5F5F5' : 'white' }}>
-                <div style={{ fontWeight: 500, color: '#888', fontSize: 12 }}>No, non ora — le attiverò in seguito dallo standard di settore o dalle generiche.</div>
-              </div>
+            <div className="alert alert-info" style={{ margin: 0 }}>
+              ✓ Le procedure standard del settore {settore || ''} saranno disponibili nel catalogo, pronte da valutare e approvare.
             </div>
           </div>
         )}
