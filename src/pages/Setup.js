@@ -47,7 +47,6 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
   useEffect(() => {
     if (lic === undefined) return
     setModRischi(incl('rischi')); setModProcedure(incl('procedure')); setModGovernance(incl('governance'))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lic])
 
   const haSettore  = !!(RISCHI_PER_SETTORE[settore]?.length)
