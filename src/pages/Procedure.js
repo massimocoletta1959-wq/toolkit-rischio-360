@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
 import { AREE_PROCEDURE, MAPPA_SIGLE } from '../lib/procedure'
 import { generaProcedura } from '../lib/generaProcedura'
+import EditorProcedura from './EditorProcedura'
 
 const STATI = ['Bozza', 'Approvata', 'Adottata', 'Personalizzata', 'Non applicabile']
 const STATO_STYLE = {
@@ -111,12 +112,13 @@ function DistribuzioneModal({ proc, defaultMembroId, membri, aziendaId, onClose,
 }
 
 export default function Procedure() {
-  const { azienda } = useApp()
+  const { azienda, profilo } = useApp()
   const [catalogo, setCatalogo] = useState([])   // procedure del settore + generico
   const [adozioni, setAdozioni] = useState({})   // codice -> record procedure_azienda
   const [ruoli, setRuoli]       = useState([])
   const [membri, setMembri]     = useState([])
   const [distProc, setDistProc] = useState(null)   // { proc, defaultMembroId }
+  const [editProc, setEditProc] = useState(null)   // { proc, modo: 'azienda'|'standard' }
   const [msg, setMsg]           = useState(null)
   const [loading, setLoading]   = useState(true)
   const [areaSel, setAreaSel]   = useState('')
@@ -252,6 +254,13 @@ export default function Procedure() {
                     <option value="">— Responsabile —</option>
                     {ruoli.map(r => <option key={r.id} value={r.id}>{r.sigla} — {r.nome}</option>)}
                   </select>
+                  <button className="btn btn-sm btn-icon" title="Personalizza per questa azienda"
+                          disabled={st === 'Non applicabile'}
+                          onClick={() => setEditProc({ proc: p, modo: 'azienda' })}>✏️</button>
+                  {profilo?.proprietario && (
+                    <button className="btn btn-sm btn-icon" title="Modifica lo STANDARD del settore (solo proprietario)"
+                            onClick={() => setEditProc({ proc: p, modo: 'standard' })}>📚</button>
+                  )}
                   <button className="btn btn-sm btn-icon" title="Genera documento personalizzato"
                           disabled={st === 'Non applicabile'}
                           onClick={() => generaProcedura(p, azienda)}>📄</button>
@@ -275,6 +284,21 @@ export default function Procedure() {
           onDone={n => {
             setDistProc(null)
             setMsg(`Distribuita "${distProc.proc.titolo}": create ${n} prese visione. Le trovi in Procedure → Ticket.`)
+            setTimeout(() => setMsg(null), 6000)
+          }}
+        />
+      )}
+
+      {editProc && (
+        <EditorProcedura
+          proc={editProc.proc}
+          azienda={azienda}
+          modo={editProc.modo}
+          onClose={() => setEditProc(null)}
+          onSaved={(isStd) => {
+            setEditProc(null)
+            load()
+            setMsg(isStd ? 'Standard del settore aggiornato.' : 'Procedura personalizzata salvata per questa azienda.')
             setTimeout(() => setMsg(null), 6000)
           }}
         />
