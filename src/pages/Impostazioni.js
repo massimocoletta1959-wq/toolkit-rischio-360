@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
+import { RISCHI_DEFAULT, RISCHI_PER_SETTORE, RISCHI_231_EDILIZIA, RISCHI_231_GENERICO } from '../lib/constants'
 
 const SETTORI = ['Manifatturiero','Servizi','Commercio','Edilizia','Sanità','Tecnologia','Agricoltura','Trasporti','Altro']
 const DIMENSIONI = ['Micro (< 10 dipendenti)','Piccola (10-49)','Media (50-249)','Grande (250+)']
@@ -26,6 +27,9 @@ export default function Impostazioni() {
   const [editForm, setEditForm]     = useState({ nome: '', piva: '', settore: '', dimensione: '' })
   const [lic, setLic]               = useState(null)
   const [modLoading, setModLoading] = useState(null)
+  const [impRischi, setImpRischi]   = useState(false)   // mostra la finestra import rischi
+  const [impScelta, setImpScelta]   = useState(null)
+  const [impLoading, setImpLoading] = useState(false)
 
   useEffect(() => {
     if (!session?.user?.id) return
@@ -38,9 +42,36 @@ export default function Impostazioni() {
   async function toggleModulo(campo, incluso) {
     if (!incluso) return
     setModLoading(campo)
+    const attivando = !azienda[campo]   // true = sto accendendo il modulo
     await supabase.from('aziende').update({ [campo]: !azienda[campo] }).eq('id', azienda.id)
     await reload()
     setModLoading(null)
+    // se attivo i Rischi e l'azienda non ne ha ancora, propongo l'import
+    if (campo === 'mod_rischi' && attivando) {
+      const { count } = await supabase.from('rischi')
+        .select('id', { count: 'exact', head: true }).eq('azienda_id', azienda.id)
+      if (!count) { setImpScelta(null); setImpRischi(true) }
+    }
+  }
+
+  async function importaRischi() {
+    if (!impScelta || impScelta === 'nessuno') { setImpRischi(false); return }
+    setImpLoading(true); setError(null)
+    const set  = RISCHI_PER_SETTORE[azienda.settore] || []
+    const r231 = azienda.settore === 'Edilizia' ? RISCHI_231_EDILIZIA : RISCHI_231_GENERICO
+    let lista = []
+    if (impScelta === 'standard') lista = [...RISCHI_DEFAULT]
+    if (impScelta === 'settore')  lista = [...set]
+    if (impScelta === 'tutti')    lista = [...RISCHI_DEFAULT, ...set]
+    if (impScelta === 'tutti231') lista = [...RISCHI_DEFAULT, ...set, ...r231]
+    if (impScelta === 'solo231')  lista = [...r231]
+    if (lista.length) {
+      const payload = lista.map(r => ({ ...r, azienda_id: azienda.id }))
+      const { error: err } = await supabase.from('rischi').insert(payload)
+      if (err) { setError(err.message); setImpLoading(false); return }
+    }
+    setImpLoading(false); setImpRischi(false)
+    await reload()
   }
 
   async function eliminaAzienda() {
@@ -284,6 +315,47 @@ export default function Impostazioni() {
           </div>
         )}
       </div>
+
+      {impRischi && (() => {
+        const settore = azienda?.settore
+        const set  = RISCHI_PER_SETTORE[settore] || []
+        const haSet = set.length > 0
+        const nStd = RISCHI_DEFAULT.length
+        const nSet = set.length
+        const r231 = settore === 'Edilizia' ? RISCHI_231_EDILIZIA : RISCHI_231_GENERICO
+        const n231 = r231.length
+        const opt = (val, titolo, badge, giallo) => (
+          <div onClick={() => setImpScelta(val)} style={{ cursor:'pointer', padding:'12px 14px', border:`2px solid ${impScelta===val ? (giallo?'#856404':'#2B5FA5') : '#E0E0E0'}`, borderRadius:8, background: impScelta===val ? (giallo?'#FEF9E7':'#EBF4FC') : 'white', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <div style={{ fontWeight:600, color: giallo?'#856404':'#1A3A5C', fontSize:13 }}>{titolo}</div>
+            {badge != null && <span style={{ fontSize:11, fontWeight:600, color: giallo?'#856404':'#2B5FA5', background: giallo?'#FEF9E7':'#EBF4FC', padding:'2px 8px', borderRadius:20 }}>{badge}</span>}
+          </div>
+        )
+        return (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+            <div className="card" style={{ maxWidth:480, width:'100%' }}>
+              <div className="card-header"><span className="card-title">🛡️ Importa i rischi standard</span></div>
+              <div className="card-body">
+                <p style={{ fontSize:13, color:'#666', marginBottom:14 }}>Hai attivato il modulo Rischi per <strong>{azienda?.nome}</strong>. Vuoi partire da una lista di rischi predefiniti?</p>
+                {error && <div className="alert alert-error" style={{ marginBottom:10 }}>{error}</div>}
+                <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
+                  {opt('standard', '📋 Solo rischi standard', nStd)}
+                  {haSet && opt('settore', `🏗️ Solo rischi ${settore}`, nSet)}
+                  {haSet && opt('tutti', `✅ Tutti — standard + ${settore}`, nStd + nSet)}
+                  {opt('solo231', '⚖️ Solo Rischi 231', n231, true)}
+                  {opt('tutti231', '🏆 Copertura completa + 231', nStd + nSet + n231, true)}
+                  {opt('nessuno', 'Parto da zero — nessun rischio', null)}
+                </div>
+                <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+                  <button className="btn" onClick={() => setImpRischi(false)} disabled={impLoading}>Chiudi</button>
+                  <button className="btn btn-primary" onClick={importaRischi} disabled={!impScelta || impLoading}>
+                    {impLoading ? 'Importazione…' : (impScelta === 'nessuno' ? 'Ok, parto da zero' : 'Importa i rischi')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
