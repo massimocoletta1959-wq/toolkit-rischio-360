@@ -30,6 +30,7 @@ export default function App() {
   const [azienda, setAziendaState] = useState(null)
   const [page, setPage]            = useState('home')
   const [modulo, setModulo]        = useState(null)   // null = Home; 'rischi' | 'procedure' | 'governance'
+  const [determinaId, setDeterminaId] = useState(null) // id determina da aprire nel wizard (null = nuova)
   const [pagMembro, setPagMembro]  = useState('task') // vista membro: 'task' | 'procedure'
   const [showSetup, setShowSetup]  = useState(false)
 
@@ -214,6 +215,9 @@ export default function App() {
     reload: () => loadDati(session.user.id),
     page, setPage, logout,
     modulo, entraModulo, tornaHome,
+    determinaId,
+    apriDetermina: (id) => { setDeterminaId(id); setPage('au_nuova') },
+    nuovaDetermina: () => { setDeterminaId(null); setPage('au_nuova') },
     onNuovaAzienda: () => setShowSetup(true),
   }
 
@@ -239,7 +243,7 @@ export default function App() {
     organigramma: <Organigramma />,
     governance:   <Governance />,
     au_registro:  <RegistroDetermine />,
-    au_nuova:     <NuovaDetermina />,
+    au_nuova:     <NuovaDetermina key={determinaId || 'nuova'} />,
     procedure:    <Procedure />,
     tracciamento: <TracciamentoProcedure />,
     impostazioni: <Impostazioni />,

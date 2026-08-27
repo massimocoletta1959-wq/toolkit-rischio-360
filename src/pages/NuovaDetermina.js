@@ -49,13 +49,15 @@ async function sha256(text) {
 
 // ── Componente ──────────────────────────────────────────────────────────
 export default function NuovaDetermina() {
-  const { azienda, setPage } = useApp()
+  const { azienda, setPage, determinaId } = useApp()
   const anno = new Date().getFullYear()
 
   const [step, setStep] = useState(1)
   const [auNome, setAuNome] = useState('')          // titolare AU (da organi/organo_membri)
   const [saving, setSaving] = useState(false)
   const [errore, setErrore] = useState(null)
+  const [soloLettura, setSoloLettura] = useState(false)  // determina già firmata → non modificabile
+  const [caricata, setCaricata] = useState(!determinaId) // false finché carico una bozza esistente
 
   // dati determina
   const [tipo, setTipo] = useState('')
@@ -84,6 +86,36 @@ export default function NuovaDetermina() {
       if (m) setAuNome(`${m.nome || ''} ${m.cognome || ''}`.trim())
     })()
   }, [azienda])
+
+  // Se sto riaprendo una determina esistente, carico i suoi dati
+  useEffect(() => {
+    (async () => {
+      if (!determinaId) return
+      const { data: det } = await supabase.from('determine').select('*').eq('id', determinaId).single()
+      if (!det) { setCaricata(true); return }
+      setTipo(det.tipo || '')
+      setOggetto(det.oggetto || '')
+      setDescrizione(det.descrizione || '')
+      setValore(det.valore == null ? '' : String(det.valore))
+      setAnalisiFin(det.analisi_finanziaria || '')
+      setAnalisiEco(det.analisi_economica || '')
+      setAlternative(det.alternative || '')
+      setArea231(det.area_231 || '')
+      if (det.stato === 'firmata' || det.stato === 'annullata') setSoloLettura(true)
+
+      const { data: rr } = await supabase.from('determina_rischi').select('*').eq('determina_id', determinaId)
+      if (rr && rr.length) {
+        const rk = { finanziario: 0, operativo: 0, legale_231: 0, reputazionale: 0 }
+        const mt = {}
+        rr.forEach(r => { rk[r.categoria] = r.livello; if (r.mitigazione) mt[r.categoria] = r.mitigazione })
+        setRisk(rk); setMit(mt)
+      }
+      const { data: pp } = await supabase.from('determina_pareri').select('*').eq('determina_id', determinaId)
+      if (pp && pp.length) setPareri(pp.map(p => ({ tipo: p.tipo, fonte: p.fonte || '', sintesi: p.sintesi || '' })))
+
+      setCaricata(true)
+    })()
+  }, [determinaId])
 
   const maxRisk = Math.max(0, ...Object.values(risk))
   const serveParere = maxRisk >= 4
@@ -124,8 +156,8 @@ export default function NuovaDetermina() {
 
   async function salva(firma) {
     setErrore(null)
-    if (!tipo) { setStep(1); setErrore('Seleziona il tipo di determina.'); return }
-    if (!oggetto.trim()) { setStep(1); setErrore("Indica l'oggetto della determina."); return }
+    if (!tipo) { setStep(1); setErrore('Seleziona il tipo di determina, poi riprova.'); return }
+    if (!oggetto.trim()) { setStep(1); setErrore("Manca l'oggetto della determina: lo trovi qui sotto. Compilalo e riprova — il resto del lavoro è al sicuro."); return }
     if (firma && serveParere && pareri.length === 0) {
       setStep(4); setErrore('Rischio alto/critico rilevato: è obbligatorio allegare almeno un parere prima di firmare.'); return
     }
@@ -143,16 +175,30 @@ export default function NuovaDetermina() {
       }
       const corpo = generaCorpo(numero)
 
-      const { data: det, error: eDet } = await supabase.from('determine').insert({
+      const campi = {
         azienda_id: azienda.id, anno, tipo, oggetto: oggetto.trim(), descrizione: descrizione || null,
         valore: valore === '' ? null : Number(valore),
         analisi_finanziaria: analisiFin || null, analisi_economica: analisiEco || null, alternative: alternative || null,
-        area_231: area231 || null, corpo_html: corpo, stato, numero, data_firma, hash_documento: hash,
-      }).select().single()
-      if (eDet) throw eDet
+        area_231: area231 || null, corpo_html: corpo, stato,
+      }
+      // il numero/hash/data si scrivono solo alla firma (una bozza non li ha)
+      if (firma) { campi.numero = numero; campi.data_firma = data_firma; campi.hash_documento = hash }
+
+      let detId = determinaId
+      if (determinaId) {
+        const { error } = await supabase.from('determine').update(campi).eq('id', determinaId)
+        if (error) throw error
+        // ricarico rischi e pareri da zero (sostituzione pulita)
+        await supabase.from('determina_rischi').delete().eq('determina_id', determinaId)
+        await supabase.from('determina_pareri').delete().eq('determina_id', determinaId)
+      } else {
+        const { data: det, error } = await supabase.from('determine').insert(campi).select().single()
+        if (error) throw error
+        detId = det.id
+      }
 
       const righeRischi = RISK_CATS.filter(c => risk[c.id] > 0).map(c => ({
-        determina_id: det.id, azienda_id: azienda.id, categoria: c.id, livello: risk[c.id], mitigazione: mit[c.id] || null,
+        determina_id: detId, azienda_id: azienda.id, categoria: c.id, livello: risk[c.id], mitigazione: mit[c.id] || null,
       }))
       if (righeRischi.length) {
         const { error } = await supabase.from('determina_rischi').insert(righeRischi)
@@ -161,7 +207,7 @@ export default function NuovaDetermina() {
 
       if (pareri.length) {
         const righeP = pareri.map(p => ({
-          determina_id: det.id, azienda_id: azienda.id, tipo: p.tipo, fonte: p.fonte || null,
+          determina_id: detId, azienda_id: azienda.id, tipo: p.tipo, fonte: p.fonte || null,
           sintesi: p.sintesi || null, obbligatorio: serveParere,
         }))
         const { error } = await supabase.from('determina_pareri').insert(righeP)
@@ -169,8 +215,8 @@ export default function NuovaDetermina() {
       }
 
       await supabase.from('governance_eventi').insert({
-        azienda_id: azienda.id, determina_id: det.id,
-        evento: firma ? 'firma' : 'creazione_bozza',
+        azienda_id: azienda.id, determina_id: detId,
+        evento: firma ? 'firma' : (determinaId ? 'aggiornamento_bozza' : 'creazione_bozza'),
         dettaglio: `${TIPO_LABEL[tipo] || tipo} — ${oggetto.trim()}`,
       })
 
@@ -187,12 +233,18 @@ export default function NuovaDetermina() {
       <div className="page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h2>Nuova Determina AU</h2>
+            <h2>{soloLettura ? 'Determina AU' : determinaId ? 'Modifica Determina AU' : 'Nuova Determina AU'}</h2>
             <p>Flusso guidato · {azienda?.nome}{auNome ? ` · AU: ${auNome}` : ''} · Anno {anno}</p>
           </div>
           <button className="btn btn-sm" onClick={() => setPage('au_registro')}>← Registro</button>
         </div>
       </div>
+
+      {soloLettura && (
+        <div className="alert" style={{ marginBottom: 14, background: '#EAF2F8', color: '#1A5276' }}>
+          🔒 Questa determina è già firmata e registrata: è consultabile ma non modificabile.
+        </div>
+      )}
 
       {/* Indicatore step */}
       <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid #E0E0E0', marginBottom: 18 }}>
@@ -408,8 +460,8 @@ export default function NuovaDetermina() {
             {pareri.length > 0 && <span className="badge" style={{ background: '#EDEBFA', color: '#5A4FCF' }}>{pareri.length} parere/i</span>}
           </div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button className="btn" onClick={() => salva(false)} disabled={saving}>{saving ? 'Salvataggio…' : '💾 Salva come bozza'}</button>
-            <button className="btn btn-primary" onClick={() => salva(true)} disabled={saving}>{saving ? 'Salvataggio…' : '✍️ Firma e registra'}</button>
+            <button className="btn" onClick={() => salva(false)} disabled={saving || soloLettura}>{saving ? 'Salvataggio…' : '💾 Salva come bozza'}</button>
+            <button className="btn btn-primary" onClick={() => salva(true)} disabled={saving || soloLettura}>{saving ? 'Salvataggio…' : '✍️ Firma e registra'}</button>
           </div>
           <div style={{ marginTop: 14 }}>
             <button className="btn btn-sm" onClick={() => setStep(5)}>← Indietro</button>

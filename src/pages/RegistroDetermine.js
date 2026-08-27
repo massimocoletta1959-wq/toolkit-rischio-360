@@ -40,7 +40,7 @@ const dataFmt = d => {
 }
 
 export default function RegistroDetermine() {
-  const { azienda, setPage } = useApp()
+  const { azienda, apriDetermina, nuovaDetermina } = useApp()
   const [determine, setDetermine] = useState([])
   const [loading, setLoading] = useState(true)
   const [filterStato, setFilterStato] = useState('')
@@ -82,7 +82,7 @@ export default function RegistroDetermine() {
             <h2>Registro Determine AU</h2>
             <p>Determine dell'Amministratore Unico di <strong>{azienda?.nome}</strong> · numerazione progressiva, registro immodificabile</p>
           </div>
-          <button className="btn btn-primary" onClick={() => setPage('au_nuova')}>+ Nuova determina</button>
+          <button className="btn btn-primary" onClick={() => nuovaDetermina()}>+ Nuova determina</button>
         </div>
       </div>
 
@@ -123,7 +123,8 @@ export default function RegistroDetermine() {
                 {filtered.map(d => {
                   const st = STATO_STYLE[d.stato] || STATO_STYLE.bozza
                   return (
-                    <tr key={d.id}>
+                    <tr key={d.id} onClick={() => apriDetermina(d.id)} style={{ cursor: 'pointer' }}
+                      title={d.stato === 'bozza' ? 'Riprendi la bozza' : 'Apri in sola lettura'}>
                       <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#666', whiteSpace: 'nowrap' }}>{numFmt(d)}</td>
                       <td style={{ maxWidth: 320, fontWeight: 600 }}>{d.oggetto}</td>
                       <td style={{ fontSize: 12, color: '#666' }}>{TIPO_LABEL[d.tipo] || d.tipo}</td>
