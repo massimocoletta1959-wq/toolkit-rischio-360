@@ -39,6 +39,83 @@ const livStyle = v => v >= 5 ? { background: '#FDEDEC', color: '#C0392B' }
 
 const STEPS = ['Tipo', 'Analisi', 'Rischio', 'Pareri', 'Redazione', 'Firma']
 
+// Testo di aiuto fisso sotto ogni campo (le domande giuste a cui rispondere)
+const HINT = {
+  fin: 'Come si copre la spesa? Impatto su cassa e liquidità, sostenibilità nel tempo, eventuali indici (es. DSCR).',
+  eco: 'Effetto su costi/ricavi e conto economico: ritorno atteso (ROI), tempo di rientro (payback), margini.',
+  alt: 'Quali opzioni hai considerato e perché hai scelto questa? Cita anche il "non fare nulla" se pertinente.',
+}
+
+// Esempi (placeholder) calibrati sul tipo di determina; 'default' per i tipi non elencati
+const PLACEHOLDER = {
+  default: {
+    fin: 'Es. Copertura con cassa aziendale; impatto contenuto sulla liquidità corrente.',
+    eco: 'Es. Beneficio atteso e tempi di rientro della spesa.',
+    alt: 'Es. 1) Opzione A — scartata perché…; 2) Opzione B — scelta perché…',
+  },
+  beni_strumentali: {
+    fin: 'Es. Leasing vs acquisto; impatto su cassa, DSCR post-investimento, fonte di copertura.',
+    eco: 'Es. ROI atteso sulle commesse abilitate, payback in mesi, aumento capacità produttiva.',
+    alt: 'Es. 1) Acquisto cash — escluso per liquidità; 2) Terzismo — escluso per costi; 3) Leasing — scelto.',
+  },
+  operazione_finanziaria: {
+    fin: 'Es. Importo, tasso (fisso/variabile), durata, garanzie richieste, effetto su indebitamento e DSCR.',
+    eco: 'Es. Costo complessivo del finanziamento, impatto su oneri finanziari, convenienza vs alternative.',
+    alt: 'Es. Altri istituti/strumenti valutati (mutuo, apertura di credito, autofinanziamento) e motivo della scelta.',
+  },
+  contratto: {
+    fin: 'Es. Valore del contratto, termini di pagamento, esposizione massima, penali.',
+    eco: 'Es. Marginalità attesa, incidenza sui costi/ricavi annui, durata e rinnovi.',
+    alt: 'Es. Altri fornitori/clienti valutati e criterio di selezione (prezzo, affidabilità, tempi).',
+  },
+  consulenza: {
+    fin: 'Es. Compenso pattuito, modalità (a forfait/a ore), eventuali spese, copertura di budget.',
+    eco: 'Es. Beneficio atteso dall\'incarico, alternativa "in house", rapporto costo/valore.',
+    alt: 'Es. Altri professionisti/studi consultati, preventivi confrontati, motivazione della scelta.',
+  },
+  contenzioso: {
+    fin: 'Es. Costi legali stimati, valore della causa, accantonamento a fondo rischi, spese soccombenza.',
+    eco: 'Es. Probabilità di esito favorevole, importo recuperabile/rischio, convenienza vs transazione.',
+    alt: 'Es. Transazione stragiudiziale, mediazione, rinuncia: valutazione comparata degli esiti.',
+  },
+  immobiliare: {
+    fin: 'Es. Canone/prezzo, durata, oneri accessori, impatto su cassa, eventuale finanziamento.',
+    eco: 'Es. Convenienza vs alternative, valorizzazione dell\'immobile, risparmio o ricavo atteso.',
+    alt: 'Es. Altri immobili/soluzioni valutati, acquisto vs locazione, motivazione della scelta.',
+  },
+  marketing: {
+    fin: 'Es. Budget della campagna/evento, ripartizione dei costi, copertura finanziaria.',
+    eco: 'Es. Ritorno atteso (lead, vendite, notorietà), ROI di marketing, KPI di misurazione.',
+    alt: 'Es. Altri canali/agenzie/eventi valutati e criterio di scelta.',
+  },
+  personale: {
+    fin: 'Es. Costo annuo lordo, oneri, impatto sul costo del personale e sul budget.',
+    eco: 'Es. Beneficio organizzativo atteso, produttività, copertura del fabbisogno.',
+    alt: 'Es. Riorganizzazione interna, part-time, esternalizzazione: opzioni valutate.',
+  },
+  assunzione: {
+    fin: 'Es. RAL e costo aziendale complessivo, incidenza sul budget del personale.',
+    eco: 'Es. Valore aggiunto della figura, obiettivi attesi, tempi di inserimento.',
+    alt: 'Es. Promozione interna, consulenza esterna, agenzia: alternative considerate.',
+  },
+  rs_innovazione: {
+    fin: 'Es. Investimento previsto, eventuali crediti d\'imposta/agevolazioni, copertura.',
+    eco: 'Es. Ritorno atteso, vantaggio competitivo, tempi di sviluppo e time-to-market.',
+    alt: 'Es. Sviluppo interno vs acquisizione vs partnership: opzioni e scelta.',
+  },
+  compliance: {
+    fin: 'Es. Costo dell\'adeguamento, sanzioni evitate, copertura di budget.',
+    eco: 'Es. Riduzione del rischio, benefici organizzativi, impatto su continuità.',
+    alt: 'Es. Livelli di adeguamento valutati, soluzioni interne vs esterne, motivazione.',
+  },
+  adempimenti_contabili: {
+    fin: 'Es. Importi in gioco, impatto su liquidità e patrimonio, coerenza con il budget.',
+    eco: 'Es. Effetto su risultato d\'esercizio, destinazione utili, riflessi economici.',
+    alt: 'Es. Ipotesi alternative valutate (es. destinazione utili) e motivazione della scelta.',
+  },
+}
+const ph = (tipo, campo) => (PLACEHOLDER[tipo] || PLACEHOLDER.default)[campo]
+
 const eur = v => v == null || v === '' ? null
   : '€ ' + Number(v).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 
@@ -234,7 +311,12 @@ export default function NuovaDetermina() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <h2>{soloLettura ? 'Determina AU' : determinaId ? 'Modifica Determina AU' : 'Nuova Determina AU'}</h2>
-            <p>Flusso guidato · {azienda?.nome}{auNome ? ` · AU: ${auNome}` : ''} · Anno {anno}</p>
+            <p>
+              {tipo
+                ? <>{TIPI.find(t => t.id === tipo)?.icon} <strong>{TIPO_LABEL[tipo]}</strong> · {azienda?.nome}</>
+                : <>Flusso guidato · {azienda?.nome}</>}
+              {auNome ? ` · AU: ${auNome}` : ''} · Anno {anno}
+            </p>
           </div>
           <button className="btn btn-sm" onClick={() => setPage('au_registro')}>← Registro</button>
         </div>
@@ -312,19 +394,22 @@ export default function NuovaDetermina() {
             <div className="form-group">
               <label className="form-label">Analisi finanziaria</label>
               <textarea className="form-control" value={analisiFin} onChange={e => setAnalisiFin(e.target.value)}
-                placeholder="Copertura, impatto cash flow, DSCR..." />
+                placeholder={ph(tipo, 'fin')} />
+              <div style={{ fontSize: 11.5, color: '#999', marginTop: 4 }}>{HINT.fin}</div>
             </div>
           </div>
           <div className="grid-2">
             <div className="form-group">
               <label className="form-label">Analisi economica</label>
               <textarea className="form-control" value={analisiEco} onChange={e => setAnalisiEco(e.target.value)}
-                placeholder="Impatto conto economico, ROI, payback..." />
+                placeholder={ph(tipo, 'eco')} />
+              <div style={{ fontSize: 11.5, color: '#999', marginTop: 4 }}>{HINT.eco}</div>
             </div>
             <div className="form-group">
               <label className="form-label">Alternative valutate</label>
               <textarea className="form-control" value={alternative} onChange={e => setAlternative(e.target.value)}
-                placeholder="Opzioni considerate e motivazione della scelta..." />
+                placeholder={ph(tipo, 'alt')} />
+              <div style={{ fontSize: 11.5, color: '#999', marginTop: 4 }}>{HINT.alt}</div>
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
