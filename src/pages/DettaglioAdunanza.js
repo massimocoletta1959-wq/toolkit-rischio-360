@@ -142,9 +142,10 @@ export default function DettaglioAdunanza() {
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(titoloDoc)}</title>
       <style>
         @page { size: A4 portrait; margin: 2cm; }
+        * { box-sizing: border-box; }
         html, body { width: 100%; }
-        body { font-family: Georgia, 'Times New Roman', serif; font-size: 12pt; line-height: 1.6; color: #1a1a1a; }
-        pre { white-space: pre-wrap; overflow-wrap: break-word; word-wrap: break-word; font-family: inherit; margin: 0; text-align: justify; }
+        body { font-family: Georgia, 'Times New Roman', serif; font-size: 12pt; line-height: 1.6; color: #1a1a1a; padding-right: 4px; }
+        pre { white-space: pre-wrap; overflow-wrap: break-word; word-wrap: break-word; hyphens: none; font-family: inherit; margin: 0; max-width: 100%; }
         .hash { margin-top: 28px; padding-top: 10px; border-top: 1px solid #ccc; font-family: monospace; font-size: 8pt; color: #888; word-break: break-all; }
       </style></head><body>
       <pre>${esc(testo)}</pre>
