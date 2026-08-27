@@ -117,10 +117,6 @@ export default function DettaglioAdunanza() {
       const del = delibere[i] // abbinamento posizionale punto→delibera
       if (del) {
         if (del.testo) R.push(del.testo)
-        const unanime = (Number(del.contrari) === 0 && Number(del.astenuti) === 0)
-        const modo = unanime ? 'all\'unanimità' : `con voti favorevoli ${del.favorevoli}, contrari ${del.contrari}, astenuti ${del.astenuti}`
-        const verbo = del.esito === 'approvata' ? 'approva' : del.esito === 'respinta' ? 'respinge' : 'rinvia'
-        R.push(`(${collegio.charAt(0).toUpperCase() + collegio.slice(1)} ${verbo} ${modo}.)`)
         if (del.area_231) R.push(`(Operazione ricadente nell'area sensibile 231: ${del.area_231}.)`)
       }
       R.push('')
