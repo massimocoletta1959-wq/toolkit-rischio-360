@@ -19,6 +19,8 @@ const RUOLI = ['Presidente', 'Vice Presidente', 'Amministratore Delegato', 'Cons
 
 const nomeMembro = m => m ? `${m.nome || ''} ${m.cognome || ''}`.trim() || m.email : '—'
 
+const fmtQuota = q => (q == null || q === '') ? '—' : `${Number(q).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 3 })}%`
+
 // ---------------------------------------------------------------------
 // Modale: nuovo organo
 // ---------------------------------------------------------------------
@@ -115,10 +117,14 @@ function OrganoModal({ aziendaId, organo, onSaved, onClose }) {
 
 // ---------------------------------------------------------------------
 // Riga per aggiungere un componente a un organo
+//  - assemblea: si indica la quota %
+//  - altri organi: si indica il ruolo
 // ---------------------------------------------------------------------
 function AggiungiComponente({ organo, membri, giaPresenti, onAdded }) {
+  const isAssemblea = organo.tipo === 'assemblea'
   const [membroId, setMembroId] = useState('')
   const [ruolo, setRuolo] = useState(organo.monocratico ? 'Amministratore Unico' : 'Consigliere')
+  const [quota, setQuota] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -127,24 +133,36 @@ function AggiungiComponente({ organo, membri, giaPresenti, onAdded }) {
   async function aggiungi() {
     if (!membroId) { setError('Scegli una persona.'); return }
     setLoading(true); setError(null)
-    const { error: err } = await supabase.from('organo_membri').insert({
-      organo_id: organo.id, membro_id: membroId, ruolo,
+    const payload = {
+      organo_id: organo.id, membro_id: membroId,
       data_nomina: new Date().toISOString().slice(0, 10),
-    })
+    }
+    if (isAssemblea) {
+      payload.ruolo = 'Socio'
+      payload.quota = quota === '' ? null : Number(quota)
+    } else {
+      payload.ruolo = ruolo
+    }
+    const { error: err } = await supabase.from('organo_membri').insert(payload)
     setLoading(false)
-    if (err) { setError(err.message.includes('duplicate') ? 'Persona già presente con questo ruolo.' : err.message); return }
-    setMembroId(''); onAdded()
+    if (err) { setError(err.message.includes('duplicate') ? 'Persona già presente.' : err.message); return }
+    setMembroId(''); setQuota(''); onAdded()
   }
 
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 12, flexWrap: 'wrap' }}>
       <select className="form-control" style={{ flex: 2, minWidth: 160 }} value={membroId} onChange={e => setMembroId(e.target.value)}>
-        <option value="">+ Aggiungi persona…</option>
+        <option value="">+ Aggiungi {isAssemblea ? 'socio' : 'persona'}…</option>
         {disponibili.map(m => <option key={m.id} value={m.id}>{nomeMembro(m)}</option>)}
       </select>
-      <select className="form-control" style={{ flex: 1, minWidth: 130 }} value={ruolo} onChange={e => setRuolo(e.target.value)}>
-        {RUOLI.map(r => <option key={r} value={r}>{r}</option>)}
-      </select>
+      {isAssemblea ? (
+        <input className="form-control" style={{ flex: 1, minWidth: 130 }} type="number" step="0.001" min="0" max="100"
+          value={quota} onChange={e => setQuota(e.target.value)} placeholder="Quota % (es. 64,29)" />
+      ) : (
+        <select className="form-control" style={{ flex: 1, minWidth: 130 }} value={ruolo} onChange={e => setRuolo(e.target.value)}>
+          {RUOLI.map(r => <option key={r} value={r}>{r}</option>)}
+        </select>
+      )}
       <button className="btn btn-primary btn-sm" onClick={aggiungi} disabled={loading || !membroId}>Aggiungi</button>
       {error && <div style={{ width: '100%', color: '#C0392B', fontSize: 12 }}>{error}</div>}
     </div>
@@ -194,6 +212,10 @@ export default function Governance() {
     await supabase.from('organo_membri').update({ ruolo }).eq('id', id)
     load()
   }
+  async function cambiaQuota(id, quota) {
+    await supabase.from('organo_membri').update({ quota: quota === '' ? null : Number(quota) }).eq('id', id)
+    load()
+  }
 
   const compDi = organoId => comp.filter(c => c.organo_id === organoId)
 
@@ -233,9 +255,11 @@ export default function Governance() {
       ) : (
         organi.map(o => {
           const info = tipoInfo(o.tipo)
+          const isAssemblea = o.tipo === 'assemblea'
           const membriOrgano = compDi(o.id)
           const idsPresenti = membriOrgano.map(c => c.membro_id)
           const pieno = o.monocratico && membriOrgano.length >= 1
+          const totQuote = membriOrgano.reduce((s, c) => s + (c.quota ? Number(c.quota) : 0), 0)
           return (
             <div className="card" key={o.id}>
               <div className="card-header">
@@ -257,22 +281,33 @@ export default function Governance() {
               )}
 
               {membriOrgano.length === 0 ? (
-                <div style={{ fontSize: 13, color: '#999', padding: '4px 0' }}>Nessun componente assegnato.</div>
+                <div style={{ fontSize: 13, color: '#999', padding: '4px 0' }}>Nessun {isAssemblea ? 'socio' : 'componente'} assegnato.</div>
               ) : (
                 <div className="table-wrap">
                   <table>
-                    <thead><tr><th>Componente</th><th>Ruolo</th><th>Dal</th><th></th></tr></thead>
+                    <thead><tr>
+                      <th>{isAssemblea ? 'Socio' : 'Componente'}</th>
+                      <th>{isAssemblea ? 'Quota %' : 'Ruolo'}</th>
+                      <th>Dal</th><th></th>
+                    </tr></thead>
                     <tbody>
                       {membriOrgano.map(c => (
                         <tr key={c.id}>
                           <td>{nomeMembro(c.membri)}</td>
                           <td>
-                            <select className="form-control" style={{ width: 'auto', minWidth: 150, padding: '4px 8px', fontSize: 13 }}
-                              value={RUOLI.includes(c.ruolo) ? c.ruolo : '__altro__'}
-                              onChange={e => e.target.value !== '__altro__' && cambiaRuolo(c.id, e.target.value)}>
-                              {!RUOLI.includes(c.ruolo) && <option value="__altro__">{c.ruolo}</option>}
-                              {RUOLI.map(r => <option key={r} value={r}>{r}</option>)}
-                            </select>
+                            {isAssemblea ? (
+                              <input className="form-control" style={{ width: 120, padding: '4px 8px', fontSize: 13 }}
+                                type="number" step="0.001" min="0" max="100" defaultValue={c.quota ?? ''}
+                                onBlur={e => { const v = e.target.value; if (String(c.quota ?? '') !== v) cambiaQuota(c.id, v) }}
+                                placeholder="%" />
+                            ) : (
+                              <select className="form-control" style={{ width: 'auto', minWidth: 150, padding: '4px 8px', fontSize: 13 }}
+                                value={RUOLI.includes(c.ruolo) ? c.ruolo : '__altro__'}
+                                onChange={e => e.target.value !== '__altro__' && cambiaRuolo(c.id, e.target.value)}>
+                                {!RUOLI.includes(c.ruolo) && <option value="__altro__">{c.ruolo}</option>}
+                                {RUOLI.map(r => <option key={r} value={r}>{r}</option>)}
+                              </select>
+                            )}
                           </td>
                           <td style={{ color: '#666', fontSize: 12 }}>{c.data_nomina ? new Date(c.data_nomina + 'T00:00:00').toLocaleDateString('it-IT') : '—'}</td>
                           <td style={{ textAlign: 'right' }}>
@@ -282,6 +317,11 @@ export default function Governance() {
                       ))}
                     </tbody>
                   </table>
+                  {isAssemblea && membriOrgano.length > 0 && (
+                    <div style={{ fontSize: 12, color: totQuote > 100.001 ? '#C0392B' : '#666', marginTop: 8, textAlign: 'right' }}>
+                      Totale quote: <strong>{fmtQuota(totQuote)}</strong>{totQuote > 100.001 ? ' — supera il 100%!' : ''}
+                    </div>
+                  )}
                 </div>
               )}
 
