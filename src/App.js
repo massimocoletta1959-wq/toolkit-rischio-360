@@ -16,6 +16,7 @@ import Report from './pages/Report'
 import Governance from './pages/Governance'
 import RegistroDetermine from './pages/RegistroDetermine'
 import NuovaDetermina from './pages/NuovaDetermina'
+import Verbali from './pages/Verbali'
 import Home from './pages/Home'
 import Layout from './components/Layout'
 import LayoutMembro from './components/LayoutMembro'
@@ -244,6 +245,7 @@ export default function App() {
     governance:   <Governance />,
     au_registro:  <RegistroDetermine />,
     au_nuova:     <NuovaDetermina key={determinaId || 'nuova'} />,
+    verbali:      <Verbali />,
     procedure:    <Procedure />,
     tracciamento: <TracciamentoProcedure />,
     impostazioni: <Impostazioni />,

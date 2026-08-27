@@ -32,6 +32,7 @@ const MODULI = {
     voci: [
       { id: 'governance', label: 'Organi', icon: '⚖️' },
       { id: 'au_registro', label: 'Determine AU', icon: '📚' },
+      { id: 'verbali', label: 'Assemblee e verbali', icon: '🗳️' },
       { id: 'ticket', label: 'Ticket', icon: '🎫' },
     ],
   },
