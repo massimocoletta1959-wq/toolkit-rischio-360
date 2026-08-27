@@ -1,0 +1,136 @@
+import React, { useState, useEffect, useCallback } from 'react'
+import { supabase } from '../lib/supabase'
+import { useApp } from '../App'
+
+// Etichette leggibili per i tipi di determina (coerenti con lo schema della migrazione 54)
+const TIPO_LABEL = {
+  beni_strumentali: 'Beni strumentali',
+  contratto: 'Contratto',
+  operazione_finanziaria: 'Operazione finanziaria',
+  procura: 'Procura / delega',
+  assunzione: 'Assunzione rilevante',
+  urgenza: 'Urgenza',
+  altro: 'Altro',
+}
+
+// Colori dei badge di stato
+const STATO_STYLE = {
+  bozza:    { background: '#FEF9E7', color: '#856404', label: 'Bozza' },
+  firmata:  { background: '#E9F7EF', color: '#1E8449', label: 'Firmata' },
+  annullata:{ background: '#FDEDEC', color: '#C0392B', label: 'Annullata' },
+}
+
+// 007/2026  (le bozze non hanno ancora numero → —/2026)
+const numFmt = d => `${d.numero != null ? String(d.numero).padStart(3, '0') : '—'}/${d.anno}`
+
+const eur = v => v == null ? '—'
+  : '€ ' + Number(v).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+
+const dataFmt = d => {
+  const raw = d.data_firma || d.created_at
+  return raw ? new Date(raw).toLocaleDateString('it-IT') : '—'
+}
+
+export default function RegistroDetermine() {
+  const { azienda, setPage } = useApp()
+  const [determine, setDetermine] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [filterStato, setFilterStato] = useState('')
+  const [search, setSearch] = useState('')
+
+  const load = useCallback(async () => {
+    if (!azienda?.id) return
+    setLoading(true)
+    const { data } = await supabase
+      .from('determine')
+      .select('*')
+      .eq('azienda_id', azienda.id)
+      .order('anno', { ascending: false })
+      .order('numero', { ascending: false, nullsFirst: true })
+      .order('created_at', { ascending: false })
+    setDetermine(data || [])
+    setLoading(false)
+  }, [azienda])
+
+  useEffect(() => { load() }, [load])
+
+  const filtered = determine.filter(d => {
+    if (filterStato && d.stato !== filterStato) return false
+    if (search && !(d.oggetto || '').toLowerCase().includes(search.toLowerCase())) return false
+    return true
+  })
+
+  const nFirmate = determine.filter(d => d.stato === 'firmata').length
+  const nBozze   = determine.filter(d => d.stato === 'bozza').length
+  const valFirmate = determine
+    .filter(d => d.stato === 'firmata' && d.valore != null)
+    .reduce((s, d) => s + Number(d.valore), 0)
+
+  return (
+    <div>
+      <div className="page-header">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h2>Registro Determine AU</h2>
+            <p>Determine dell'Amministratore Unico di <strong>{azienda?.nome}</strong> · numerazione progressiva, registro immodificabile</p>
+          </div>
+          {/* Attivo al prossimo step, quando aggiungeremo il wizard "Nuova determina" */}
+          <button className="btn btn-primary" disabled title="Disponibile al prossimo step">+ Nuova determina</button>
+        </div>
+      </div>
+
+      <div className="stats-grid">
+        <div className="stat-card"><div className="stat-num">{determine.length}</div><div className="stat-label">Determine totali</div></div>
+        <div className="stat-card"><div className="stat-num" style={{ color: '#1E8449' }}>{nFirmate}</div><div className="stat-label">Firmate</div></div>
+        <div className="stat-card"><div className="stat-num" style={{ color: '#856404' }}>{nBozze}</div><div className="stat-label">Bozze aperte</div></div>
+        <div className="stat-card"><div className="stat-num" style={{ fontSize: 20 }}>{eur(valFirmate)}</div><div className="stat-label">Valore firmato</div></div>
+      </div>
+
+      <div className="card">
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+          <input className="form-control" style={{ maxWidth: 240 }} placeholder="🔍 Cerca per oggetto..."
+            value={search} onChange={e => setSearch(e.target.value)} />
+          <select className="form-control" style={{ maxWidth: 180 }} value={filterStato} onChange={e => setFilterStato(e.target.value)}>
+            <option value="">Tutti gli stati</option>
+            <option value="bozza">Bozze</option>
+            <option value="firmata">Firmate</option>
+            <option value="annullata">Annullate</option>
+          </select>
+          {(filterStato || search) && <button className="btn btn-sm" onClick={() => { setFilterStato(''); setSearch('') }}>✕ Reimposta</button>}
+        </div>
+
+        {loading ? <div className="spinner" /> : filtered.length === 0 ? (
+          <div className="empty-state">
+            <div style={{ fontSize: 36 }}>📚</div>
+            <p>{determine.length === 0
+              ? 'Nessuna determina registrata. Il registro si popolerà man mano che l\'Amministratore Unico emette le determine.'
+              : 'Nessuna determina corrisponde ai filtri.'}</p>
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead><tr>
+                <th>N.</th><th>Oggetto</th><th>Tipo</th><th>Data</th><th>Valore</th><th>Stato</th>
+              </tr></thead>
+              <tbody>
+                {filtered.map(d => {
+                  const st = STATO_STYLE[d.stato] || STATO_STYLE.bozza
+                  return (
+                    <tr key={d.id}>
+                      <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#666', whiteSpace: 'nowrap' }}>{numFmt(d)}</td>
+                      <td style={{ maxWidth: 320, fontWeight: 600 }}>{d.oggetto}</td>
+                      <td style={{ fontSize: 12, color: '#666' }}>{TIPO_LABEL[d.tipo] || d.tipo}</td>
+                      <td style={{ fontSize: 12, color: '#666', whiteSpace: 'nowrap' }}>{dataFmt(d)}</td>
+                      <td style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{eur(d.valore)}</td>
+                      <td><span className="badge" style={{ background: st.background, color: st.color }}>{st.label}</span></td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
