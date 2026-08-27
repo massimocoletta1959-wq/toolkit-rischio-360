@@ -141,9 +141,10 @@ export default function DettaglioAdunanza() {
     if (!w) { setErrore('Consenti le finestre popup per stampare il verbale.'); return }
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(titoloDoc)}</title>
       <style>
-        @page { margin: 2.2cm; }
+        @page { size: A4 portrait; margin: 2cm; }
+        html, body { width: 100%; }
         body { font-family: Georgia, 'Times New Roman', serif; font-size: 12pt; line-height: 1.6; color: #1a1a1a; }
-        pre { white-space: pre-wrap; font-family: inherit; margin: 0; }
+        pre { white-space: pre-wrap; overflow-wrap: break-word; word-wrap: break-word; font-family: inherit; margin: 0; text-align: justify; }
         .hash { margin-top: 28px; padding-top: 10px; border-top: 1px solid #ccc; font-family: monospace; font-size: 8pt; color: #888; word-break: break-all; }
       </style></head><body>
       <pre>${esc(testo)}</pre>
