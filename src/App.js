@@ -18,6 +18,7 @@ import RegistroDetermine from './pages/RegistroDetermine'
 import NuovaDetermina from './pages/NuovaDetermina'
 import Verbali from './pages/Verbali'
 import DettaglioAdunanza from './pages/DettaglioAdunanza'
+import ModelliVerbale from './pages/ModelliVerbale'
 import Home from './pages/Home'
 import Layout from './components/Layout'
 import LayoutMembro from './components/LayoutMembro'
@@ -251,6 +252,7 @@ export default function App() {
     au_nuova:     <NuovaDetermina key={determinaId || 'nuova'} />,
     verbali:      <Verbali />,
     adunanza:     <DettaglioAdunanza key={adunanzaId || 'nuova'} />,
+    modelli_verbale: <ModelliVerbale />,
     procedure:    <Procedure />,
     tracciamento: <TracciamentoProcedure />,
     impostazioni: <Impostazioni />,

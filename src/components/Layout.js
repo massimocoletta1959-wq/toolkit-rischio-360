@@ -33,6 +33,7 @@ const MODULI = {
       { id: 'governance', label: 'Organi', icon: '⚖️' },
       { id: 'au_registro', label: 'Determine AU', icon: '📚' },
       { id: 'verbali', label: 'Assemblee e verbali', icon: '🗳️' },
+      { id: 'modelli_verbale', label: 'Modelli verbale', icon: '📝' },
       { id: 'ticket', label: 'Ticket', icon: '🎫' },
     ],
   },
