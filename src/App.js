@@ -17,6 +17,7 @@ import Governance from './pages/Governance'
 import RegistroDetermine from './pages/RegistroDetermine'
 import NuovaDetermina from './pages/NuovaDetermina'
 import Verbali from './pages/Verbali'
+import DettaglioAdunanza from './pages/DettaglioAdunanza'
 import Home from './pages/Home'
 import Layout from './components/Layout'
 import LayoutMembro from './components/LayoutMembro'
@@ -32,6 +33,7 @@ export default function App() {
   const [page, setPage]            = useState('home')
   const [modulo, setModulo]        = useState(null)   // null = Home; 'rischi' | 'procedure' | 'governance'
   const [determinaId, setDeterminaId] = useState(null) // id determina da aprire nel wizard (null = nuova)
+  const [adunanzaId, setAdunanzaId] = useState(null)   // id adunanza da aprire nel dettaglio
   const [pagMembro, setPagMembro]  = useState('task') // vista membro: 'task' | 'procedure'
   const [showSetup, setShowSetup]  = useState(false)
 
@@ -219,6 +221,8 @@ export default function App() {
     determinaId,
     apriDetermina: (id) => { setDeterminaId(id); setPage('au_nuova') },
     nuovaDetermina: () => { setDeterminaId(null); setPage('au_nuova') },
+    adunanzaId,
+    apriAdunanza: (id) => { setAdunanzaId(id); setPage('adunanza') },
     onNuovaAzienda: () => setShowSetup(true),
   }
 
@@ -246,6 +250,7 @@ export default function App() {
     au_registro:  <RegistroDetermine />,
     au_nuova:     <NuovaDetermina key={determinaId || 'nuova'} />,
     verbali:      <Verbali />,
+    adunanza:     <DettaglioAdunanza key={adunanzaId || 'nuova'} />,
     procedure:    <Procedure />,
     tracciamento: <TracciamentoProcedure />,
     impostazioni: <Impostazioni />,

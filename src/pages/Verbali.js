@@ -36,14 +36,14 @@ function NuovaAdunanzaModal({ aziendaId, organi, onSaved, onClose }) {
     if (!organoId) { setErrore('Seleziona l\'organo che si riunisce.'); return }
     if (!titolo.trim()) { setErrore('Indica un titolo per l\'adunanza.'); return }
     setSaving(true); setErrore(null)
-    const { error } = await supabase.from('adunanze').insert({
+    const { data, error } = await supabase.from('adunanze').insert({
       azienda_id: aziendaId, organo_id: organoId, titolo: titolo.trim(), sessione,
       data_ora: dataOra ? new Date(dataOra).toISOString() : null,
       luogo: luogo || null, modalita, stato: 'programmata',
-    })
+    }).select().single()
     setSaving(false)
     if (error) { setErrore(error.message); return }
-    onSaved()
+    onSaved(data?.id)
   }
 
   return (
@@ -112,7 +112,7 @@ function NuovaAdunanzaModal({ aziendaId, organi, onSaved, onClose }) {
 
 // ── Pagina: elenco adunanze ───────────────────────────────────────────
 export default function Verbali() {
-  const { azienda } = useApp()
+  const { azienda, apriAdunanza } = useApp()
   const [adunanze, setAdunanze] = useState([])
   const [organi, setOrgani] = useState([])
   const [orgById, setOrgById] = useState({})
@@ -192,7 +192,8 @@ export default function Verbali() {
                   const st = STATO_STYLE[a.stato] || STATO_STYLE.programmata
                   const org = orgById[a.organo_id]
                   return (
-                    <tr key={a.id}>
+                    <tr key={a.id} onClick={() => apriAdunanza(a.id)} style={{ cursor: 'pointer' }}
+                      title={a.stato === 'verbalizzata' ? 'Apri il verbale (sola lettura)' : 'Apri e compila'}>
                       <td style={{ fontFamily: 'monospace', fontSize: 12, color: '#666', whiteSpace: 'nowrap' }}>{numFmt(a)}</td>
                       <td style={{ maxWidth: 300, fontWeight: 600 }}>{a.titolo}</td>
                       <td style={{ fontSize: 12, color: '#666' }}>{org ? `${org.nome}` : '—'}</td>
@@ -210,7 +211,7 @@ export default function Verbali() {
 
       {showNuova && (
         <NuovaAdunanzaModal aziendaId={azienda.id} organi={organi}
-          onSaved={() => { setShowNuova(false); load() }}
+          onSaved={(newId) => { setShowNuova(false); if (newId) apriAdunanza(newId); else load() }}
           onClose={() => setShowNuova(false)} />
       )}
     </div>
