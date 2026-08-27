@@ -87,8 +87,12 @@ export default function DettaglioAdunanza() {
 
     if (ad.intestazione && ad.intestazione.trim()) { R.push(ad.intestazione.trim()); R.push('') }
 
-    R.push(`VERBALE ${tOrg.toUpperCase()} N. ${num}/${ad.anno}`)
-    R.push(`${azienda?.nome || ''}`)
+    if (isAssemblea) {
+      R.push(`VERBALE N. ${num}/${ad.anno}`)
+    } else {
+      R.push(`VERBALE ${tOrg.toUpperCase()} N. ${num}/${ad.anno}`)
+      R.push(`${azienda?.nome || ''}`)
+    }
     R.push('')
     R.push(`L'anno ${ad.anno}, il giorno ${dataStr}, alle ore ${oraInizio}, presso ${ad.luogo || '____________'}${modLabel}, si è riunita${isAssemblea ? '' : 'o'} ${collegio} di ${azienda?.nome || 'questa società'}, in sessione ${ad.sessione}, per discutere e deliberare sul seguente`)
     R.push('')
