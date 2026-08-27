@@ -76,31 +76,61 @@ export default function DettaglioAdunanza() {
   function generaVerbale() {
     if (!ad) return ''
     const tOrg = ORGANO_LABEL[organo?.tipo] || 'Organo'
-    const dataStr = ad.data_ora ? new Date(ad.data_ora).toLocaleString('it-IT', { dateStyle: 'long', timeStyle: 'short' }) : '____________'
-    const modLabel = { presenza: 'in presenza', videoconferenza: 'in videoconferenza', mista: 'in modalità mista' }[ad.modalita] || ''
-    const righe = []
-    righe.push(`VERBALE ${tOrg.toUpperCase()} N. ${ad.numero != null ? String(ad.numero).padStart(2, '0') : '—'}/${ad.anno}`)
-    righe.push(`${azienda?.nome || ''}${azienda?.settore ? ' · ' + azienda.settore : ''}`)
-    righe.push('')
-    righe.push(`Il giorno ${dataStr}, presso ${ad.luogo || '____________'} ${modLabel}, si è riunito/a ${tOrg} di ${azienda?.nome || 'questa società'}, sessione ${ad.sessione}, per discutere e deliberare sul seguente ordine del giorno.`)
-    if (ad.presenti != null || ad.aventi_diritto != null) {
-      righe.push('')
-      righe.push(`Risultano presenti ${ad.presenti ?? '__'} componenti su ${ad.aventi_diritto ?? '__'} aventi diritto; constatata la regolarità della costituzione, si passa alla trattazione.`)
-    }
-    righe.push('')
-    righe.push('ORDINE DEL GIORNO')
-    punti.forEach((p, i) => righe.push(`${i + 1}. ${p.titolo || '(punto senza titolo)'}${p.relatore ? ` — relatore: ${p.relatore}` : ''}`))
-    if (delibere.length) {
-      righe.push('')
-      righe.push('DELIBERAZIONI')
-      delibere.forEach((d, i) => {
-        const tot = `${d.favorevoli} favorevoli, ${d.contrari} contrari, ${d.astenuti} astenuti`
-        righe.push(`Delibera ${i + 1} — ${d.oggetto || '(oggetto)'}: ${d.esito.toUpperCase()} (${tot}).${d.testo ? ' ' + d.testo : ''}${d.area_231 ? ` [Area 231: ${d.area_231}]` : ''}`)
-      })
-    }
-    righe.push('')
-    righe.push('Null\'altro essendovi da deliberare, la seduta è tolta.')
-    return righe.join('\n')
+    const isAssemblea = organo?.tipo === 'assemblea'
+    const collegio = isAssemblea ? 'l\'assemblea' : 'il consiglio'
+    const d = ad.data_ora ? new Date(ad.data_ora) : null
+    const dataStr = d ? d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }) : '____________'
+    const oraInizio = d ? d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '____'
+    const modLabel = { presenza: '', videoconferenza: ' in videoconferenza', mista: ' in modalità mista' }[ad.modalita] || ''
+    const num = ad.numero != null ? String(ad.numero).padStart(2, '0') : '—'
+    const R = []
+
+    R.push(`VERBALE ${tOrg.toUpperCase()} N. ${num}/${ad.anno}`)
+    R.push(`${azienda?.nome || ''}${azienda?.settore ? ' · ' + azienda.settore : ''}`)
+    R.push('')
+    R.push(`L'anno ${ad.anno}, il giorno ${dataStr}, alle ore ${oraInizio}, presso ${ad.luogo || '____________'}${modLabel}, si è riunita${isAssemblea ? '' : 'o'} ${collegio} di ${azienda?.nome || 'questa società'}, in sessione ${ad.sessione}, per discutere e deliberare sul seguente`)
+    R.push('')
+    R.push('ORDINE DEL GIORNO')
+    punti.forEach((p, i) => R.push(`${i + 1}. ${p.titolo || '(punto senza titolo)'}`))
+    R.push('')
+
+    // Apertura
+    const pres = ad.presidente || (isAssemblea ? '____________' : 'il Presidente')
+    const quorum = (ad.presenti != null || ad.aventi_diritto != null)
+      ? ` — essendo presenti n. ${ad.presenti ?? '__'} ${isAssemblea ? 'soci' : 'componenti'} su n. ${ad.aventi_diritto ?? '__'} aventi diritto —`
+      : ''
+    R.push(`Assume la presidenza ${pres} il quale, constatata e fatta constatare la regolare costituzione dell'adunanza${quorum}, dichiara la seduta validamente costituita e atta a deliberare.`)
+    if (ad.segretario) R.push(`Viene chiamato a fungere da segretario ${ad.segretario}, che accetta.`)
+    R.push('')
+
+    // Trattazione punto per punto
+    R.push('Si passa quindi alla trattazione degli argomenti all\'ordine del giorno.')
+    R.push('')
+    punti.forEach((p, i) => {
+      R.push(`Punto ${i + 1} all'ordine del giorno: ${p.titolo || '____________'}.`)
+      const rel = p.relatore ? ` Prende la parola ${p.relatore}, che illustra l'argomento.` : ''
+      const del = delibere[i] // abbinamento posizionale punto→delibera
+      if (del) {
+        const unanime = (Number(del.contrari) === 0 && Number(del.astenuti) === 0)
+        const modo = unanime ? 'all\'unanimità' : `a maggioranza (favorevoli ${del.favorevoli}, contrari ${del.contrari}, astenuti ${del.astenuti})`
+        const verbo = del.esito === 'approvata' ? 'delibera' : del.esito === 'respinta' ? 'respinge la proposta' : 'rinvia la trattazione'
+        R.push(`${rel} Dopo ampia discussione, ${collegio} ${modo} ${verbo}${del.esito === 'approvata' ? ':' : '.'}`)
+        if (del.esito === 'approvata') R.push(`${del.testo || del.oggetto || '____________'}`)
+        if (del.area_231) R.push(`(Operazione ricadente nell'area sensibile 231: ${del.area_231}.)`)
+      } else {
+        R.push(`${rel} Il punto viene illustrato e discusso.`)
+      }
+      R.push('')
+    })
+
+    // Chiusura
+    R.push(`Null'altro essendovi da deliberare e nessuno chiedendo la parola, il Presidente dichiara sciolta la seduta alle ore ${ad.ora_chiusura || '____'}.`)
+    R.push('')
+    R.push('Letto, approvato e sottoscritto.')
+    R.push('')
+    R.push(`Il Segretario                                   Il Presidente`)
+    R.push(`${ad.segretario || '____________'}                    ${ad.presidente || '____________'}`)
+    return R.join('\n')
   }
 
   async function salva(verbalizza) {
@@ -131,6 +161,7 @@ export default function DettaglioAdunanza() {
         titolo: ad.titolo.trim(), sessione: ad.sessione, data_ora: ad.data_ora, luogo: ad.luogo || null,
         modalita: ad.modalita, presenti: ad.presenti === '' ? null : ad.presenti,
         aventi_diritto: ad.aventi_diritto === '' ? null : ad.aventi_diritto,
+        presidente: ad.presidente || null, segretario: ad.segretario || null, ora_chiusura: ad.ora_chiusura || null,
         verbale_html: corpoFinale, stato, numero, data_verbale, hash_documento: hash,
       }).eq('id', adunanzaId)
       if (eUp) throw eUp
@@ -227,6 +258,20 @@ export default function DettaglioAdunanza() {
         <div className="form-group">
           <label className="form-label">Luogo</label>
           <input className="form-control" value={ad.luogo || ''} disabled={soloLettura} onChange={e => setTestata('luogo', e.target.value)} placeholder="Sede legale / link videoconferenza" />
+        </div>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <div className="form-group" style={{ flex: 1, minWidth: 160 }}>
+            <label className="form-label">Presidente della seduta</label>
+            <input className="form-control" value={ad.presidente || ''} disabled={soloLettura} onChange={e => setTestata('presidente', e.target.value)} placeholder="Nome e cognome" />
+          </div>
+          <div className="form-group" style={{ flex: 1, minWidth: 160 }}>
+            <label className="form-label">Segretario</label>
+            <input className="form-control" value={ad.segretario || ''} disabled={soloLettura} onChange={e => setTestata('segretario', e.target.value)} placeholder="Nome e cognome" />
+          </div>
+          <div className="form-group" style={{ width: 120 }}>
+            <label className="form-label">Ora chiusura</label>
+            <input className="form-control" value={ad.ora_chiusura || ''} disabled={soloLettura} onChange={e => setTestata('ora_chiusura', e.target.value)} placeholder="es. 18:30" />
+          </div>
         </div>
       </div>
 
