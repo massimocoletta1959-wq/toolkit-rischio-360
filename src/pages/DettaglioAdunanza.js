@@ -137,6 +137,19 @@ export default function DettaglioAdunanza() {
     const titoloDoc = `Verbale ${num}-${ad.anno} ${azienda?.nome || ''}`.trim()
     const testo = (verbale && verbale.trim()) ? verbale : generaVerbale()
     const esc = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+    // Separo il blocco firme (due colonne) dal corpo, per allinearle bene
+    const linee = testo.split('\n')
+    const idx = linee.findIndex(l => l.includes('Il Segretario') && l.includes('Il Presidente'))
+    let corpoHtml, firmeHtml = ''
+    if (idx >= 0) {
+      corpoHtml = esc(linee.slice(0, idx).join('\n').replace(/\n+$/, ''))
+      firmeHtml = `<table class="firme"><tr><td>Il Segretario</td><td>Il Presidente</td></tr>` +
+        `<tr><td class="nome">${esc(ad.segretario || '')}</td><td class="nome">${esc(ad.presidente || '')}</td></tr></table>`
+    } else {
+      corpoHtml = esc(testo)
+    }
+
     const w = window.open('', '_blank')
     if (!w) { setErrore('Consenti le finestre popup per stampare il verbale.'); return }
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(titoloDoc)}</title>
@@ -146,9 +159,13 @@ export default function DettaglioAdunanza() {
         html, body { width: 100%; }
         body { font-family: Georgia, 'Times New Roman', serif; font-size: 12pt; line-height: 1.6; color: #1a1a1a; padding-right: 4px; }
         pre { white-space: pre-wrap; overflow-wrap: break-word; word-wrap: break-word; hyphens: none; font-family: inherit; margin: 0; max-width: 100%; }
+        table.firme { width: 100%; margin-top: 46px; border-collapse: collapse; }
+        table.firme td { width: 50%; text-align: center; vertical-align: top; }
+        table.firme .nome { padding-top: 46px; }
         .hash { margin-top: 28px; padding-top: 10px; border-top: 1px solid #ccc; font-family: monospace; font-size: 8pt; color: #888; word-break: break-all; }
       </style></head><body>
-      <pre>${esc(testo)}</pre>
+      <pre>${corpoHtml}</pre>
+      ${firmeHtml}
       ${ad.hash_documento ? `<div class="hash">Impronta SHA-256: ${esc(ad.hash_documento)}</div>` : ''}
       <script>window.onload = function(){ window.print(); }</script>
       </body></html>`)
