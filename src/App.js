@@ -14,6 +14,7 @@ import Impostazioni from './pages/Impostazioni'
 import IMieiTask from './pages/IMieiTask'
 import Report from './pages/Report'
 import Governance from './pages/Governance'
+import RegistroDetermine from './pages/RegistroDetermine'
 import Home from './pages/Home'
 import Layout from './components/Layout'
 import LayoutMembro from './components/LayoutMembro'
@@ -236,6 +237,7 @@ export default function App() {
     membri:       <GestioneMembri />,
     organigramma: <Organigramma />,
     governance:   <Governance />,
+    au_registro:  <RegistroDetermine />,
     procedure:    <Procedure />,
     tracciamento: <TracciamentoProcedure />,
     impostazioni: <Impostazioni />,

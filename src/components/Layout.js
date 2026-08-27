@@ -3,9 +3,9 @@ import { useApp } from '../App'
 
 // Funzioni comuni, disponibili sia dalla Home sia dentro un modulo
 const COMUNI = [
-  { id: 'impostazioni', label: 'Impostazioni',  icon: '⚙️' },
-  { id: 'membri',       label: 'Membri',         icon: '👥' },
-  { id: 'organigramma', label: 'Organigramma',   icon: '🏛️' },
+  { id: 'impostazioni', label: 'Impostazioni', icon: '⚙️' },
+  { id: 'membri', label: 'Membri', icon: '👥' },
+  { id: 'organigramma', label: 'Organigramma', icon: '🏛️' },
 ]
 
 // Menù specifico di ciascun modulo (colore + voci)
@@ -13,25 +13,26 @@ const MODULI = {
   rischi: {
     label: 'Rischi', colore: '#378ADD',
     voci: [
-      { id: 'cruscotto', label: 'Cruscotto',       icon: '📊' },
-      { id: 'registro',  label: 'Registro rischi', icon: '📋' },
-      { id: 'piano',     label: "Piano d'azione",  icon: '✅' },
-      { id: 'ticket',    label: 'Ticket',           icon: '🎫' },
+      { id: 'cruscotto', label: 'Cruscotto', icon: '📊' },
+      { id: 'registro', label: 'Registro rischi', icon: '📋' },
+      { id: 'piano', label: "Piano d'azione", icon: '✅' },
+      { id: 'ticket', label: 'Ticket', icon: '🎫' },
     ],
   },
   procedure: {
     label: 'Procedure', colore: '#1D9E75',
     voci: [
-      { id: 'procedure',    label: 'Procedure',    icon: '📘' },
+      { id: 'procedure', label: 'Procedure', icon: '📘' },
       { id: 'tracciamento', label: 'Tracciamento', icon: '📊' },
-      { id: 'ticket',       label: 'Ticket',       icon: '🎫' },
+      { id: 'ticket', label: 'Ticket', icon: '🎫' },
     ],
   },
   governance: {
     label: 'Governance', colore: '#7F77DD',
     voci: [
       { id: 'governance', label: 'Organi', icon: '⚖️' },
-      { id: 'ticket',     label: 'Ticket', icon: '🎫' },
+      { id: 'au_registro', label: 'Determine AU', icon: '📚' },
+      { id: 'ticket', label: 'Ticket', icon: '🎫' },
     ],
   },
 }
@@ -72,7 +73,7 @@ export default function Layout({ children }) {
                   onClick={e => { e.stopPropagation(); switchAzienda(az); setShowSwitch(false) }}
                   style={{ padding: '10px 14px', fontSize: 13, cursor: 'pointer', background: az.id === azienda?.id ? '#EBF4FC' : 'white', color: az.id === azienda?.id ? '#2B5FA5' : '#333', fontWeight: az.id === azienda?.id ? 600 : 400, borderBottom: '1px solid #F0F0F0' }}
                 >
-                  {az.id === azienda?.id && '✓ '}{az.nome}
+                  {az.id === azienda?.id && ' ✓ '}{az.nome}
                   {az.settore && <span style={{ fontSize: 11, color: '#aaa', marginLeft: 6 }}>{az.settore}</span>}
                 </div>
               ))}
@@ -88,7 +89,7 @@ export default function Layout({ children }) {
           {mod ? (
             <>
               <div className="nav-item" onClick={tornaHome}>
-                <span>←</span><span>Torna alla Home</span>
+                <span>←</span><span>Torna alla home</span>
               </div>
               {COMUNI.map(item => <NavItem key={item.id} item={item} />)}
 
