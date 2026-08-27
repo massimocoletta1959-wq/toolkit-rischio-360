@@ -74,8 +74,7 @@ export default function RegistroDetermine() {
             <h2>Registro Determine AU</h2>
             <p>Determine dell'Amministratore Unico di <strong>{azienda?.nome}</strong> · numerazione progressiva, registro immodificabile</p>
           </div>
-          {/* Attivo al prossimo step, quando aggiungeremo il wizard "Nuova determina" */}
-          <button className="btn btn-primary" disabled title="Disponibile al prossimo step">+ Nuova determina</button>
+          <button className="btn btn-primary" onClick={() => setPage('au_nuova')}>+ Nuova determina</button>
         </div>
       </div>
 
@@ -103,7 +102,7 @@ export default function RegistroDetermine() {
           <div className="empty-state">
             <div style={{ fontSize: 36 }}>📚</div>
             <p>{determine.length === 0
-              ? 'Nessuna determina registrata. Il registro si popolerà man mano che l\'Amministratore Unico emette le determine.'
+              ? 'Nessuna determina registrata. Clicca "+ Nuova determina" per crearne una.'
               : 'Nessuna determina corrisponde ai filtri.'}</p>
           </div>
         ) : (
