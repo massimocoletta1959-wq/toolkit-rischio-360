@@ -85,8 +85,10 @@ export default function DettaglioAdunanza() {
     const num = ad.numero != null ? String(ad.numero).padStart(2, '0') : '—'
     const R = []
 
+    if (ad.intestazione && ad.intestazione.trim()) { R.push(ad.intestazione.trim()); R.push('') }
+
     R.push(`VERBALE ${tOrg.toUpperCase()} N. ${num}/${ad.anno}`)
-    R.push(`${azienda?.nome || ''}${azienda?.settore ? ' · ' + azienda.settore : ''}`)
+    R.push(`${azienda?.nome || ''}`)
     R.push('')
     R.push(`L'anno ${ad.anno}, il giorno ${dataStr}, alle ore ${oraInizio}, presso ${ad.luogo || '____________'}${modLabel}, si è riunita${isAssemblea ? '' : 'o'} ${collegio} di ${azienda?.nome || 'questa società'}, in sessione ${ad.sessione}, per discutere e deliberare sul seguente`)
     R.push('')
@@ -102,23 +104,20 @@ export default function DettaglioAdunanza() {
     R.push(`Assume la presidenza ${pres} il quale, constatata e fatta constatare la regolare costituzione dell'adunanza${quorum}, dichiara la seduta validamente costituita e atta a deliberare.`)
     if (ad.segretario) R.push(`Viene chiamato a fungere da segretario ${ad.segretario}, che accetta.`)
     R.push('')
-
-    // Trattazione punto per punto
     R.push('Si passa quindi alla trattazione degli argomenti all\'ordine del giorno.')
     R.push('')
+
+    // Trattazione punto per punto — testo neutro (la narrazione la scrive l'utente)
     punti.forEach((p, i) => {
       R.push(`Punto ${i + 1} all'ordine del giorno: ${p.titolo || '____________'}.`)
-      const rel = p.relatore ? ` Prende la parola ${p.relatore}, che illustra l'argomento.` : ''
       const del = delibere[i] // abbinamento posizionale punto→delibera
       if (del) {
+        if (del.testo) R.push(del.testo)
         const unanime = (Number(del.contrari) === 0 && Number(del.astenuti) === 0)
-        const modo = unanime ? 'all\'unanimità' : `a maggioranza (favorevoli ${del.favorevoli}, contrari ${del.contrari}, astenuti ${del.astenuti})`
-        const verbo = del.esito === 'approvata' ? 'delibera' : del.esito === 'respinta' ? 'respinge la proposta' : 'rinvia la trattazione'
-        R.push(`${rel} Dopo ampia discussione, ${collegio} ${modo} ${verbo}${del.esito === 'approvata' ? ':' : '.'}`)
-        if (del.esito === 'approvata') R.push(`${del.testo || del.oggetto || '____________'}`)
+        const modo = unanime ? 'all\'unanimità' : `con voti favorevoli ${del.favorevoli}, contrari ${del.contrari}, astenuti ${del.astenuti}`
+        const verbo = del.esito === 'approvata' ? 'approva' : del.esito === 'respinta' ? 'respinge' : 'rinvia'
+        R.push(`(${collegio.charAt(0).toUpperCase() + collegio.slice(1)} ${verbo} ${modo}.)`)
         if (del.area_231) R.push(`(Operazione ricadente nell'area sensibile 231: ${del.area_231}.)`)
-      } else {
-        R.push(`${rel} Il punto viene illustrato e discusso.`)
       }
       R.push('')
     })
@@ -131,6 +130,27 @@ export default function DettaglioAdunanza() {
     R.push(`Il Segretario                                   Il Presidente`)
     R.push(`${ad.segretario || '____________'}                    ${ad.presidente || '____________'}`)
     return R.join('\n')
+  }
+
+  function stampaPdf() {
+    const num = ad.numero != null ? String(ad.numero).padStart(2, '0') : '—'
+    const titoloDoc = `Verbale ${num}-${ad.anno} ${azienda?.nome || ''}`.trim()
+    const testo = (verbale && verbale.trim()) ? verbale : generaVerbale()
+    const esc = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const w = window.open('', '_blank')
+    if (!w) { setErrore('Consenti le finestre popup per stampare il verbale.'); return }
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(titoloDoc)}</title>
+      <style>
+        @page { margin: 2.2cm; }
+        body { font-family: Georgia, 'Times New Roman', serif; font-size: 12pt; line-height: 1.6; color: #1a1a1a; }
+        pre { white-space: pre-wrap; font-family: inherit; margin: 0; }
+        .hash { margin-top: 28px; padding-top: 10px; border-top: 1px solid #ccc; font-family: monospace; font-size: 8pt; color: #888; word-break: break-all; }
+      </style></head><body>
+      <pre>${esc(testo)}</pre>
+      ${ad.hash_documento ? `<div class="hash">Impronta SHA-256: ${esc(ad.hash_documento)}</div>` : ''}
+      <script>window.onload = function(){ window.print(); }</script>
+      </body></html>`)
+    w.document.close()
   }
 
   async function salva(verbalizza) {
@@ -162,6 +182,7 @@ export default function DettaglioAdunanza() {
         modalita: ad.modalita, presenti: ad.presenti === '' ? null : ad.presenti,
         aventi_diritto: ad.aventi_diritto === '' ? null : ad.aventi_diritto,
         presidente: ad.presidente || null, segretario: ad.segretario || null, ora_chiusura: ad.ora_chiusura || null,
+        intestazione: ad.intestazione || null,
         verbale_html: corpoFinale, stato, numero, data_verbale, hash_documento: hash,
       }).eq('id', adunanzaId)
       if (eUp) throw eUp
@@ -215,7 +236,10 @@ export default function DettaglioAdunanza() {
             <h2>{soloLettura ? 'Verbale' : 'Adunanza'} · {ORGANO_LABEL[organo?.tipo] || 'Organo'}</h2>
             <p>{organo?.nome} · {azienda?.nome} · N. {ad.numero != null ? String(ad.numero).padStart(2, '0') : '—'}/{ad.anno}</p>
           </div>
-          <button className="btn btn-sm" onClick={() => setPage('verbali')}>← Elenco</button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="btn btn-sm" onClick={stampaPdf}>🖨️ Stampa / PDF</button>
+            <button className="btn btn-sm" onClick={() => setPage('verbali')}>← Elenco</button>
+          </div>
         </div>
       </div>
 
@@ -229,6 +253,12 @@ export default function DettaglioAdunanza() {
       {/* Testata */}
       <div className="card">
         <div className="card-header"><span className="card-title">Dati della seduta</span></div>
+        <div className="form-group">
+          <label className="form-label">Intestazione del verbale</label>
+          <textarea className="form-control" style={{ minHeight: 70 }} value={ad.intestazione || ''} disabled={soloLettura}
+            onChange={e => setTestata('intestazione', e.target.value)}
+            placeholder="Testo libero che comparirà in cima al verbale (es. ragione sociale completa, sede legale, capitale sociale, C.F./P.IVA, n. R.E.A.)" />
+        </div>
         <div className="form-group">
           <label className="form-label">Titolo *</label>
           <input className="form-control" value={ad.titolo || ''} disabled={soloLettura} onChange={e => setTestata('titolo', e.target.value)} />
