@@ -4,12 +4,20 @@ import { useApp } from '../App'
 
 // ── Costanti ────────────────────────────────────────────────────────────
 const TIPI = [
-  { id: 'beni_strumentali',      label: 'Acquisto beni strumentali', icon: '🏭', desc: 'Macchinari, attrezzature, immobilizzazioni' },
-  { id: 'contratto',             label: 'Approvazione contratto',     icon: '📄', desc: 'Fornitori, clienti, partner strategici' },
-  { id: 'operazione_finanziaria',label: 'Operazione finanziaria',     icon: '💰', desc: 'Finanziamenti, leasing, garanzie' },
-  { id: 'procura',               label: 'Concessione procura/delega', icon: '✋', desc: 'Procuratori, agenti, rappresentanti' },
-  { id: 'assunzione',            label: 'Assunzione rilevante',       icon: '👔', desc: 'Dirigenti, quadri, figure strategiche' },
-  { id: 'urgenza',               label: 'Emergenza / Urgenza',        icon: '⚡', desc: 'Decisioni urgenti non differibili' },
+  { id: 'beni_strumentali',      label: 'Acquisto beni strumentali',        icon: '🏭', desc: 'Macchinari, attrezzature, immobilizzazioni' },
+  { id: 'contratto',             label: 'Approvazione contratto',           icon: '📄', desc: 'Fornitori, clienti, partner strategici' },
+  { id: 'operazione_finanziaria',label: 'Operazione finanziaria',           icon: '💰', desc: 'Finanziamenti, leasing, garanzie' },
+  { id: 'adempimenti_contabili', label: 'Adempimenti contabili e fiscali',  icon: '📊', desc: 'Bilancio, destinazione utili, variazioni di budget' },
+  { id: 'personale',             label: 'Personale e organizzazione',       icon: '👥', desc: 'Mobilità interna, disciplinari, organigramma, mansioni' },
+  { id: 'assunzione',            label: 'Assunzione rilevante',             icon: '👔', desc: 'Dirigenti, quadri, figure strategiche' },
+  { id: 'consulenza',            label: 'Consulenza e incarichi esterni',   icon: '🧑‍💼', desc: 'Legali, commercialisti, revisori, tecnici' },
+  { id: 'contenzioso',           label: 'Contenzioso e gestione legale',    icon: '⚖️', desc: 'Azioni legali, costituzione in giudizio, transazioni' },
+  { id: 'rs_innovazione',        label: 'Ricerca, sviluppo e innovazione',  icon: '🔬', desc: 'Nuovi prodotti, digital transformation, brevetti, marchi' },
+  { id: 'marketing',             label: 'Marketing, comunicazione, eventi', icon: '📣', desc: 'Campagne, sponsorizzazioni, fiere, agenzie' },
+  { id: 'immobiliare',           label: 'Gestione immobiliare e manutenzioni', icon: '🏠', desc: 'Locazioni, dismissioni, manutenzione straordinaria' },
+  { id: 'compliance',            label: 'Sicurezza e conformità',           icon: '🛡️', desc: 'Sicurezza lavoro, GDPR, 231, nomine (RSPP, DPO)' },
+  { id: 'procura',               label: 'Concessione procura/delega',       icon: '✋', desc: 'Procuratori, agenti, rappresentanti' },
+  { id: 'urgenza',               label: 'Emergenza / Urgenza',              icon: '⚡', desc: 'Decisioni urgenti non differibili' },
 ]
 const TIPO_LABEL = Object.fromEntries(TIPI.map(t => [t.id, t.label]))
 
