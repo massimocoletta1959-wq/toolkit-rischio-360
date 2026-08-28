@@ -105,6 +105,9 @@ function ScegliAssembleaModal({ azienda, onScelta, onClose }) {
       nome: `Modello da: ${ad.titolo || 'assemblea'}`,
       organo_tipo: organo?.tipo || '',
       corpo_html: corpo,
+      intestazione: ad.intestazione || '',
+      odg: (punti || []).map(p => ({ titolo: p.titolo || '', relatore: p.relatore || '' })),
+      delibere: (delibere || []).map(d => ({ oggetto: d.oggetto || '', testo: d.testo || '', esito: d.esito || 'approvata' })),
     })
   }
 
@@ -239,6 +242,10 @@ function ModelloEditor({ azienda, modello, onSaved, onClose }) {
   const [saving, setSaving] = useState(false)
   const [errore, setErrore] = useState(null)
   const areaRef = React.useRef(null)
+  // struttura trasportata (non editabile qui: si modifica nell'assemblea)
+  const intestazione = modello?.intestazione || ''
+  const odg = modello?.odg || []
+  const delibere = modello?.delibere || []
 
   // inserisce il segnaposto nel punto del cursore
   function inserisci(tag) {
@@ -257,7 +264,11 @@ function ModelloEditor({ azienda, modello, onSaved, onClose }) {
       await supabase.from('verbale_template').update({ predefinito: false })
         .eq('azienda_id', azienda.id).eq('organo_tipo', organoTipo || null)
     }
-    const payload = { azienda_id: azienda.id, nome: nome.trim(), organo_tipo: organoTipo || null, corpo_html: corpo, predefinito }
+    const payload = {
+      azienda_id: azienda.id, nome: nome.trim(), organo_tipo: organoTipo || null,
+      corpo_html: corpo, predefinito,
+      intestazione: intestazione || null, odg, delibere,
+    }
     const { error } = editing
       ? await supabase.from('verbale_template').update(payload).eq('id', modello.id)
       : await supabase.from('verbale_template').insert(payload)
@@ -300,6 +311,13 @@ function ModelloEditor({ azienda, modello, onSaved, onClose }) {
             <strong>{'{{ODG}}'}</strong> inserisce l'elenco numerato dei punti; <strong>{'{{DELIBERE}}'}</strong> il blocco delle delibere con gli esiti dei voti.
           </div>
         </div>
+
+        {(odg.length > 0 || delibere.length > 0 || intestazione) && (
+          <div style={{ background: '#EDEBFA', border: '1px solid #D9D5F5', borderRadius: 8, padding: '10px 12px', marginBottom: 12, fontSize: 12, color: '#5A4FCF' }}>
+            📎 Questo modello porta con sé anche la struttura, che verrà copiata nelle nuove assemblee (e poi potrai modificarla):
+            {intestazione ? ' intestazione,' : ''} {odg.length} punti all'ordine del giorno, {delibere.length} delibere.
+          </div>
+        )}
 
         <div className="form-group">
           <label className="form-label">Testo del facsimile *</label>

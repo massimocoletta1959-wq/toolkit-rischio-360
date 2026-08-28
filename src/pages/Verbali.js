@@ -49,14 +49,43 @@ function NuovaAdunanzaModal({ aziendaId, organi, onSaved, onClose }) {
     if (!organoId) { setErrore('Seleziona l\'organo che si riunisce.'); return }
     if (!titolo.trim()) { setErrore('Indica un titolo per l\'adunanza.'); return }
     setSaving(true); setErrore(null)
+
+    // se scelto un modello, ne leggo la struttura da copiare
+    let tpl = null
+    if (templateId) {
+      const { data } = await supabase.from('verbale_template').select('*').eq('id', templateId).single()
+      tpl = data || null
+    }
+
     const { data, error } = await supabase.from('adunanze').insert({
       azienda_id: aziendaId, organo_id: organoId, titolo: titolo.trim(), sessione,
       data_ora: dataOra ? new Date(dataOra).toISOString() : null,
       luogo: luogo || null, modalita, stato: 'programmata',
       template_id: templateId || null,
+      intestazione: tpl?.intestazione || null,
     }).select().single()
+    if (error) { setSaving(false); setErrore(error.message); return }
+
+    // copio OdG e delibere dal modello nella nuova adunanza
+    if (tpl) {
+      const odg = Array.isArray(tpl.odg) ? tpl.odg : []
+      if (odg.length) {
+        await supabase.from('adunanza_punti').insert(odg.map((p, i) => ({
+          adunanza_id: data.id, azienda_id: aziendaId, ordine: i + 1,
+          titolo: p.titolo || `Punto ${i + 1}`, relatore: p.relatore || null, con_delibera: true,
+        })))
+      }
+      const delb = Array.isArray(tpl.delibere) ? tpl.delibere : []
+      if (delb.length) {
+        await supabase.from('delibere').insert(delb.map(d => ({
+          adunanza_id: data.id, azienda_id: aziendaId,
+          oggetto: d.oggetto || 'Delibera', testo: d.testo || null,
+          favorevoli: 0, contrari: 0, astenuti: 0, esito: d.esito || 'approvata',
+        })))
+      }
+    }
+
     setSaving(false)
-    if (error) { setErrore(error.message); return }
     onSaved(data?.id)
   }
 
