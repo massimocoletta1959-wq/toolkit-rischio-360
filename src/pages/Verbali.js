@@ -29,8 +29,21 @@ function NuovaAdunanzaModal({ aziendaId, organi, onSaved, onClose }) {
   const [dataOra, setDataOra] = useState('')
   const [luogo, setLuogo] = useState('')
   const [modalita, setModalita] = useState('presenza')
+  const [templateId, setTemplateId] = useState('')
+  const [modelli, setModelli] = useState([])
   const [saving, setSaving] = useState(false)
   const [errore, setErrore] = useState(null)
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('verbale_template').select('id,nome,organo_tipo').eq('azienda_id', aziendaId).order('created_at')
+      setModelli(data || [])
+    })()
+  }, [aziendaId])
+
+  // filtra i modelli per il tipo di organo scelto (o generici)
+  const organoSel = organi.find(o => o.id === organoId)
+  const modelliCompat = modelli.filter(m => !m.organo_tipo || m.organo_tipo === organoSel?.tipo)
 
   async function salva() {
     if (!organoId) { setErrore('Seleziona l\'organo che si riunisce.'); return }
@@ -40,6 +53,7 @@ function NuovaAdunanzaModal({ aziendaId, organi, onSaved, onClose }) {
       azienda_id: aziendaId, organo_id: organoId, titolo: titolo.trim(), sessione,
       data_ora: dataOra ? new Date(dataOra).toISOString() : null,
       luogo: luogo || null, modalita, stato: 'programmata',
+      template_id: templateId || null,
     }).select().single()
     setSaving(false)
     if (error) { setErrore(error.message); return }
@@ -62,6 +76,15 @@ function NuovaAdunanzaModal({ aziendaId, organi, onSaved, onClose }) {
               <option key={o.id} value={o.id}>{o.nome} · {ORGANO_LABEL[o.tipo] || o.tipo}</option>
             ))}
           </select>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Modello di verbale (facoltativo)</label>
+          <select className="form-control" value={templateId} onChange={e => setTemplateId(e.target.value)}>
+            <option value="">Parti da zero (testo standard)</option>
+            {modelliCompat.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
+          </select>
+          <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>Se scegli un modello, il verbale verrà generato dal tuo facsimile riempiendo i segnaposti.</div>
         </div>
 
         <div className="form-group">

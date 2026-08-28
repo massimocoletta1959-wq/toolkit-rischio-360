@@ -29,6 +29,17 @@ export default function DettaglioAdunanza() {
   const [punti, setPunti] = useState([])     // [{titolo, relatore, con_delibera}]
   const [delibere, setDelibere] = useState([]) // [{oggetto, testo, favorevoli, contrari, astenuti, esito}]
   const [verbale, setVerbale] = useState('')
+  const [modelli, setModelli] = useState([])       // modelli di verbale dell'azienda
+  const [templateId, setTemplateId] = useState('') // modello selezionato
+
+  // Carica i modelli di verbale dell'azienda
+  useEffect(() => {
+    (async () => {
+      if (!azienda?.id) return
+      const { data } = await supabase.from('verbale_template').select('id,nome,corpo_html,organo_tipo,predefinito').eq('azienda_id', azienda.id).order('created_at')
+      setModelli(data || [])
+    })()
+  }, [azienda])
 
   // Carica adunanza + organo + punti + delibere
   useEffect(() => {
@@ -38,6 +49,7 @@ export default function DettaglioAdunanza() {
       if (!a) { setCaricata(true); return }
       setAd(a)
       setVerbale(a.verbale_html || '')
+      setTemplateId(a.template_id || '')
       if (a.stato === 'verbalizzata' || a.stato === 'annullata') setSoloLettura(true)
 
       const { data: org } = await supabase.from('organi').select('*').eq('id', a.organo_id).single()
@@ -73,8 +85,46 @@ export default function DettaglioAdunanza() {
   const setDel = (i, k, v) => setDelibere(d => d.map((x, j) => j === i ? { ...x, [k]: v } : x))
   const delDelibera = i => setDelibere(d => d.filter((_, j) => j !== i))
 
+  // Applica un modello (facsimile con segnaposti) riempiendolo coi dati correnti
+  function applicaModello(tpl) {
+    const isAssemblea = organo?.tipo === 'assemblea'
+    const d = ad.data_ora ? new Date(ad.data_ora) : null
+    const dataStr = d ? d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }) : '____________'
+    const oraInizio = d ? d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '____'
+    const num = ad.numero != null ? String(ad.numero).padStart(2, '0') : '—'
+    const odg = punti.map((p, i) => `${i + 1}. ${p.titolo || ''}`).join('\n')
+    const delibBlocco = delibere.map(x => x.testo || x.oggetto || '').filter(Boolean).join('\n\n')
+    const map = {
+      '{{ORGANO}}': ORGANO_LABEL[organo?.tipo] || 'Organo',
+      '{{AZIENDA}}': azienda?.nome || '',
+      '{{SETTORE}}': azienda?.settore || '',
+      '{{NUMERO}}': num,
+      '{{ANNO}}': String(ad.anno || ''),
+      '{{DATA}}': dataStr,
+      '{{ORA_INIZIO}}': oraInizio,
+      '{{ORA_CHIUSURA}}': ad.ora_chiusura || '____',
+      '{{LUOGO}}': ad.luogo || '____________',
+      '{{MODALITA}}': { presenza: 'in presenza', videoconferenza: 'in videoconferenza', mista: 'in modalità mista' }[ad.modalita] || '',
+      '{{SESSIONE}}': ad.sessione || '',
+      '{{PRESIDENTE}}': ad.presidente || '____________',
+      '{{SEGRETARIO}}': ad.segretario || '____________',
+      '{{PRESENTI}}': ad.presenti != null ? String(ad.presenti) : '__',
+      '{{AVENTI_DIRITTO}}': ad.aventi_diritto != null ? String(ad.aventi_diritto) : '__',
+      '{{ODG}}': odg,
+      '{{DELIBERE}}': delibBlocco,
+    }
+    let t = tpl
+    Object.entries(map).forEach(([k, v]) => { t = t.split(k).join(v) })
+    if (ad.intestazione && ad.intestazione.trim()) t = `${ad.intestazione.trim()}\n\n${t}`
+    return t
+  }
+
   function generaVerbale() {
     if (!ad) return ''
+    // se è selezionato un modello, si applica quello
+    const tpl = modelli.find(m => m.id === templateId)
+    if (tpl) return applicaModello(tpl.corpo_html || '')
+
     const tOrg = ORGANO_LABEL[organo?.tipo] || 'Organo'
     const isAssemblea = organo?.tipo === 'assemblea'
     const collegio = isAssemblea ? 'l\'assemblea' : 'il consiglio'
@@ -202,6 +252,7 @@ export default function DettaglioAdunanza() {
         aventi_diritto: ad.aventi_diritto === '' ? null : ad.aventi_diritto,
         presidente: ad.presidente || null, segretario: ad.segretario || null, ora_chiusura: ad.ora_chiusura || null,
         intestazione: ad.intestazione || null,
+        template_id: templateId || null,
         verbale_html: corpoFinale, stato, numero, data_verbale, hash_documento: hash,
       }).eq('id', adunanzaId)
       if (eUp) throw eUp
@@ -242,6 +293,17 @@ export default function DettaglioAdunanza() {
     }
   }
 
+  async function elimina() {
+    if (!window.confirm(`Eliminare definitivamente l'adunanza "${ad.titolo || ''}" e tutti i suoi dati (ordine del giorno, delibere, verbale)?`)) return
+    setSaving(true)
+    await supabase.from('governance_eventi').delete().eq('adunanza_id', adunanzaId)
+    await supabase.from('delibere').delete().eq('adunanza_id', adunanzaId)
+    await supabase.from('adunanza_punti').delete().eq('adunanza_id', adunanzaId)
+    const { error } = await supabase.from('adunanze').delete().eq('id', adunanzaId)
+    if (error) { setErrore(error.message); setSaving(false); return }
+    setPage('verbali')
+  }
+
   if (!caricata) return <div className="spinner" />
   if (!ad) return (
     <div className="card"><p>Adunanza non trovata. <button className="btn btn-sm" onClick={() => setPage('verbali')}>← Torna all'elenco</button></p></div>
@@ -257,6 +319,7 @@ export default function DettaglioAdunanza() {
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <button className="btn btn-sm" onClick={stampaPdf}>🖨️ Stampa / PDF</button>
+            {!soloLettura && <button className="btn btn-sm btn-danger" onClick={elimina} disabled={saving}>🗑 Elimina</button>}
             <button className="btn btn-sm" onClick={() => setPage('verbali')}>← Elenco</button>
           </div>
         </div>
@@ -391,14 +454,25 @@ export default function DettaglioAdunanza() {
       <div className="card">
         <div className="card-header">
           <span className="card-title">Verbale</span>
-          {!soloLettura && <button className="btn btn-sm" onClick={() => setVerbale(generaVerbale())}>↻ Genera da dati</button>}
+          {!soloLettura && (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              <select className="form-control" style={{ width: 'auto', minWidth: 150, padding: '4px 8px', fontSize: 13 }}
+                value={templateId} onChange={e => setTemplateId(e.target.value)}>
+                <option value="">Testo standard</option>
+                {modelli.map(m => <option key={m.id} value={m.id}>Modello: {m.nome}</option>)}
+              </select>
+              <button className="btn btn-sm" onClick={() => setVerbale(generaVerbale())}>↻ Genera</button>
+            </div>
+          )}
         </div>
         <p style={{ fontSize: 12, color: '#999', marginBottom: 8 }}>
-          Genera la bozza dai dati inseriti, poi modificala liberamente. Alla verbalizzazione il testo viene congelato con un hash.
+          {templateId
+            ? 'Genera applicando il modello scelto: i segnaposti vengono riempiti con i dati, l\'ordine del giorno e le delibere. Puoi poi modificare il testo.'
+            : 'Genera la bozza dai dati inseriti, poi modificala liberamente. Alla verbalizzazione il testo viene congelato con un hash.'}
         </p>
         <textarea className="form-control" style={{ minHeight: 260, fontFamily: 'inherit', lineHeight: 1.6 }}
           value={verbale} disabled={soloLettura} onChange={e => setVerbale(e.target.value)}
-          placeholder="Clicca «Genera da dati» per creare la bozza, oppure scrivi qui il verbale." />
+          placeholder="Scegli un modello (o «Testo standard»), poi clicca «Genera». In alternativa scrivi qui il verbale." />
       </div>
 
       {/* Azioni */}
