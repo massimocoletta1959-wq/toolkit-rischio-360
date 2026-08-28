@@ -32,11 +32,125 @@ const ORGANO_OPZIONI = [
 ]
 const organoLabel = t => (ORGANO_OPZIONI.find(o => o[0] === (t || ''))?.[1]) || t
 
+const ORGANO_ESTESO = {
+  cda: 'Consiglio di Amministrazione', amministratore_unico: 'Amministratore Unico',
+  comitato: 'Comitato', collegio_sindacale: 'Collegio Sindacale', assemblea: 'Assemblea dei Soci', altro: 'Organo',
+}
+
+// Sostituisce nel testo tutte le occorrenze di `val` con `tag` (se val non vuoto)
+function subst(testo, val, tag) {
+  if (val == null || String(val).trim() === '') return testo
+  const s = String(val).trim()
+  return testo.split(s).join(tag)
+}
+
+// Converte un verbale compilato in un modello con segnaposti (best-effort)
+function verbaleToModello(testo, { azienda, organo, ad, punti, delibere }) {
+  let t = testo
+
+  // Blocco ORDINE DEL GIORNO → {{ODG}}  (righe numerate "1. ...", "2. ...")
+  if (punti && punti.length) {
+    const blocco = punti.map((p, i) => `${i + 1}. ${p.titolo || ''}`).join('\n')
+    if (t.includes(blocco)) t = t.replace(blocco, '{{ODG}}')
+  }
+  // Blocco delibere: se i testi delle delibere sono presenti, li marchio (best-effort)
+  if (delibere && delibere.length) {
+    delibere.forEach(d => { if (d.testo && d.testo.trim()) t = t.split(d.testo.trim()).join('{{DELIBERE}}') })
+  }
+
+  // Campi anagrafici (dal più specifico al più generico)
+  const d = ad.data_ora ? new Date(ad.data_ora) : null
+  if (d) {
+    const dataStr = d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })
+    t = subst(t, dataStr, '{{DATA}}')
+    const oraStr = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+    t = subst(t, oraStr, '{{ORA_INIZIO}}')
+  }
+  t = subst(t, ad.presidente, '{{PRESIDENTE}}')
+  t = subst(t, ad.segretario, '{{SEGRETARIO}}')
+  t = subst(t, ad.luogo, '{{LUOGO}}')
+  t = subst(t, ad.ora_chiusura, '{{ORA_CHIUSURA}}')
+  t = subst(t, azienda?.nome, '{{AZIENDA}}')
+  if (organo) t = subst(t, ORGANO_ESTESO[organo.tipo], '{{ORGANO}}')
+  if (ad.presenti != null) t = subst(t, ad.presenti, '{{PRESENTI}}')
+  if (ad.aventi_diritto != null) t = subst(t, ad.aventi_diritto, '{{AVENTI_DIRITTO}}')
+  if (ad.numero != null) t = subst(t, String(ad.numero).padStart(2, '0'), '{{NUMERO}}')
+  t = subst(t, ad.sessione, '{{SESSIONE}}')
+
+  return t
+}
+
+// Modale: scelta dell'assemblea da cui creare il modello
+function ScegliAssembleaModal({ azienda, onScelta, onClose }) {
+  const [adunanze, setAdunanze] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('adunanze').select('*')
+        .eq('azienda_id', azienda.id).order('created_at', { ascending: false })
+      setAdunanze(data || [])
+      setLoading(false)
+    })()
+  }, [azienda])
+
+  async function scegli(ad) {
+    // carico organo, punti e delibere per la conversione
+    const { data: organo } = await supabase.from('organi').select('*').eq('id', ad.organo_id).single()
+    const { data: punti } = await supabase.from('adunanza_punti').select('*').eq('adunanza_id', ad.id).order('ordine')
+    const { data: delibere } = await supabase.from('delibere').select('*').eq('adunanza_id', ad.id).order('created_at')
+    const testo = ad.verbale_html || ''
+    const corpo = verbaleToModello(testo, { azienda, organo, ad, punti: punti || [], delibere: delibere || [] })
+    onScelta({
+      nome: `Modello da: ${ad.titolo || 'assemblea'}`,
+      organo_tipo: organo?.tipo || '',
+      corpo_html: corpo,
+    })
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 16 }}>
+      <div className="card" style={{ width: 560, maxWidth: '95%', margin: 0, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+        <div className="card-header">
+          <span className="card-title">Scegli l'assemblea da usare come modello</span>
+          <button className="btn btn-sm" onClick={onClose}>✕</button>
+        </div>
+        {loading ? <div className="spinner" /> : adunanze.length === 0 ? (
+          <p style={{ fontSize: 13, color: '#999' }}>Nessuna assemblea registrata da cui partire.</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Titolo</th><th>Anno</th><th></th></tr></thead>
+              <tbody>
+                {adunanze.map(a => (
+                  <tr key={a.id}>
+                    <td style={{ fontWeight: 600 }}>{a.titolo}</td>
+                    <td style={{ fontSize: 12, color: '#666' }}>{a.anno}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button className="btn btn-sm btn-primary" onClick={() => scegli(a)} disabled={!a.verbale_html}
+                        title={a.verbale_html ? '' : 'Questa assemblea non ha ancora un verbale'}>Usa come modello</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div style={{ fontSize: 11, color: '#999', marginTop: 10 }}>
+          Il verbale scelto verrà convertito in modello inserendo automaticamente i segnaposti al posto di date, nomi e dati variabili. Potrai rifinirlo prima di salvare.
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ModelliVerbale() {
   const { azienda } = useApp()
   const [modelli, setModelli] = useState([])
   const [loading, setLoading] = useState(true)
   const [edit, setEdit] = useState(null)  // null | {} (nuovo) | {…} (esistente)
+  const [daAssemblea, setDaAssemblea] = useState(false)
 
   const load = useCallback(async () => {
     if (!azienda?.id) return
@@ -62,7 +176,10 @@ export default function ModelliVerbale() {
             <h2>Modelli di verbale</h2>
             <p>Facsimile riutilizzabili per <strong>{azienda?.nome}</strong>: incolla il tuo verbale tipo e inserisci i segnaposto</p>
           </div>
-          <button className="btn btn-primary" onClick={() => setEdit({})}>+ Nuovo modello</button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn" onClick={() => setDaAssemblea(true)}>↩ Crea da assemblea</button>
+            <button className="btn btn-primary" onClick={() => setEdit({})}>+ Nuovo modello</button>
+          </div>
         </div>
       </div>
 
@@ -101,6 +218,12 @@ export default function ModelliVerbale() {
       {edit !== null && (
         <ModelloEditor azienda={azienda} modello={edit}
           onSaved={() => { setEdit(null); load() }} onClose={() => setEdit(null)} />
+      )}
+
+      {daAssemblea && (
+        <ScegliAssembleaModal azienda={azienda}
+          onScelta={(bozza) => { setDaAssemblea(false); setEdit(bozza) }}
+          onClose={() => setDaAssemblea(false)} />
       )}
     </div>
   )
