@@ -197,6 +197,40 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
         } catch (gErr) { console.error('Governance da visura:', gErr) }
       }
 
+      // 3-bis) GOVERNANCE: soci -> organo "Assemblea dei Soci" (dati reali dalla visura)
+      if (modGovernance && visuraData?.soci?.length) {
+        try {
+          const { data: assemblea } = await supabase.from('organi').insert({
+            azienda_id: aziendaId,
+            tipo: 'assemblea',
+            nome: 'Assemblea Generale Ordinaria dei Soci',
+            monocratico: false,
+          }).select().single()
+          for (const s of visuraData.soci) {
+            const denom = (s.denominazione || '').trim()
+            if (!denom) continue
+            // se persona fisica "Nome Cognome": divido; se societa': tutto in nome
+            let nome = denom, cognome = ''
+            if (!s.persona_giuridica) {
+              const parti = denom.split(/\s+/)
+              if (parti.length > 1) { nome = parti.slice(0, -1).join(' '); cognome = parti.slice(-1)[0] }
+            }
+            const { data: m } = await supabase.from('membri').insert({
+              azienda_id: aziendaId,
+              nome, cognome,
+              ruolo: 'Socio',
+            }).select().single()
+            if (assemblea && m) {
+              await supabase.from('organo_membri').insert({
+                organo_id: assemblea.id, membro_id: m.id,
+                ruolo: 'Socio',
+                quota: (s.quota_perc != null && s.quota_perc !== '') ? Number(s.quota_perc) : null,
+              })
+            }
+          }
+        } catch (sErr) { console.error('Soci da visura:', sErr) }
+      }
+
       setLoading(false)
       onDone(aziendaId)
     } catch (e2) {
@@ -320,7 +354,7 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
             <div style={{ fontWeight: 700, color: '#1A3A5C', marginBottom: 8 }}>⚖️ Governance</div>
             {visuraData?.componenti?.length ? (
               <div className="alert alert-info" style={{ margin: 0 }}>
-                ✓ I dati di governance verranno creati dalla visura: organo “{visuraData.organo?.nome || 'organo'}” e {visuraData.componenti.length} componenti reali.
+                ✓ I dati di governance verranno creati dalla visura: organo “{visuraData.organo?.nome || 'organo'}” e {visuraData.componenti.length} componenti reali.{visuraData.soci?.length ? ` Inoltre l'Assemblea con ${visuraData.soci.length} soci e relative quote.` : ''}
               </div>
             ) : (
               <div style={{ fontSize: 12, color: '#666', background: '#F7F8FA', borderRadius: 8, padding: '10px 14px' }}>
@@ -370,7 +404,7 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
           <div style={{ background: '#F4F9FF', border: '1px dashed #B9D4F0', borderRadius: 12, padding: 16, marginBottom: 18 }}>
             <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A3A5C', marginBottom: 4 }}>📄 Importa da visura camerale</div>
             <div style={{ fontSize: 12, color: '#6B7683', marginBottom: 12, lineHeight: 1.5 }}>
-              Carica il PDF della visura: compileremo l'anagrafica e, se attivi la Governance, creeremo l'organo amministrativo con i suoi componenti.
+              Carica il PDF della visura: compileremo l'anagrafica e, se attivi la Governance, creeremo l'organo amministrativo con i suoi componenti e l'Assemblea con i soci e le quote.
             </div>
             <label className="btn btn-sm" style={{ cursor: visuraLoading ? 'default' : 'pointer', background: '#2B5FA5', color: '#fff' }}>
               {visuraLoading ? 'Lettura in corso…' : '📎 Scegli il PDF della visura'}
@@ -381,6 +415,7 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
               <div style={{ fontSize: 12, color: '#0F6E56', marginTop: 10, lineHeight: 1.5 }}>
                 ✓ Dati estratti dalla visura.
                 {visuraData.componenti?.length ? ` Trovati ${visuraData.componenti.length} componenti (creati se attivi la Governance).` : ''}
+                {visuraData.soci?.length ? ` Trovati ${visuraData.soci.length} soci con quote.` : ''}
                 {' '}Controlla i campi qui sotto.
               </div>
             )}
