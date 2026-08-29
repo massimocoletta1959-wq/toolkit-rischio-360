@@ -16,6 +16,12 @@ function isPresaVisione(t) {
   return t.tipo === 'presa_visione' || !!t.procedura_id
 }
 
+// Un ticket è "governance" se legato a un organo o a un'adunanza/riunione,
+// oppure se di tipo istruttorio del CdA (parere / delibera / incarico)
+function isGovernance(t) {
+  return !!t.organo_id || !!t.riunione_id || ['parere', 'delibera', 'incarico'].includes(t.tipo)
+}
+
 // Ricava l'area (es. AMM) di una presa visione, dal codice procedura → catalogo
 function areaDaTicket(t) {
   const cod = codiceDaTicket(t)
@@ -203,6 +209,7 @@ function ListaTicket({ tasks, onAggiorna, autore, onReload }) {
 
 export default function IMieiTask({ modo = 'task' }) {
   const proceduraView = modo === 'procedure'
+  const governanceView = modo === 'governance'
   const { profilo, session } = useApp()
   const [tickets, setTickets]       = useState([])
   const [aziendeFiltro, setAziendeFiltro] = useState([]) // aziende disponibili
@@ -237,14 +244,21 @@ export default function IMieiTask({ modo = 'task' }) {
 
   useEffect(() => { load() }, [load])
 
-  // Ticket del modo corrente: task operativi oppure prese visione
-  const ticketsModo = tickets.filter(t => proceduraView ? isPresaVisione(t) : !isPresaVisione(t))
+  // Smistamento a tre vie:
+  //  - governance: tutto ciò che è legato a un organo/adunanza
+  //  - procedure: prese visione NON di governance
+  //  - task: tutto il resto (operativo), NON di governance
+  const ticketsModo = tickets.filter(t => {
+    if (governanceView) return isGovernance(t)
+    if (isGovernance(t)) return false
+    return proceduraView ? isPresaVisione(t) : !isPresaVisione(t)
+  })
 
   // Filtra per azienda, stato e (categoria rischio | area procedura)
   const filtered = ticketsModo.filter(t => {
     if (aziendaSelezionata !== 'tutte' && t.aziende?.id !== aziendaSelezionata) return false
     if (filterStato && t.stato !== filterStato) return false
-    if (!proceduraView && filterCategoria && t.rischi?.categoria !== filterCategoria) return false
+    if (!proceduraView && !governanceView && filterCategoria && t.rischi?.categoria !== filterCategoria) return false
     if (proceduraView && filterArea && areaDaTicket(t) !== filterArea) return false
     return true
   })
@@ -258,8 +272,8 @@ export default function IMieiTask({ modo = 'task' }) {
   return (
     <div>
       <div className="page-header">
-        <h2>{proceduraView ? 'Le mie procedure' : 'I miei task'}</h2>
-        <p>{proceduraView ? 'Procedure da prendere in visione' : 'Task operativi assegnati a te'}{multiAz ? ` — ${aziendeFiltro.length} aziende` : ''}</p>
+        <h2>{governanceView ? 'Governance' : proceduraView ? 'Le mie procedure' : 'I miei task'}</h2>
+        <p>{governanceView ? 'Delibere da esaminare e incarichi del tuo organo' : proceduraView ? 'Procedure da prendere in visione' : 'Task operativi assegnati a te'}{multiAz ? ` — ${aziendeFiltro.length} aziende` : ''}</p>
       </div>
 
       <div className="stats-grid">
@@ -306,10 +320,10 @@ export default function IMieiTask({ modo = 'task' }) {
       {loading ? <div className="spinner" /> : filtered.length === 0 ? (
         <div className="card">
           <div className="empty-state">
-            <div style={{ fontSize: 36 }}>{proceduraView ? '📋' : '✅'}</div>
+            <div style={{ fontSize: 36 }}>{governanceView ? '⚖️' : proceduraView ? '📋' : '✅'}</div>
             <p>{ticketsModo.length === 0
-              ? (proceduraView ? 'Nessuna procedura da prendere in visione.' : 'Nessun task assegnato al momento.')
-              : (proceduraView ? 'Nessuna procedura con questo filtro.' : 'Nessun task con questo filtro.')}</p>
+              ? (governanceView ? 'Nessuna delibera o incarico dal tuo organo al momento.' : proceduraView ? 'Nessuna procedura da prendere in visione.' : 'Nessun task assegnato al momento.')
+              : (governanceView ? 'Nessun elemento con questo filtro.' : proceduraView ? 'Nessuna procedura con questo filtro.' : 'Nessun task con questo filtro.')}</p>
           </div>
         </div>
       ) : (

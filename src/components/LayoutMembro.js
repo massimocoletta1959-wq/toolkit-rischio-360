@@ -1,13 +1,13 @@
 import React from 'react'
 import { useApp } from '../App'
-
 export default function LayoutMembro({ children, page = 'task', setPage }) {
   const { azienda, profilo, logout } = useApp()
   const voci = [
-    { id: 'task',      icona: '🎫', label: 'I miei task' },
-    { id: 'procedure', icona: '📋', label: 'Le mie procedure' },
+    { id: 'task',       icona: '🎫', label: 'I miei task' },
+    { id: 'procedure',  icona: '📋', label: 'Le mie procedure' },
+    { id: 'governance', icona: '⚖️', label: 'Governance' },
   ]
-
+  const titoloCorrente = (voci.find(v => v.id === page) || voci[0]).label
   return (
     <div className="app-layout">
       <aside className="sidebar">
@@ -17,7 +17,7 @@ export default function LayoutMembro({ children, page = 'task', setPage }) {
         </div>
         <div className="sidebar-azienda">
           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Area personale</span>
-          <strong style={{ fontSize: 13 }}>{page === 'procedure' ? 'Le mie procedure' : 'I miei task'}</strong>
+          <strong style={{ fontSize: 13 }}>{titoloCorrente}</strong>
         </div>
         <nav className="sidebar-nav">
           {voci.map(v => (
