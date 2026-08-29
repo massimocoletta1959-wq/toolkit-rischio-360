@@ -31,6 +31,9 @@ export default function DettaglioAdunanza() {
   const [verbale, setVerbale] = useState('')
   const [modelli, setModelli] = useState([])       // modelli di verbale dell'azienda
   const [templateId, setTemplateId] = useState('') // modello selezionato
+  const [componenti, setComponenti] = useState([]) // membri dell'organo (per circolarizzare)
+  const [ticketCirc, setTicketCirc] = useState([]) // ticket di questa adunanza (tracciamento)
+  const [circMsg, setCircMsg] = useState(null)
 
   // Carica i modelli di verbale dell'azienda
   useEffect(() => {
@@ -55,6 +58,14 @@ export default function DettaglioAdunanza() {
       const { data: org } = await supabase.from('organi').select('*').eq('id', a.organo_id).single()
       setOrgano(org || null)
 
+      // componenti dell'organo (per circolarizzare ai membri)
+      const { data: comp } = await supabase.from('organo_membri')
+        .select('membro_id, ruolo, membri(nome,cognome,email)').eq('organo_id', a.organo_id)
+      setComponenti(comp || [])
+
+      // ticket già circolarizzati per questa adunanza (tracciamento)
+      await caricaTicket()
+
       const { data: pp } = await supabase.from('adunanza_punti').select('*').eq('adunanza_id', adunanzaId).order('ordine')
       setPunti((pp || []).map(p => ({ titolo: p.titolo, relatore: p.relatore || '', con_delibera: p.con_delibera })))
 
@@ -69,6 +80,42 @@ export default function DettaglioAdunanza() {
   }, [adunanzaId])
 
   const setTestata = (k, v) => setAd(a => ({ ...a, [k]: v }))
+
+  async function caricaTicket() {
+    if (!adunanzaId) return
+    const { data } = await supabase.from('ticket').select('*, membri(nome,cognome,email)')
+      .eq('riunione_id', adunanzaId).order('created_at')
+    setTicketCirc(data || [])
+  }
+
+  // Invia a tutti i componenti dell'organo un ticket (presa visione o incarico)
+  async function circolarizza(tipo, { titolo, istruzioni, scadenza }) {
+    setCircMsg(null)
+    const dest = componenti.filter(c => c.membro_id)
+    if (dest.length === 0) { setCircMsg({ tipo: 'err', txt: 'Nessun componente da avvisare: aggiungi prima i membri all\'organo.' }); return }
+    const righe = dest.map(c => ({
+      azienda_id: azienda.id,
+      membro_id: c.membro_id,
+      organo_id: ad.organo_id,
+      riunione_id: adunanzaId,
+      tipo,                                   // 'presa_visione' | 'incarico'
+      titolo,
+      istruzioni: istruzioni || null,
+      scadenza: scadenza || null,
+      priorita: 'media',
+      stato: 'Aperto',
+      email_inviata: false,
+    }))
+    const { error } = await supabase.from('ticket').insert(righe)
+    if (error) { setCircMsg({ tipo: 'err', txt: error.message }); return }
+    await supabase.from('governance_eventi').insert({
+      azienda_id: azienda.id, adunanza_id: adunanzaId,
+      evento: tipo === 'incarico' ? 'incarico_assegnato' : 'documento_circolarizzato',
+      dettaglio: `${titolo} → ${dest.length} destinatari`,
+    })
+    setCircMsg({ tipo: 'ok', txt: `Inviato a ${dest.length} ${dest.length === 1 ? 'componente' : 'componenti'}.` })
+    caricaTicket()
+  }
 
   // ── Punti OdG ──
   const addPunto = () => setPunti(p => [...p, { titolo: '', relatore: '', con_delibera: true }])
@@ -407,6 +454,11 @@ export default function DettaglioAdunanza() {
         ))}
       </div>
 
+      {/* Circolarizzazione ai componenti dell'organo */}
+      <BloccoCircolarizzazione
+        componenti={componenti} ticket={ticketCirc} messaggio={circMsg}
+        soloLettura={soloLettura} onInvia={circolarizza} organoNome={organo?.nome} />
+
       {/* Delibere */}
       <div className="card">
         <div className="card-header">
@@ -485,3 +537,55 @@ export default function DettaglioAdunanza() {
     </div>
   )
 }
+
+// ── Blocco Circolarizzazione ai componenti dell'organo ──────────────────
+function BloccoCircolarizzazione({ componenti, ticket, messaggio, soloLettura, onInvia, organoNome }) {
+  const [modo, setModo] = useState(null)   // null | 'presa_visione' | 'incarico'
+  const [titolo, setTitolo] = useState('')
+  const [istruzioni, setIstruzioni] = useState('')
+  const [scadenza, setScadenza] = useState('')
+  const [inviando, setInviando] = useState(false)
+
+  const prese = ticket.filter(t => t.tipo === 'presa_visione')
+  const incarichi = ticket.filter(t => t.tipo === 'incarico')
+
+  async function invia() {
+    setInviando(true)
+    await onInvia(modo, { titolo: titolo.trim() || (modo === 'incarico' ? 'Incarico' : 'Documento da esaminare'), istruzioni, scadenza })
+    setInviando(false)
+    setModo(null); setTitolo(''); setIstruzioni(''); setScadenza('')
+  }
+
+  const nome = c => c?.membri ? `${c.membri.nome || ''} ${c.membri.cognome || ''}`.trim() : '—'
+  const statoTicket = t => t.tipo === 'presa_visione'
+    ? (t.data_presa_visione ? `✓ Vista ${new Date(t.data_presa_visione).toLocaleDateString('it-IT')}` : '⏳ Da vedere')
+    : (t.stato === 'Completato' ? '✓ Completato' : t.stato === 'In lavorazione' ? '↻ In lavorazione' : '⏳ Aperto')
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <span className="card-title">Circolarizzazione ai componenti</span>
+      </div>
+      <p style={{ fontSize: 12, color: '#999', marginBottom: 10 }}>
+        Invia ai componenti {organoNome ? `di ${organoNome}` : 'dell\'organo'} i documenti da esaminare (presa visione) o gli incarichi da svolgere. Li ricevono nella loro area, sezione Governance.
+      </p>
+
+      {!soloLettura && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+          <button className="btn btn-sm btn-primary" onClick={() => setModo('presa_visione')}>📩 Invia in presa visione</button>
+          <button className="btn btn-sm" onClick={() => setModo('incarico')}>📌 Assegna incarico</button>
+        </div>
+      )}
+
+      {modo && (
+        <div style={{ background: '#F7F8FA', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: '#5A4FCF' }}>
+            {modo === 'presa_visione' ? 'Documento da far esaminare' : 'Incarico da assegnare'} · {componenti.length} destinatari
+          </div>
+          <div className="form-group" style={{ marginBottom: 8 }}>
+            <input className="form-control" value={titolo} onChange={e => setTitolo(e.target.value)}
+              placeholder={modo === 'presa_visione' ? 'Oggetto (es. Progetto di bilancio 2025)' : 'Oggetto dell\'incarico (es. Predisporre relazione sulla gestione)'} />
+          </div>
+          <div className="form-group" style={{ marginBottom: 8 }}>
+            <textarea className="form-control" value={istruzioni} onChange={e => setIstruzioni(e.target.value)}
+              placeholder={modo
