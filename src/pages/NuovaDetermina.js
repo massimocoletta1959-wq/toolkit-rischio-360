@@ -126,7 +126,7 @@ async function sha256(text) {
 
 // ── Componente ──────────────────────────────────────────────────────────
 export default function NuovaDetermina() {
-  const { azienda, setPage, determinaId } = useApp()
+  const { azienda, setPage, determinaId, determinaOrgano } = useApp()
   const anno = new Date().getFullYear()
 
   const [step, setStep] = useState(1)
@@ -135,6 +135,8 @@ export default function NuovaDetermina() {
   const [errore, setErrore] = useState(null)
   const [soloLettura, setSoloLettura] = useState(false)  // determina già firmata → non modificabile
   const [caricata, setCaricata] = useState(!determinaId) // false finché carico una bozza esistente
+  const [organoAzienda, setOrganoAzienda] = useState(undefined) // undefined=caricamento, 'amministratore_unico'|'cda'|null
+  const [titolareNome, setTitolareNome] = useState('')          // AU: titolare; CdA: presidente
 
   // dati determina
   const [tipo, setTipo] = useState('')
@@ -150,17 +152,29 @@ export default function NuovaDetermina() {
   const [pareri, setPareri] = useState([])
   const [nuovoParere, setNuovoParere] = useState({ tipo: 'legale', fonte: '', sintesi: '' })
 
-  // Carica il titolare dell'Amministratore Unico
+  // Rileva l'organo amministrativo ATTUALE (AU o CdA) e il nominativo di riferimento
   useEffect(() => {
     (async () => {
       if (!azienda?.id) return
-      const { data: org } = await supabase.from('organi')
-        .select('id').eq('azienda_id', azienda.id).eq('tipo', 'amministratore_unico').limit(1)
-      if (!org || !org.length) return
-      const { data: comp } = await supabase.from('organo_membri')
-        .select('membri(nome,cognome)').eq('organo_id', org[0].id).limit(1)
-      const m = comp && comp[0] && comp[0].membri
-      if (m) setAuNome(`${m.nome || ''} ${m.cognome || ''}`.trim())
+      const { data: orgs } = await supabase.from('organi')
+        .select('id,tipo').eq('azienda_id', azienda.id)
+        .in('tipo', ['amministratore_unico', 'cda'])
+      const org = orgs && orgs.length ? orgs[0] : null
+      setOrganoAzienda(org ? org.tipo : null)
+      if (!org) return
+      if (org.tipo === 'amministratore_unico') {
+        const { data: comp } = await supabase.from('organo_membri')
+          .select('membri(nome,cognome)').eq('organo_id', org.id).limit(1)
+        const m = comp && comp[0] && comp[0].membri
+        if (m) { const nm = `${m.nome || ''} ${m.cognome || ''}`.trim(); setAuNome(nm); setTitolareNome(nm) }
+      } else {
+        // CdA: cerco il Presidente (o il primo componente)
+        const { data: comp } = await supabase.from('organo_membri')
+          .select('ruolo, membri(nome,cognome)').eq('organo_id', org.id)
+        const pres = (comp || []).find(c => (c.ruolo || '').toLowerCase().includes('presidente')) || (comp || [])[0]
+        const m = pres && pres.membri
+        if (m) setTitolareNome(`${m.nome || ''} ${m.cognome || ''}`.trim())
+      }
     })()
   }, [azienda])
 
@@ -213,10 +227,14 @@ export default function NuovaDetermina() {
       ? `ACQUISITI i pareri professionali: ${pareri.map(p => `${p.tipo}${p.fonte ? ' (' + p.fonte + ')' : ''}`).join('; ')};`
       : ''
     return [
-      `DETERMINA DELL'AMMINISTRATORE UNICO N. ${num}/${anno}`,
+      isCda
+        ? `DELIBERA DEL CONSIGLIO DI AMMINISTRAZIONE N. ${num}/${anno}`
+        : `DETERMINA DELL'AMMINISTRATORE UNICO N. ${num}/${anno}`,
       `${azienda?.nome || ''}${azienda?.settore ? ' · ' + azienda.settore : ''} · ${dataOggi}`,
       ``,
-      `PREMESSA. Il/La sottoscritto/a ${auNome || 'Amministratore Unico'}, in qualità di Amministratore Unico di ${azienda?.nome || 'questa società'}, avendo valutato la necessità e l'opportunità dell'operazione di seguito descritta;`,
+      isCda
+        ? `PREMESSA. Il Consiglio di Amministrazione di ${azienda?.nome || 'questa società'}, riunitosi e validamente costituito, avendo valutato la necessità e l'opportunità dell'operazione di seguito descritta;`
+        : `PREMESSA. Il/La sottoscritto/a ${titolareNome || auNome || 'Amministratore Unico'}, in qualità di Amministratore Unico di ${azienda?.nome || 'questa società'}, avendo valutato la necessità e l'opportunità dell'operazione di seguito descritta;`,
       ``,
       `VISTE le analisi economico-finanziarie condotte e la documentazione istruttoria agli atti;`,
       alternative ? `VALUTATE le alternative considerate: ${alternative};` : '',
@@ -224,7 +242,7 @@ export default function NuovaDetermina() {
       righeParere,
       area231 ? `RILEVATO che l'operazione ricade nell'area sensibile 231 "${area231}", per la quale sono stati rispettati i protocolli previsti dal Modello Organizzativo;` : '',
       ``,
-      `DETERMINA`,
+      isCda ? `DELIBERA` : `DETERMINA`,
       `1. di approvare l'operazione avente ad oggetto: ${oggetto}${eur(valore) ? `, per un valore di ${eur(valore)}` : ''};`,
       descrizione ? `2. ${descrizione}` : '',
       `${descrizione ? '3' : '2'}. di autorizzare la sottoscrizione di tutti gli atti conseguenti.`,
@@ -243,7 +261,7 @@ export default function NuovaDetermina() {
     try {
       let numero = null, data_firma = null, hash = null, stato = 'bozza'
       if (firma) {
-        const { data: n, error: eN } = await supabase.rpc('prossimo_numero_determina', { p_azienda: azienda.id, p_anno: anno })
+        const { data: n, error: eN } = await supabase.rpc('prossimo_numero_determina', { p_azienda: azienda.id, p_anno: anno, p_organo: organoAtto })
         if (eN) throw eN
         numero = n
         data_firma = new Date().toISOString()
@@ -253,7 +271,7 @@ export default function NuovaDetermina() {
       const corpo = generaCorpo(numero)
 
       const campi = {
-        azienda_id: azienda.id, anno, tipo, oggetto: oggetto.trim(), descrizione: descrizione || null,
+        azienda_id: azienda.id, anno, tipo, organo: organoAtto, oggetto: oggetto.trim(), descrizione: descrizione || null,
         valore: valore === '' ? null : Number(valore),
         analisi_finanziaria: analisiFin || null, analisi_economica: analisiEco || null, alternative: alternative || null,
         area_231: area231 || null, corpo_html: corpo, stato,
@@ -305,12 +323,33 @@ export default function NuovaDetermina() {
   }
 
   // ── UI ──────────────────────────────────────────────────────────────
+  // Organo dell'atto che sto creando: da context (nuovo) o dall'organo attuale
+  const organoAtto = determinaOrgano || organoAzienda || 'amministratore_unico'
+  const isCda = organoAtto === 'cda'
+
+  // GUARDIA DI ACCESSO (solo in creazione nuova; le bozze/atti esistenti si aprono sempre)
+  if (!determinaId && organoAzienda !== undefined && organoAzienda && determinaOrgano && determinaOrgano !== organoAzienda) {
+    const attesa = determinaOrgano === 'cda' ? 'il Consiglio di Amministrazione' : "l'Amministratore Unico"
+    const reale = organoAzienda === 'cda' ? 'il Consiglio di Amministrazione' : "l'Amministratore Unico"
+    return (
+      <div>
+        <div className="page-header">
+          <h2>Operazione non consentita</h2>
+        </div>
+        <div className="alert alert-error">
+          Questa società ha {reale} come organo amministrativo, quindi non è possibile creare un atto per {attesa}.
+        </div>
+        <button className="btn" onClick={() => setPage(organoAzienda === 'cda' ? 'au_registro' : 'au_registro')}>← Torna al registro</button>
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h2>{soloLettura ? 'Determina AU' : determinaId ? 'Modifica Determina AU' : 'Nuova Determina AU'}</h2>
+            <h2>{soloLettura ? (isCda ? 'Delibera CdA' : 'Determina AU') : determinaId ? (isCda ? 'Modifica Delibera CdA' : 'Modifica Determina AU') : (isCda ? 'Nuova Delibera CdA' : 'Nuova Determina AU')}</h2>
             <p>
               {tipo
                 ? <>{TIPI.find(t => t.id === tipo)?.icon} <strong>{TIPO_LABEL[tipo]}</strong> · {azienda?.nome}</>

@@ -45,14 +45,23 @@ export default function RegistroDetermine() {
   const [loading, setLoading] = useState(true)
   const [filterStato, setFilterStato] = useState('')
   const [search, setSearch] = useState('')
+  const [organoAzienda, setOrganoAzienda] = useState(undefined) // undefined=caricamento, 'amministratore_unico'|'cda'|null
 
   const load = useCallback(async () => {
     if (!azienda?.id) return
     setLoading(true)
+    // Organo amministrativo ATTUALE dell'azienda (AU o CdA sono mutuamente esclusivi)
+    const { data: orgs } = await supabase.from('organi')
+      .select('tipo').eq('azienda_id', azienda.id)
+      .in('tipo', ['amministratore_unico', 'cda'])
+    const org = orgs && orgs.length ? orgs[0].tipo : null
+    setOrganoAzienda(org)
+    // Mostro le determine/delibere dell'organo attuale
     const { data } = await supabase
       .from('determine')
       .select('*')
       .eq('azienda_id', azienda.id)
+      .eq('organo', org || 'amministratore_unico')
       .order('anno', { ascending: false })
       .order('numero', { ascending: false, nullsFirst: true })
       .order('created_at', { ascending: false })
@@ -68,6 +77,13 @@ export default function RegistroDetermine() {
     return true
   })
 
+  // Etichette adattive in base all'organo attuale
+  const isCda = organoAzienda === 'cda'
+  const titoloRegistro = isCda ? 'Registro Delibere CdA' : 'Registro Determine AU'
+  const sottotitoloRegistro = isCda
+    ? 'Delibere del Consiglio di Amministrazione di'
+    : "Determine dell'Amministratore Unico di"
+  const nuovoLabel = isCda ? '+ Nuova delibera' : '+ Nuova determina'
   const nFirmate = determine.filter(d => d.stato === 'firmata').length
   const nBozze   = determine.filter(d => d.stato === 'bozza').length
   const valFirmate = determine
@@ -76,13 +92,18 @@ export default function RegistroDetermine() {
 
   return (
     <div>
+      {organoAzienda === null && (
+        <div className="alert alert-error" style={{ marginBottom: 16 }}>
+          Questa azienda non ha un organo amministrativo (Amministratore Unico o CdA). Crealo nella sezione Organi per gestire le determine/delibere.
+        </div>
+      )}
       <div className="page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h2>Registro Determine AU</h2>
-            <p>Determine dell'Amministratore Unico di <strong>{azienda?.nome}</strong> · numerazione progressiva, registro immodificabile</p>
+            <h2>{titoloRegistro}</h2>
+            <p>{sottotitoloRegistro} <strong>{azienda?.nome}</strong> · numerazione progressiva, registro immodificabile</p>
           </div>
-          <button className="btn btn-primary" onClick={() => nuovaDetermina()}>+ Nuova determina</button>
+          <button className="btn btn-primary" onClick={() => nuovaDetermina(organoAzienda)}>{nuovoLabel}</button>
         </div>
       </div>
 
