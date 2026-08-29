@@ -36,10 +36,11 @@ export default function Home() {
       supabase.from('organi').select('id,nome,tipo').eq('azienda_id', A),
       supabase.from('azioni').select('id').eq('azienda_id', A),
       supabase.from('riunioni').select('data_riunione').eq('azienda_id', A),
+      supabase.from('procedure_template').select('codice').in('settore', [azienda?.settore, 'generico']),
     ])
     const val = i => (res[i].status === 'fulfilled' ? (res[i].value.data || []) : [])
     const rischiRows = val(0), procRows = val(1), organi = val(2)
-    const azioniRows = val(3), riunioniRows = val(4)
+    const azioniRows = val(3), riunioniRows = val(4), catalogoRows = val(5)
 
     const tiers = { t1: 0, t2: 0, t3: 0, t4: 0 }
     rischiRows.forEach(r => {
@@ -60,7 +61,7 @@ export default function Home() {
 
     setD({
       rischi:     { n: rischiRows.length, tiers, azioni: azioniRows.length },
-      procedure:  { n: procRows.filter(p => p.stato === 'Adottata').length, catalogo: CATALOGO_PROCEDURE.length, personalizzate: procRows.filter(p => p.stato === 'Personalizzata').length },
+      procedure:  { n: procRows.filter(p => p.stato === 'Adottata').length, catalogo: catalogoRows.length || CATALOGO_PROCEDURE.length, personalizzate: procRows.filter(p => p.stato === 'Personalizzata').length },
       governance: { n: organi.length, organi, componenti, prossima: prossime[0] || null },
     })
 
