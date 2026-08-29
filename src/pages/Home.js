@@ -60,7 +60,7 @@ export default function Home() {
 
     setD({
       rischi:     { n: rischiRows.length, tiers, azioni: azioniRows.length },
-      procedure:  { n: procRows.filter(p => p.stato && p.stato !== 'Non applicabile').length, catalogo: CATALOGO_PROCEDURE.length, personalizzate: procRows.filter(p => p.stato === 'Personalizzata').length },
+      procedure:  { n: procRows.filter(p => p.stato === 'Adottata').length, catalogo: CATALOGO_PROCEDURE.length, personalizzate: procRows.filter(p => p.stato === 'Personalizzata').length },
       governance: { n: organi.length, organi, componenti, prossima: prossime[0] || null },
     })
 

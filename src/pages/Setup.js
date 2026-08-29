@@ -17,6 +17,10 @@ function pivaValida(p) {
 }
 
 export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzienda = false }) {
+  async function esci() {
+    try { await supabase.auth.signOut() } catch (_e) {}
+    localStorage.clear(); sessionStorage.clear(); window.location.reload()
+  }
   const [step, setStep]         = useState(1)
   const [nome, setNome]         = useState('')
   const [piva, setPiva]         = useState('')
@@ -391,6 +395,15 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
           <div style={{ fontSize: 36, marginBottom: 8 }}>🏢</div>
           <h1>{nuovaAzienda ? 'Nuova azienda' : 'Configura la tua azienda'}</h1>
           <p>Prima configurazione — ci vogliono 30 secondi</p>
+          {!nuovaAzienda && (
+            <p style={{ marginTop: 6, fontSize: 12.5 }}>
+              Non sei tu o vuoi cambiare account?{' '}
+              <button type="button" onClick={esci}
+                style={{ background: 'none', border: 'none', color: '#2B5FA5', cursor: 'pointer', textDecoration: 'underline', fontSize: 12.5, padding: 0 }}>
+                Esci
+              </button>
+            </p>
+          )}
         </div>
         {error && <div className="alert alert-error">{error}</div>}
         <form onSubmit={handleStep1}>
