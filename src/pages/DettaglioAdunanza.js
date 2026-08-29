@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
 
+const EDGE_EMAIL = 'https://vwbixmbbcutjcplskjvg.supabase.co/functions/v1/invia-email'
+
 const ORGANO_LABEL = {
   cda: 'Consiglio di Amministrazione', amministratore_unico: 'Amministratore Unico',
   comitato: 'Comitato', collegio_sindacale: 'Collegio Sindacale', assemblea: 'Assemblea dei Soci', altro: 'Organo',
@@ -106,15 +108,47 @@ export default function DettaglioAdunanza() {
       stato: 'Aperto',
       email_inviata: false,
     }))
-    const { error } = await supabase.from('ticket').insert(righe)
+    const { data: creati, error } = await supabase.from('ticket').insert(righe).select('id')
     if (error) { setCircMsg({ tipo: 'err', txt: error.message }); return }
     await supabase.from('governance_eventi').insert({
       azienda_id: azienda.id, adunanza_id: adunanzaId,
       evento: tipo === 'incarico' ? 'incarico_assegnato' : 'documento_circolarizzato',
-      dettaglio: `${titolo} → ${dest.length} destinatari`,
+      dettaglio: `${titolo} - ${dest.length} destinatari`,
     })
-    setCircMsg({ tipo: 'ok', txt: `Inviato a ${dest.length} ${dest.length === 1 ? 'componente' : 'componenti'}.` })
+    // Invio email a ciascun destinatario (riusa la Edge Function invia-email)
+    let inviate = 0
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await Promise.all((creati || []).map(t =>
+        fetch(EDGE_EMAIL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ ticket_id: t.id, tipo: 'assegnazione' }),
+        }).then(() => { inviate++ }).catch(() => {})
+      ))
+    } catch (_e) { /* se l'email fallisce, i ticket restano comunque creati */ }
+    setCircMsg({ tipo: 'ok', txt: `Inviato a ${dest.length} ${dest.length === 1 ? 'componente' : 'componenti'}${inviate ? ' (email in partenza)' : ''}.` })
     caricaTicket()
+  }
+
+  // Sollecita i destinatari che non hanno ancora completato
+  async function sollecita(righeTicket) {
+    const mancanti = righeTicket.filter(t => t.tipo === 'presa_visione' ? !t.data_presa_visione : t.stato !== 'Completato')
+    if (!mancanti.length) return
+    setCircMsg(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await Promise.all(mancanti.map(t =>
+        fetch(EDGE_EMAIL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ ticket_id: t.id, tipo: 'reminder' }),
+        }).catch(() => {})
+      ))
+      setCircMsg({ tipo: 'ok', txt: `Sollecito inviato a ${mancanti.length} ${mancanti.length === 1 ? 'persona' : 'persone'}.` })
+    } catch (_e) {
+      setCircMsg({ tipo: 'err', txt: 'Non è stato possibile inviare il sollecito.' })
+    }
   }
 
   // ── Punti OdG ──
@@ -457,7 +491,7 @@ export default function DettaglioAdunanza() {
       {/* Circolarizzazione ai componenti dell'organo */}
       <BloccoCircolarizzazione
         componenti={componenti} ticket={ticketCirc} messaggio={circMsg}
-        soloLettura={soloLettura} onInvia={circolarizza} organoNome={organo?.nome} />
+        soloLettura={soloLettura} onInvia={circolarizza} onSollecita={sollecita} organoNome={organo?.nome} />
 
       {/* Delibere */}
       <div className="card">
@@ -539,7 +573,7 @@ export default function DettaglioAdunanza() {
 }
 
 // --- Blocco Circolarizzazione ai componenti dell'organo ---
-function BloccoCircolarizzazione({ componenti, ticket, messaggio, soloLettura, onInvia, organoNome }) {
+function BloccoCircolarizzazione({ componenti, ticket, messaggio, soloLettura, onInvia, onSollecita, organoNome }) {
   const [modo, setModo] = useState(null)   // null | 'presa_visione' | 'incarico'
   const [titolo, setTitolo] = useState('')
   const [istruzioni, setIstruzioni] = useState('')
@@ -608,6 +642,11 @@ function BloccoCircolarizzazione({ componenti, ticket, messaggio, soloLettura, o
 
       {ticket.length > 0 && (
         <div className="table-wrap">
+          {!soloLettura && (
+            <div style={{ textAlign: 'right', marginBottom: 8 }}>
+              <button className="btn btn-sm" onClick={() => onSollecita(ticket)}>Sollecita i mancanti</button>
+            </div>
+          )}
           <table>
             <thead><tr><th>Destinatario</th><th>Tipo</th><th>Oggetto</th><th>Stato</th></tr></thead>
             <tbody>
