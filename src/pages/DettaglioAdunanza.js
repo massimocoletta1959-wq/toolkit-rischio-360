@@ -196,7 +196,8 @@ export default function DettaglioAdunanza() {
     }
     let t = tpl
     Object.entries(map).forEach(([k, v]) => { t = t.split(k).join(v) })
-    if (ad.intestazione && ad.intestazione.trim()) t = `${ad.intestazione.trim()}\n\n${t}`
+    // Nota: l'intestazione NON va anteposta qui — il modello la contiene già
+    // (viene salvata dentro il corpo quando si crea il modello da un'assemblea).
     return t
   }
 
