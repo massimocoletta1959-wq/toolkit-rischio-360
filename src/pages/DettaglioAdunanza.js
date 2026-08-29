@@ -538,16 +538,13 @@ export default function DettaglioAdunanza() {
   )
 }
 
-// ── Blocco Circolarizzazione ai componenti dell'organo ──────────────────
+// --- Blocco Circolarizzazione ai componenti dell'organo ---
 function BloccoCircolarizzazione({ componenti, ticket, messaggio, soloLettura, onInvia, organoNome }) {
   const [modo, setModo] = useState(null)   // null | 'presa_visione' | 'incarico'
   const [titolo, setTitolo] = useState('')
   const [istruzioni, setIstruzioni] = useState('')
   const [scadenza, setScadenza] = useState('')
   const [inviando, setInviando] = useState(false)
-
-  const prese = ticket.filter(t => t.tipo === 'presa_visione')
-  const incarichi = ticket.filter(t => t.tipo === 'incarico')
 
   async function invia() {
     setInviando(true)
@@ -556,10 +553,10 @@ function BloccoCircolarizzazione({ componenti, ticket, messaggio, soloLettura, o
     setModo(null); setTitolo(''); setIstruzioni(''); setScadenza('')
   }
 
-  const nome = c => c?.membri ? `${c.membri.nome || ''} ${c.membri.cognome || ''}`.trim() : '—'
+  const nome = t => t?.membri ? `${t.membri.nome || ''} ${t.membri.cognome || ''}`.trim() : '-'
   const statoTicket = t => t.tipo === 'presa_visione'
-    ? (t.data_presa_visione ? `✓ Vista ${new Date(t.data_presa_visione).toLocaleDateString('it-IT')}` : '⏳ Da vedere')
-    : (t.stato === 'Completato' ? '✓ Completato' : t.stato === 'In lavorazione' ? '↻ In lavorazione' : '⏳ Aperto')
+    ? (t.data_presa_visione ? 'Vista ' + new Date(t.data_presa_visione).toLocaleDateString('it-IT') : 'Da vedere')
+    : (t.stato === 'Completato' ? 'Completato' : t.stato === 'In lavorazione' ? 'In lavorazione' : 'Aperto')
 
   return (
     <div className="card">
@@ -567,25 +564,65 @@ function BloccoCircolarizzazione({ componenti, ticket, messaggio, soloLettura, o
         <span className="card-title">Circolarizzazione ai componenti</span>
       </div>
       <p style={{ fontSize: 12, color: '#999', marginBottom: 10 }}>
-        Invia ai componenti {organoNome ? `di ${organoNome}` : 'dell\'organo'} i documenti da esaminare (presa visione) o gli incarichi da svolgere. Li ricevono nella loro area, sezione Governance.
+        Invia ai componenti {organoNome ? 'di ' + organoNome : "dell'organo"} i documenti da esaminare (presa visione) o gli incarichi da svolgere. Li ricevono nella loro area, sezione Governance.
       </p>
 
       {!soloLettura && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-          <button className="btn btn-sm btn-primary" onClick={() => setModo('presa_visione')}>📩 Invia in presa visione</button>
-          <button className="btn btn-sm" onClick={() => setModo('incarico')}>📌 Assegna incarico</button>
+          <button className="btn btn-sm btn-primary" onClick={() => setModo('presa_visione')}>Invia in presa visione</button>
+          <button className="btn btn-sm" onClick={() => setModo('incarico')}>Assegna incarico</button>
         </div>
       )}
 
       {modo && (
         <div style={{ background: '#F7F8FA', borderRadius: 8, padding: 12, marginBottom: 12 }}>
           <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: '#5A4FCF' }}>
-            {modo === 'presa_visione' ? 'Documento da far esaminare' : 'Incarico da assegnare'} · {componenti.length} destinatari
+            {modo === 'presa_visione' ? 'Documento da far esaminare' : 'Incarico da assegnare'} - {componenti.length} destinatari
           </div>
           <div className="form-group" style={{ marginBottom: 8 }}>
             <input className="form-control" value={titolo} onChange={e => setTitolo(e.target.value)}
-              placeholder={modo === 'presa_visione' ? 'Oggetto (es. Progetto di bilancio 2025)' : 'Oggetto dell\'incarico (es. Predisporre relazione sulla gestione)'} />
+              placeholder={modo === 'presa_visione' ? 'Oggetto (es. Progetto di bilancio 2025)' : "Oggetto dell'incarico (es. Predisporre relazione)"} />
           </div>
           <div className="form-group" style={{ marginBottom: 8 }}>
             <textarea className="form-control" value={istruzioni} onChange={e => setIstruzioni(e.target.value)}
-              placeholder={modo
+              placeholder={modo === 'presa_visione' ? 'Note per i consiglieri (facoltative)' : 'Cosa deve fare il destinatario'} />
+          </div>
+          {modo === 'incarico' && (
+            <div className="form-group" style={{ marginBottom: 8 }}>
+              <label className="form-label">Scadenza</label>
+              <input className="form-control" type="date" value={scadenza} onChange={e => setScadenza(e.target.value)} style={{ maxWidth: 200 }} />
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-sm btn-primary" onClick={invia} disabled={inviando}>{inviando ? 'Invio...' : 'Invia a tutti i componenti'}</button>
+            <button className="btn btn-sm" onClick={() => setModo(null)}>Annulla</button>
+          </div>
+        </div>
+      )}
+
+      {messaggio && (
+        <div className="alert" style={{ marginBottom: 12, background: messaggio.tipo === 'ok' ? '#E9F7EF' : '#FDEDEC', color: messaggio.tipo === 'ok' ? '#1E8449' : '#C0392B' }}>
+          {messaggio.txt}
+        </div>
+      )}
+
+      {ticket.length > 0 && (
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Destinatario</th><th>Tipo</th><th>Oggetto</th><th>Stato</th></tr></thead>
+            <tbody>
+              {ticket.map(t => (
+                <tr key={t.id}>
+                  <td style={{ fontSize: 13 }}>{nome(t)}</td>
+                  <td style={{ fontSize: 12, color: '#666' }}>{t.tipo === 'presa_visione' ? 'Presa visione' : 'Incarico'}</td>
+                  <td style={{ fontSize: 12, color: '#666', maxWidth: 240 }}>{t.titolo}</td>
+                  <td style={{ fontSize: 12 }}>{statoTicket(t)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
