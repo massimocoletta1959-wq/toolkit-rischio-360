@@ -95,6 +95,19 @@ export default function DettaglioAdunanza() {
     setCircMsg(null)
     const dest = componenti.filter(c => c.membro_id)
     if (dest.length === 0) { setCircMsg({ tipo: 'err', txt: 'Nessun componente da avvisare: aggiungi prima i membri all\'organo.' }); return }
+
+    // (B) Blocco anti-ri-invio: già inviato lo stesso oggetto+tipo per questa adunanza?
+    const giaInviato = ticketCirc.some(t => t.tipo === tipo && (t.titolo || '').trim() === (titolo || '').trim())
+    if (giaInviato) {
+      const ok = window.confirm(`Hai già circolarizzato "${titolo}" a questi componenti. Vuoi inviare di nuovo? (partiranno altre ${dest.length} email)`)
+      if (!ok) return
+    } else {
+      // (A) Conferma prima di inviare
+      const label = tipo === 'incarico' ? 'assegnare l\'incarico' : 'inviare in presa visione'
+      const ok = window.confirm(`Stai per ${label} a ${dest.length} ${dest.length === 1 ? 'componente' : 'componenti'} e partiranno ${dest.length} email. Confermi?`)
+      if (!ok) return
+    }
+
     const righe = dest.map(c => ({
       azienda_id: azienda.id,
       membro_id: c.membro_id,
