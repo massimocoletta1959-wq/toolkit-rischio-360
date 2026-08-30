@@ -38,7 +38,7 @@ const livStyle = v => v >= 5 ? { background: '#FDEDEC', color: '#C0392B' }
   : v >= 3 ? { background: '#FEF9E7', color: '#856404' }
   : { background: '#EAF2F8', color: '#2874A6' }
 
-const STEPS = ['Tipo', 'Analisi', 'Rischio', 'Pareri', 'Redazione', 'Chiusura']
+const STEPS = ['Tipo', 'Analisi', 'Rischio', 'Pareri', 'Redazione', 'Fascicolo', 'Chiusura']
 
 // Testo di aiuto fisso sotto ogni campo (le domande giuste a cui rispondere)
 const HINT = {
@@ -149,6 +149,7 @@ export default function NuovaDetermina() {
   const [conEconomica, setConEconomica] = useState(true)  // false = delibera senza impatti economici
   const [vociExtra, setVociExtra] = useState([])   // voci checklist aggiuntive (azienda+tipo)
   const [nuovaVoce, setNuovaVoce] = useState('')
+  const [checklist, setChecklist] = useState([])   // compilazione sull'atto: [{voce, spuntata, nota}]
   const [alternative, setAlternative] = useState('')
   const [area231, setArea231] = useState('')
   const [risk, setRisk] = useState({ finanziario: 0, operativo: 0, legale_231: 0, reputazionale: 0 })
@@ -224,6 +225,7 @@ export default function NuovaDetermina() {
       setAnalisiFin(det.analisi_finanziaria || '')
       setAnalisiEco(det.analisi_economica || '')
       if (det.con_analisi_economica === false) setConEconomica(false)
+      if (Array.isArray(det.checklist)) setChecklist(det.checklist)
       setAlternative(det.alternative || '')
       setArea231(det.area_231 || '')
       if (det.stato === 'firmata' || det.stato === 'annullata') setSoloLettura(true)
@@ -321,6 +323,7 @@ export default function NuovaDetermina() {
         azienda_id: azienda.id, anno, tipo, organo: organoAtto, oggetto: oggetto.trim(), descrizione: descrizione || null,
         valore: valore === '' ? null : Number(valore),
         con_analisi_economica: conEconomica,
+        checklist,
         analisi_finanziaria: conEconomica ? (analisiFin || null) : null,
         analisi_economica: conEconomica ? (analisiEco || null) : null,
         alternative: conEconomica ? (alternative || null) : null,
@@ -486,12 +489,12 @@ export default function NuovaDetermina() {
                   <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontSize: 14, color: '#44506A', lineHeight: 1.7 }}>
                     {FASCICOLI[tipo].giustificativi.map((g, i) => <li key={'b' + i}>{g}</li>)}
                     {vociExtra.map(v => (
-                      <li key={v.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                        <span style={{ flex: 1 }}>{v.testo} <span style={{ fontSize: 11, color: '#8A93A5' }}>(aggiunta)</span></span>
+                      <li key={v.id}>
+                        {v.testo} <span style={{ fontSize: 11, color: '#8A93A5' }}>(aggiunta)</span>
                         <button type="button" title="Modifica" onClick={() => modificaVoceChecklist(v)}
-                          style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: '#5A4FCF', padding: 0 }}>✎</button>
+                          style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: '#5A4FCF', padding: '0 2px', marginLeft: 4 }}>✎</button>
                         <button type="button" title="Elimina" onClick={() => eliminaVoceChecklist(v)}
-                          style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: '#C0392B', padding: 0 }}>✕</button>
+                          style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: '#C0392B', padding: '0 2px' }}>✕</button>
                       </li>
                     ))}
                   </ul>
@@ -684,8 +687,24 @@ export default function NuovaDetermina() {
         </div>
       )}
 
-      {/* STEP 6 — Firma */}
+      {/* STEP 6 — Fascicolo (checklist giustificativi) */}
       {step === 6 && (
+        <div className="card">
+          <label className="form-label">Fascicolo — giustificativi raccolti</label>
+          <div style={{ fontSize: 12.5, color: '#999', marginBottom: 12 }}>
+            Spunta i documenti che hai raccolto per questo atto e, se vuoi, aggiungi una nota (es. protocollo, data). È una traccia consigliata, non vincolante.
+          </div>
+          <FascicoloChecklist
+            tipo={tipo} vociExtra={vociExtra} checklist={checklist} setChecklist={setChecklist} soloLettura={soloLettura} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14 }}>
+            <button className="btn" onClick={() => setStep(5)}>← Indietro</button>
+            <button className="btn btn-primary" onClick={() => setStep(7)}>Avanti →</button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 7 — Chiusura */}
+      {step === 7 && (
         <div className="card" style={{ textAlign: 'center', padding: 28 }}>
           <div style={{ fontSize: 40, marginBottom: 10 }}>✍️</div>
           <div style={{ fontSize: 15, fontWeight: 600, color: '#1A3A5C', marginBottom: 6 }}>{isCda ? 'Salva o chiudi l\'istruttoria' : 'Salva o firma la determina'}</div>
@@ -703,10 +722,58 @@ export default function NuovaDetermina() {
             <button className="btn btn-primary" onClick={() => salva(true)} disabled={saving || soloLettura}>{saving ? 'Salvataggio…' : (isCda ? '📋 Chiudi l\'istruttoria e protocolla' : '✍️ Firma e registra')}</button>
           </div>
           <div style={{ marginTop: 14 }}>
-            <button className="btn btn-sm" onClick={() => setStep(5)}>← Indietro</button>
+            <button className="btn btn-sm" onClick={() => setStep(6)}>← Indietro</button>
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Checklist del fascicolo: spunta + nota per ogni giustificativo ─────────
+function FascicoloChecklist({ tipo, vociExtra, checklist, setChecklist, soloLettura }) {
+  // Voci da mostrare: base (da FASCICOLI) + aggiunte (vociExtra)
+  const base = (tipo && FASCICOLI[tipo] && FASCICOLI[tipo].giustificativi) || []
+  const extra = (vociExtra || []).map(v => v.testo)
+  const voci = [...base, ...extra]
+
+  // stato di una voce nella checklist salvata
+  const stato = (voce) => checklist.find(c => c.voce === voce) || { voce, spuntata: false, nota: '' }
+
+  function aggiorna(voce, patch) {
+    setChecklist(prev => {
+      const i = prev.findIndex(c => c.voce === voce)
+      if (i === -1) return [...prev, { voce, spuntata: false, nota: '', ...patch }]
+      const copia = [...prev]
+      copia[i] = { ...copia[i], ...patch }
+      return copia
+    })
+  }
+
+  if (voci.length === 0) {
+    return <div style={{ fontSize: 13, color: '#999' }}>Nessun giustificativo previsto per questo tipo.</div>
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {voci.map((voce, i) => {
+        const st = stato(voce)
+        return (
+          <div key={i} style={{ border: '1px solid #E8ECF2', borderRadius: 8, padding: '10px 12px', background: st.spuntata ? '#F3FBF6' : '#fff' }}>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: soloLettura ? 'default' : 'pointer', fontSize: 13.5, color: '#1A3A5C' }}>
+              <input type="checkbox" checked={!!st.spuntata} disabled={soloLettura}
+                onChange={e => aggiorna(voce, { spuntata: e.target.checked })} style={{ marginTop: 3 }} />
+              <span>{voce}</span>
+            </label>
+            {st.spuntata && (
+              <input className="form-control" style={{ marginTop: 8, fontSize: 13, padding: '6px 10px' }}
+                value={st.nota || ''} disabled={soloLettura}
+                onChange={e => aggiorna(voce, { nota: e.target.value })}
+                placeholder="Nota (facoltativa): es. acquisiti 3 preventivi, agli atti prot. 12/2026" />
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
