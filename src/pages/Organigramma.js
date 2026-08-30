@@ -191,6 +191,11 @@ export default function Organigramma() {
         </div>
       </div>
 
+      {/* Vista organigramma a tre fasce */}
+      {!loading && ruoli.length > 0 && (
+        <OrganigrammaVista ruoli={ruoli} membri={membri} />
+      )}
+
       <div className="card">
         <div className="card-header">
           <span className="card-title">🏛️ Ruoli dell'azienda</span>
@@ -257,6 +262,76 @@ export default function Organigramma() {
           💡 Non ci sono ancora membri in questa azienda: crea prima i membri in <strong>Membri</strong>, poi torna qui per assegnarli ai ruoli.
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Vista organigramma a tre fasce (Governance / Core / Staff) ────────────
+const FASCE_VISTA = [
+  { key: 'governance', label: 'Governance', colore: '#7F77DD', bg: '#EEEDFB' },
+  { key: 'core',       label: 'Operative (Core)', colore: '#2B8A6B', bg: '#E8F6F0' },
+  { key: 'staff',      label: 'Supporto (Staff)', colore: '#2B5FA5', bg: '#EAF2FC' },
+]
+
+function OrganigrammaVista({ ruoli, membri }) {
+  const nomeMembro = (id) => {
+    const m = membri.find(x => x.id === id)
+    return m ? `${m.nome || ''} ${m.cognome || ''}`.trim() : null
+  }
+
+  // Casella singola (ruolo + persona), con i figli annidati sotto
+  const Casella = ({ r, livello }) => {
+    const persona = r.membro_id ? nomeMembro(r.membro_id) : null
+    const figli = ruoli.filter(x => x.parent_id === r.id)
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{
+          border: `1.5px solid ${persona ? '#CBD5E1' : '#E5B84B'}`,
+          background: '#fff', borderRadius: 10, padding: '10px 14px', minWidth: 170, maxWidth: 220,
+          textAlign: 'center', boxShadow: '0 1px 3px rgba(26,58,92,0.08)',
+        }}>
+          <div style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, background: '#1A3A5C', color: '#fff', padding: '2px 8px', borderRadius: 10, marginBottom: 5 }}>{r.sigla}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#1A3A5C', lineHeight: 1.25 }}>{r.nome}</div>
+          <div style={{ fontSize: 12, color: persona ? '#2B8A6B' : '#B9770E', marginTop: 4 }}>
+            {persona || '— Non assegnato —'}
+          </div>
+        </div>
+        {figli.length > 0 && (
+          <>
+            <div style={{ width: 1, height: 14, background: '#CBD5E1' }} />
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center', borderTop: figli.length > 1 ? '1px solid #CBD5E1' : 'none', paddingTop: figli.length > 1 ? 14 : 0 }}>
+              {figli.map(f => <Casella key={f.id} r={f} livello={livello + 1} />)}
+            </div>
+          </>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 18 }}>
+      <div className="card-header"><span className="card-title">📊 Organigramma</span></div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {FASCE_VISTA.map(f => {
+          const nella = ruoli.filter(r => r.fascia === f.key)
+          const radici = nella.filter(r => !r.parent_id || !nella.some(x => x.id === r.parent_id))
+          if (nella.length === 0) return null
+          return (
+            <div key={f.key} style={{ background: f.bg, borderRadius: 12, padding: '14px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: f.colore }} />
+                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: f.colore }}>{f.label}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                {radici.map(r => <Casella key={r.id} r={r} livello={0} />)}
+              </div>
+            </div>
+          )
+        })}
+        {ruoli.every(r => !r.fascia) && (
+          <div style={{ fontSize: 13, color: '#999' }}>Assegna una fascia ai ruoli (qui sotto) per vederli comparire nell'organigramma.</div>
+        )}
+      </div>
     </div>
   )
 }
