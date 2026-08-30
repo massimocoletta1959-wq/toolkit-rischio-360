@@ -81,28 +81,31 @@ function verbaleToModello(testo, { azienda, organo, ad, punti, delibere }) {
 }
 
 // Modale: scelta dell'assemblea da cui creare il modello
-function ScegliAssembleaModal({ azienda, onScelta, onClose }) {
+function ScegliAssembleaModal({ azienda, organi = [], filtroOrgano = '', onScelta, onClose }) {
   const [adunanze, setAdunanze] = useState([])
   const [loading, setLoading] = useState(true)
+  const [filtro, setFiltro] = useState(filtroOrgano || '')
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('adunanze').select('*')
+      const { data } = await supabase.from('adunanze').select('*, organi(nome, tipo)')
         .eq('azienda_id', azienda.id).order('created_at', { ascending: false })
       setAdunanze(data || [])
       setLoading(false)
     })()
   }, [azienda])
 
+  const nomeOrgano = (a) => a.organi?.nome || (organi.find(o => o.tipo === a.organi?.tipo)?.nome) || '—'
+  const lista = filtro ? adunanze.filter(a => a.organi?.tipo === filtro) : adunanze
+
   async function scegli(ad) {
-    // carico organo, punti e delibere per la conversione
     const { data: organo } = await supabase.from('organi').select('*').eq('id', ad.organo_id).single()
     const { data: punti } = await supabase.from('adunanza_punti').select('*').eq('adunanza_id', ad.id).order('ordine')
     const { data: delibere } = await supabase.from('delibere').select('*').eq('adunanza_id', ad.id).order('created_at')
     const testo = ad.verbale_html || ''
     const corpo = verbaleToModello(testo, { azienda, organo, ad, punti: punti || [], delibere: delibere || [] })
     onScelta({
-      nome: `Modello da: ${ad.titolo || 'assemblea'}`,
+      nome: `Modello da: ${ad.titolo || 'adunanza'}`,
       organo_tipo: organo?.tipo || '',
       corpo_html: corpo,
       intestazione: ad.intestazione || '',
@@ -114,25 +117,34 @@ function ScegliAssembleaModal({ azienda, onScelta, onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 16 }}>
-      <div className="card" style={{ width: 560, maxWidth: '95%', margin: 0, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+      <div className="card" style={{ width: 620, maxWidth: '95%', margin: 0, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
         <div className="card-header">
-          <span className="card-title">Scegli l'assemblea da usare come modello</span>
+          <span className="card-title">Scegli l'adunanza da usare come modello</span>
           <button className="btn btn-sm" onClick={onClose}>✕</button>
         </div>
-        {loading ? <div className="spinner" /> : adunanze.length === 0 ? (
-          <p style={{ fontSize: 13, color: '#999' }}>Nessuna assemblea registrata da cui partire.</p>
+        {organi.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <select className="form-control" style={{ maxWidth: 300 }} value={filtro} onChange={e => setFiltro(e.target.value)}>
+              <option value="">Tutti gli organi</option>
+              {organi.map(o => <option key={o.id} value={o.tipo}>{o.nome}</option>)}
+            </select>
+          </div>
+        )}
+        {loading ? <div className="spinner" /> : lista.length === 0 ? (
+          <p style={{ fontSize: 13, color: '#999' }}>Nessuna adunanza registrata da cui partire{filtro ? ' per questo organo' : ''}.</p>
         ) : (
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Titolo</th><th>Anno</th><th></th></tr></thead>
+              <thead><tr><th>Titolo</th><th>Organo</th><th>Anno</th><th></th></tr></thead>
               <tbody>
-                {adunanze.map(a => (
+                {lista.map(a => (
                   <tr key={a.id}>
                     <td style={{ fontWeight: 600 }}>{a.titolo}</td>
+                    <td style={{ fontSize: 12, color: '#666' }}>{nomeOrgano(a)}</td>
                     <td style={{ fontSize: 12, color: '#666' }}>{a.anno}</td>
                     <td style={{ textAlign: 'right' }}>
                       <button className="btn btn-sm btn-primary" onClick={() => scegli(a)} disabled={!a.verbale_html}
-                        title={a.verbale_html ? '' : 'Questa assemblea non ha ancora un verbale'}>Usa come modello</button>
+                        title={a.verbale_html ? '' : 'Questa adunanza non ha ancora un verbale'}>Usa come modello</button>
                     </td>
                   </tr>
                 ))}
@@ -154,16 +166,29 @@ export default function ModelliVerbale() {
   const [loading, setLoading] = useState(true)
   const [edit, setEdit] = useState(null)  // null | {} (nuovo) | {…} (esistente)
   const [daAssemblea, setDaAssemblea] = useState(false)
+  const [organi, setOrgani] = useState([])       // organi reali dell'azienda (dal pannello Governance)
+  const [filtroOrgano, setFiltroOrgano] = useState('')  // '' = tutti
 
   const load = useCallback(async () => {
     if (!azienda?.id) return
     setLoading(true)
+    const { data: orgs } = await supabase.from('organi')
+      .select('id, nome, tipo').eq('azienda_id', azienda.id).order('created_at')
+    setOrgani(orgs || [])
     const { data } = await supabase.from('verbale_template').select('*').eq('azienda_id', azienda.id).order('created_at')
     setModelli(data || [])
     setLoading(false)
   }, [azienda])
 
   useEffect(() => { load() }, [load])
+
+  // etichetta organo: prima cerca tra gli organi reali dell'azienda, poi fallback fisso
+  const nomeOrgano = (tipo) => {
+    const o = organi.find(x => x.tipo === tipo)
+    if (o) return o.nome
+    return organoLabel(tipo)
+  }
+  const modelliFiltrati = filtroOrgano ? modelli.filter(m => m.organo_tipo === filtroOrgano) : modelli
 
   async function elimina(m) {
     if (!window.confirm(`Eliminare il modello "${m.nome}"?`)) return
@@ -180,13 +205,23 @@ export default function ModelliVerbale() {
             <p>Facsimile riutilizzabili per <strong>{azienda?.nome}</strong>: incolla il tuo verbale tipo e inserisci i segnaposto</p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn" onClick={() => setDaAssemblea(true)}>↩ Crea da assemblea</button>
+            <button className="btn" onClick={() => setDaAssemblea(true)}>↩ Crea da adunanza</button>
             <button className="btn btn-primary" onClick={() => setEdit({})}>+ Nuovo modello</button>
           </div>
         </div>
       </div>
 
-      {loading ? <div className="spinner" /> : modelli.length === 0 ? (
+      {/* Filtro per organo (solo gli organi realmente presenti in Governance) */}
+      {organi.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <select className="form-control" style={{ maxWidth: 320 }} value={filtroOrgano} onChange={e => setFiltroOrgano(e.target.value)}>
+            <option value="">Tutti gli organi</option>
+            {organi.map(o => <option key={o.id} value={o.tipo}>{o.nome}</option>)}
+          </select>
+        </div>
+      )}
+
+      {loading ? <div className="spinner" /> : modelliFiltrati.length === 0 ? (
         <div className="card">
           <div className="empty-state">
             <div style={{ fontSize: 36 }}>📝</div>
@@ -199,10 +234,10 @@ export default function ModelliVerbale() {
             <table>
               <thead><tr><th>Nome</th><th>Organo</th><th>Predefinito</th><th></th></tr></thead>
               <tbody>
-                {modelli.map(m => (
+                {modelliFiltrati.map(m => (
                   <tr key={m.id}>
                     <td style={{ fontWeight: 600 }}>{m.nome}</td>
-                    <td style={{ fontSize: 12, color: '#666' }}>{organoLabel(m.organo_tipo)}</td>
+                    <td style={{ fontSize: 12, color: '#666' }}>{nomeOrgano(m.organo_tipo)}</td>
                     <td>{m.predefinito ? <span className="badge" style={{ background: '#E9F7EF', color: '#1E8449' }}>Predefinito</span> : <span style={{ color: '#bbb' }}>—</span>}</td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
@@ -219,12 +254,12 @@ export default function ModelliVerbale() {
       )}
 
       {edit !== null && (
-        <ModelloEditor azienda={azienda} modello={edit}
+        <ModelloEditor azienda={azienda} organi={organi} filtroOrgano={filtroOrgano} modello={edit}
           onSaved={() => { setEdit(null); load() }} onClose={() => setEdit(null)} />
       )}
 
       {daAssemblea && (
-        <ScegliAssembleaModal azienda={azienda}
+        <ScegliAssembleaModal azienda={azienda} organi={organi} filtroOrgano={filtroOrgano}
           onScelta={(bozza) => { setDaAssemblea(false); setEdit(bozza) }}
           onClose={() => setDaAssemblea(false)} />
       )}
@@ -233,10 +268,10 @@ export default function ModelliVerbale() {
 }
 
 // ── Editor modello ────────────────────────────────────────────────────
-function ModelloEditor({ azienda, modello, onSaved, onClose }) {
+function ModelloEditor({ azienda, organi = [], filtroOrgano = '', modello, onSaved, onClose }) {
   const editing = !!modello?.id
   const [nome, setNome] = useState(modello?.nome || '')
-  const [organoTipo, setOrganoTipo] = useState(modello?.organo_tipo || '')
+  const [organoTipo, setOrganoTipo] = useState(modello?.organo_tipo || filtroOrgano || (organi[0]?.tipo) || '')
   const [corpo, setCorpo] = useState(modello?.corpo_html || '')
   const [predefinito, setPredefinito] = useState(modello?.predefinito || false)
   const [saving, setSaving] = useState(false)
@@ -294,7 +329,8 @@ function ModelloEditor({ azienda, modello, onSaved, onClose }) {
           <div className="form-group" style={{ flex: 1, minWidth: 160 }}>
             <label className="form-label">Organo</label>
             <select className="form-control" value={organoTipo} onChange={e => setOrganoTipo(e.target.value)}>
-              {ORGANO_OPZIONI.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              {organi.length === 0 && <option value="">— Nessun organo in Governance —</option>}
+              {organi.map(o => <option key={o.id} value={o.tipo}>{o.nome}</option>)}
             </select>
           </div>
         </div>
