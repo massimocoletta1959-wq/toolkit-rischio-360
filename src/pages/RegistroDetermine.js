@@ -108,10 +108,10 @@ export default function RegistroDetermine() {
       </div>
 
       <div className="stats-grid">
-        <div className="stat-card"><div className="stat-num">{determine.length}</div><div className="stat-label">Determine totali</div></div>
-        <div className="stat-card"><div className="stat-num" style={{ color: '#1E8449' }}>{nFirmate}</div><div className="stat-label">Firmate</div></div>
+        <div className="stat-card"><div className="stat-num">{determine.length}</div><div className="stat-label">{isCda ? 'Delibere totali' : 'Determine totali'}</div></div>
+        <div className="stat-card"><div className="stat-num" style={{ color: '#1E8449' }}>{nFirmate}</div><div className="stat-label">{isCda ? 'Protocollate' : 'Firmate'}</div></div>
         <div className="stat-card"><div className="stat-num" style={{ color: '#856404' }}>{nBozze}</div><div className="stat-label">Bozze aperte</div></div>
-        <div className="stat-card"><div className="stat-num" style={{ fontSize: 20 }}>{eur(valFirmate)}</div><div className="stat-label">Valore firmato</div></div>
+        <div className="stat-card"><div className="stat-num" style={{ fontSize: 20 }}>{eur(valFirmate)}</div><div className="stat-label">{isCda ? 'Valore protocollato' : 'Valore firmato'}</div></div>
       </div>
 
       <div className="card">
@@ -121,7 +121,7 @@ export default function RegistroDetermine() {
           <select className="form-control" style={{ maxWidth: 180 }} value={filterStato} onChange={e => setFilterStato(e.target.value)}>
             <option value="">Tutti gli stati</option>
             <option value="bozza">Bozze</option>
-            <option value="firmata">Firmate</option>
+            <option value="firmata">{isCda ? 'Protocollate' : 'Firmate'}</option>
             <option value="annullata">Annullate</option>
           </select>
           {(filterStato || search) && <button className="btn btn-sm" onClick={() => { setFilterStato(''); setSearch('') }}>✕ Reimposta</button>}

@@ -37,7 +37,7 @@ const livStyle = v => v >= 5 ? { background: '#FDEDEC', color: '#C0392B' }
   : v >= 3 ? { background: '#FEF9E7', color: '#856404' }
   : { background: '#EAF2F8', color: '#2874A6' }
 
-const STEPS = ['Tipo', 'Analisi', 'Rischio', 'Pareri', 'Redazione', 'Firma']
+const STEPS = ['Tipo', 'Analisi', 'Rischio', 'Pareri', 'Redazione', 'Chiusura']
 
 // Testo di aiuto fisso sotto ogni campo (le domande giuste a cui rispondere)
 const HINT = {
@@ -254,7 +254,7 @@ export default function NuovaDetermina() {
     if (!tipo) { setStep(1); setErrore('Seleziona il tipo di determina, poi riprova.'); return }
     if (!oggetto.trim()) { setStep(1); setErrore("Manca l'oggetto della determina: lo trovi qui sotto. Compilalo e riprova — il resto del lavoro è al sicuro."); return }
     if (firma && serveParere && pareri.length === 0) {
-      setStep(4); setErrore('Rischio alto/critico rilevato: è obbligatorio allegare almeno un parere prima di firmare.'); return
+      setStep(4); setErrore(isCda ? 'Rischio alto/critico rilevato: è obbligatorio allegare almeno un parere prima di protocollare.' : 'Rischio alto/critico rilevato: è obbligatorio allegare almeno un parere prima di firmare.'); return
     }
 
     setSaving(true)
@@ -354,7 +354,7 @@ export default function NuovaDetermina() {
               {tipo
                 ? <>{TIPI.find(t => t.id === tipo)?.icon} <strong>{TIPO_LABEL[tipo]}</strong> · {azienda?.nome}</>
                 : <>Flusso guidato · {azienda?.nome}</>}
-              {auNome ? ` · AU: ${auNome}` : ''} · Anno {anno}
+              {titolareNome ? (isCda ? ` · Presidente: ${titolareNome}` : ` · AU: ${titolareNome}`) : ''} · Anno {anno}
             </p>
           </div>
           <button className="btn btn-sm" onClick={() => setPage('au_registro')}>← Registro</button>
@@ -363,7 +363,7 @@ export default function NuovaDetermina() {
 
       {soloLettura && (
         <div className="alert" style={{ marginBottom: 14, background: '#EAF2F8', color: '#1A5276' }}>
-          🔒 Questa determina è già firmata e registrata: è consultabile ma non modificabile.
+          🔒 {isCda ? 'Questa delibera ha l\'istruttoria chiusa ed è protocollata' : 'Questa determina è già firmata e registrata'}: è consultabile ma non modificabile.
         </div>
       )}
 
@@ -496,7 +496,7 @@ export default function NuovaDetermina() {
           </div>
           {serveParere && (
             <div className="alert alert-error" style={{ marginBottom: 14 }}>
-              🚨 Rischio alto/critico rilevato: prima della firma sarà obbligatorio allegare almeno un parere (step successivo).
+              🚨 Rischio alto/critico rilevato: prima di {isCda ? 'protocollare' : 'firmare'} sarà obbligatorio allegare almeno un parere (step successivo).
             </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -556,12 +556,12 @@ export default function NuovaDetermina() {
       {/* STEP 5 — Redazione */}
       {step === 5 && (
         <div className="card">
-          <label className="form-label">Anteprima determina</label>
+          <label className="form-label">Anteprima {isCda ? 'delibera' : 'determina'}</label>
           <pre style={{
             whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 13, lineHeight: 1.7, color: '#333',
             background: '#F7F8FA', border: '1px solid #E0E0E0', borderRadius: 8, padding: 16, marginTop: 6,
           }}>{generaCorpo(null)}</pre>
-          <div style={{ fontSize: 11.5, color: '#999', marginTop: 8 }}>Il numero definitivo verrà assegnato alla firma. Puoi ancora tornare indietro per modificare i dati.</div>
+          <div style={{ fontSize: 11.5, color: '#999', marginTop: 8 }}>Il numero definitivo verrà assegnato alla {isCda ? 'protocollazione' : 'firma'}. Puoi ancora tornare indietro per modificare i dati.</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14 }}>
             <button className="btn" onClick={() => setStep(4)}>← Indietro</button>
             <button className="btn btn-primary" onClick={() => setStep(6)}>Avanti →</button>
@@ -573,9 +573,9 @@ export default function NuovaDetermina() {
       {step === 6 && (
         <div className="card" style={{ textAlign: 'center', padding: 28 }}>
           <div style={{ fontSize: 40, marginBottom: 10 }}>✍️</div>
-          <div style={{ fontSize: 15, fontWeight: 600, color: '#1A3A5C', marginBottom: 6 }}>Salva o firma la determina</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: '#1A3A5C', marginBottom: 6 }}>{isCda ? 'Salva o chiudi l\'istruttoria' : 'Salva o firma la determina'}</div>
           <div style={{ fontSize: 12.5, color: '#666', marginBottom: 18 }}>
-            La firma assegna il numero progressivo definitivo e congela il documento con un hash SHA-256. La bozza resta modificabile.
+            {isCda ? 'La chiusura dell\'istruttoria assegna il numero progressivo definitivo e congela il documento preparatorio con un hash SHA-256.' : 'La firma assegna il numero progressivo definitivo e congela il documento con un hash SHA-256.'} La bozza resta modificabile.
           </div>
           <div style={{ display: 'inline-flex', gap: 8, marginBottom: 18, flexWrap: 'wrap', justifyContent: 'center' }}>
             <span className="badge" style={{ background: '#E9F7EF', color: '#1E8449' }}>Tipo: {TIPO_LABEL[tipo] || '—'}</span>
@@ -585,7 +585,7 @@ export default function NuovaDetermina() {
           </div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button className="btn" onClick={() => salva(false)} disabled={saving || soloLettura}>{saving ? 'Salvataggio…' : '💾 Salva come bozza'}</button>
-            <button className="btn btn-primary" onClick={() => salva(true)} disabled={saving || soloLettura}>{saving ? 'Salvataggio…' : '✍️ Firma e registra'}</button>
+            <button className="btn btn-primary" onClick={() => salva(true)} disabled={saving || soloLettura}>{saving ? 'Salvataggio…' : (isCda ? '📋 Chiudi l\'istruttoria e protocolla' : '✍️ Firma e registra')}</button>
           </div>
           <div style={{ marginTop: 14 }}>
             <button className="btn btn-sm" onClick={() => setStep(5)}>← Indietro</button>
