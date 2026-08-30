@@ -50,18 +50,32 @@ export default function RegistroDetermine() {
   const load = useCallback(async () => {
     if (!azienda?.id) return
     setLoading(true)
+    // Pulizia bozze fantasma: elimino le provvisorie orfane di questa azienda
+    try {
+      const { data: orfane } = await supabase.from('determine')
+        .select('id').eq('azienda_id', azienda.id).eq('provvisoria', true)
+      const ids = (orfane || []).map(o => o.id)
+      if (ids.length) {
+        const { data: alg } = await supabase.from('determina_allegati')
+          .select('storage_path').in('determina_id', ids)
+        const paths = (alg || []).map(a => a.storage_path)
+        if (paths.length) await supabase.storage.from('fascicoli').remove(paths)
+        await supabase.from('determine').delete().in('id', ids)
+      }
+    } catch (_e) { /* pulizia best-effort */ }
     // Organo amministrativo ATTUALE dell'azienda (AU o CdA sono mutuamente esclusivi)
     const { data: orgs } = await supabase.from('organi')
       .select('tipo').eq('azienda_id', azienda.id)
       .in('tipo', ['amministratore_unico', 'cda'])
     const org = orgs && orgs.length ? orgs[0].tipo : null
     setOrganoAzienda(org)
-    // Mostro le determine/delibere dell'organo attuale
+    // Mostro le determine/delibere dell'organo attuale (escluse eventuali provvisorie)
     const { data } = await supabase
       .from('determine')
       .select('*')
       .eq('azienda_id', azienda.id)
       .eq('organo', org || 'amministratore_unico')
+      .eq('provvisoria', false)
       .order('anno', { ascending: false })
       .order('numero', { ascending: false, nullsFirst: true })
       .order('created_at', { ascending: false })

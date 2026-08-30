@@ -146,7 +146,25 @@ export default function App() {
     setAziendaState(saved || tutteAziende[0] || null)
   }
 
+  // Elimina le bozze provvisorie orfane di un'azienda (fascicoli inclusi)
+  async function pulisciProvvisorie(aziendaId) {
+    if (!aziendaId) return
+    try {
+      const { data: orfane } = await supabase.from('determine')
+        .select('id').eq('azienda_id', aziendaId).eq('provvisoria', true)
+      const ids = (orfane || []).map(o => o.id)
+      if (!ids.length) return
+      const { data: alg } = await supabase.from('determina_allegati')
+        .select('storage_path').in('determina_id', ids)
+      const paths = (alg || []).map(a => a.storage_path)
+      if (paths.length) await supabase.storage.from('fascicoli').remove(paths)
+      await supabase.from('determine').delete().in('id', ids)
+    } catch (_e) { /* best-effort */ }
+  }
+
   function switchAzienda(az) {
+    // pulizia bozze fantasma dell'azienda che si lascia
+    if (azienda?.id && azienda.id !== az.id) pulisciProvvisorie(azienda.id)
     setAziendaState(az)
     localStorage.setItem('azienda_attiva', az.id)
     setModulo(null)
