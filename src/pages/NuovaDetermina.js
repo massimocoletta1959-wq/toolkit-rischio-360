@@ -150,6 +150,7 @@ export default function NuovaDetermina() {
   const [vociExtra, setVociExtra] = useState([])   // voci checklist aggiuntive (azienda+tipo)
   const [nuovaVoce, setNuovaVoce] = useState('')
   const [checklist, setChecklist] = useState([])   // compilazione sull'atto: [{voce, spuntata, nota}]
+  const [bozzaProvvId, setBozzaProvvId] = useState(null)   // id bozza provvisoria per allegare i file
   const [alternative, setAlternative] = useState('')
   const [area231, setArea231] = useState('')
   const [risk, setRisk] = useState({ finanziario: 0, operativo: 0, legale_231: 0, reputazionale: 0 })
@@ -298,6 +299,49 @@ export default function NuovaDetermina() {
     ].filter(Boolean).join('\n')
   }
 
+  // Crea una bozza provvisoria per poter allegare i file già in preparazione.
+  // Restituisce l'id, o null se manca l'oggetto.
+  async function assicuraBozzaProvvisoria() {
+    if (determinaId || bozzaProvvId) return determinaId || bozzaProvvId
+    if (!oggetto.trim()) { setErrore('Inserisci l\'oggetto per proseguire e poter allegare i documenti.'); setStep(1); return null }
+    const campi = {
+      azienda_id: azienda.id, anno, tipo, organo: organoAtto,
+      oggetto: oggetto.trim(), descrizione: descrizione || null,
+      valore: valore === '' ? null : Number(valore),
+      con_analisi_economica: conEconomica, checklist,
+      analisi_finanziaria: conEconomica ? (analisiFin || null) : null,
+      analisi_economica: conEconomica ? (analisiEco || null) : null,
+      alternative: conEconomica ? (alternative || null) : null,
+      area_231: area231 || null, corpo_html: generaCorpo(null),
+      stato: 'bozza', provvisoria: true,
+    }
+    const { data, error } = await supabase.from('determine').insert(campi).select().single()
+    if (error) { setErrore(error.message); return null }
+    setBozzaProvvId(data.id)
+    return data.id
+  }
+
+  // Passaggio allo step Fascicolo: garantisce la bozza provvisoria
+  async function vaiAlFascicolo() {
+    setErrore(null)
+    const id = await assicuraBozzaProvvisoria()
+    if (id) setStep(6)
+  }
+
+  // Uscita dal wizard: se c'è una bozza provvisoria non confermata, la elimino
+  async function esciDalWizard() {
+    if (bozzaProvvId && !determinaId) {
+      try {
+        const { data: alg } = await supabase.from('determina_allegati').select('storage_path').eq('determina_id', bozzaProvvId)
+        const paths = (alg || []).map(a => a.storage_path)
+        if (paths.length) await supabase.storage.from('fascicoli').remove(paths)
+        await supabase.from('determina_allegati').delete().eq('determina_id', bozzaProvvId)
+        await supabase.from('determine').delete().eq('id', bozzaProvvId)
+      } catch (_e) { /* pulizia best-effort */ }
+    }
+    setPage('au_registro')
+  }
+
   async function salva(firma) {
     setErrore(null)
     if (!tipo) { setStep(1); setErrore('Seleziona il tipo di determina, poi riprova.'); return }
@@ -327,18 +371,19 @@ export default function NuovaDetermina() {
         analisi_finanziaria: conEconomica ? (analisiFin || null) : null,
         analisi_economica: conEconomica ? (analisiEco || null) : null,
         alternative: conEconomica ? (alternative || null) : null,
-        area_231: area231 || null, corpo_html: corpo, stato,
+        area_231: area231 || null, corpo_html: corpo, stato, provvisoria: false,
       }
       // il numero/hash/data si scrivono solo alla firma (una bozza non li ha)
       if (firma) { campi.numero = numero; campi.data_firma = data_firma; campi.hash_documento = hash }
 
-      let detId = determinaId
-      if (determinaId) {
-        const { error } = await supabase.from('determine').update(campi).eq('id', determinaId)
+      const idEsistente = determinaId || bozzaProvvId
+      let detId = idEsistente
+      if (idEsistente) {
+        const { error } = await supabase.from('determine').update(campi).eq('id', idEsistente)
         if (error) throw error
         // ricarico rischi e pareri da zero (sostituzione pulita)
-        await supabase.from('determina_rischi').delete().eq('determina_id', determinaId)
-        await supabase.from('determina_pareri').delete().eq('determina_id', determinaId)
+        await supabase.from('determina_rischi').delete().eq('determina_id', idEsistente)
+        await supabase.from('determina_pareri').delete().eq('determina_id', idEsistente)
       } else {
         const { data: det, error } = await supabase.from('determine').insert(campi).select().single()
         if (error) throw error
@@ -378,6 +423,7 @@ export default function NuovaDetermina() {
   // ── UI ──────────────────────────────────────────────────────────────
   // Organo dell'atto che sto creando: da context (nuovo) o dall'organo attuale
   const organoAtto = determinaOrgano || organoAzienda || 'amministratore_unico'
+  const attoId = determinaId || bozzaProvvId   // id per allegati/fascicolo
   const isCda = organoAtto === 'cda'
 
   // GUARDIA DI ACCESSO (solo in creazione nuova; le bozze/atti esistenti si aprono sempre)
@@ -412,7 +458,7 @@ export default function NuovaDetermina() {
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             {determinaId && !soloLettura && <button className="btn btn-sm btn-danger" onClick={elimina} disabled={saving}>🗑 Elimina bozza</button>}
-            <button className="btn btn-sm" onClick={() => setPage('au_registro')}>← Registro</button>
+            <button className="btn btn-sm" onClick={esciDalWizard}>← Registro</button>
           </div>
         </div>
       </div>
@@ -682,7 +728,7 @@ export default function NuovaDetermina() {
           <div style={{ fontSize: 11.5, color: '#999', marginTop: 8 }}>Il numero definitivo verrà assegnato alla {isCda ? 'protocollazione' : 'firma'}. Puoi ancora tornare indietro per modificare i dati.</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14 }}>
             <button className="btn" onClick={() => setStep(conEconomica ? 4 : 1)}>← Indietro</button>
-            <button className="btn btn-primary" onClick={() => setStep(6)}>Avanti →</button>
+            <button className="btn btn-primary" onClick={vaiAlFascicolo}>Avanti →</button>
           </div>
         </div>
       )}
@@ -695,7 +741,8 @@ export default function NuovaDetermina() {
             Spunta i documenti che hai raccolto per questo atto e, se vuoi, aggiungi una nota (es. protocollo, data). È una traccia consigliata, non vincolante.
           </div>
           <FascicoloChecklist
-            tipo={tipo} vociExtra={vociExtra} checklist={checklist} setChecklist={setChecklist} soloLettura={soloLettura} />
+            tipo={tipo} vociExtra={vociExtra} checklist={checklist} setChecklist={setChecklist} soloLettura={soloLettura}
+            determinaId={attoId} aziendaId={azienda?.id} />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14 }}>
             <button className="btn" onClick={() => setStep(5)}>← Indietro</button>
             <button className="btn btn-primary" onClick={() => setStep(7)}>Avanti →</button>
@@ -729,25 +776,67 @@ export default function NuovaDetermina() {
     </div>
   )
 }
+// ── Checklist del fascicolo: spunta + nota + allegati per giustificativo ────
+const MAX_FILE_MB = 10
 
-// ── Checklist del fascicolo: spunta + nota per ogni giustificativo ─────────
-function FascicoloChecklist({ tipo, vociExtra, checklist, setChecklist, soloLettura }) {
-  // Voci da mostrare: base (da FASCICOLI) + aggiunte (vociExtra)
+function FascicoloChecklist({ tipo, vociExtra, checklist, setChecklist, soloLettura, determinaId, aziendaId }) {
   const base = (tipo && FASCICOLI[tipo] && FASCICOLI[tipo].giustificativi) || []
   const extra = (vociExtra || []).map(v => v.testo)
   const voci = [...base, ...extra]
 
-  // stato di una voce nella checklist salvata
-  const stato = (voce) => checklist.find(c => c.voce === voce) || { voce, spuntata: false, nota: '' }
+  const [allegati, setAllegati] = useState([])
+  const [busy, setBusy] = useState(null)   // voce in upload
+  const [msg, setMsg] = useState(null)
 
+  const caricaAllegati = useCallback(async () => {
+    if (!determinaId) { setAllegati([]); return }
+    const { data } = await supabase.from('determina_allegati')
+      .select('*').eq('determina_id', determinaId).order('created_at')
+    setAllegati(data || [])
+  }, [determinaId])
+  useEffect(() => { caricaAllegati() }, [caricaAllegati])
+
+  const stato = (voce) => checklist.find(c => c.voce === voce) || { voce, spuntata: false, nota: '' }
   function aggiorna(voce, patch) {
     setChecklist(prev => {
       const i = prev.findIndex(c => c.voce === voce)
       if (i === -1) return [...prev, { voce, spuntata: false, nota: '', ...patch }]
-      const copia = [...prev]
-      copia[i] = { ...copia[i], ...patch }
-      return copia
+      const copia = [...prev]; copia[i] = { ...copia[i], ...patch }; return copia
     })
+  }
+
+  const allegatiDiVoce = (voce) => allegati.filter(a => a.voce === voce)
+
+  async function caricaFile(voce, file) {
+    if (!file) return
+    if (!determinaId) { setMsg('Salva prima la bozza per poter allegare i file.'); return }
+    if (file.size > MAX_FILE_MB * 1024 * 1024) { setMsg(`Il file supera ${MAX_FILE_MB} MB.`); return }
+    setBusy(voce); setMsg(null)
+    // percorso: azienda/determina/timestamp-nomefile (nome ripulito)
+    const safe = file.name.replace(/[^\w.\-]+/g, '_')
+    const path = `${aziendaId}/${determinaId}/${Date.now()}-${safe}`
+    const up = await supabase.storage.from('fascicoli').upload(path, file, { upsert: false })
+    if (up.error) { setBusy(null); setMsg('Caricamento non riuscito: ' + up.error.message); return }
+    const { error } = await supabase.from('determina_allegati').insert({
+      azienda_id: aziendaId, determina_id: determinaId, voce,
+      nome_file: file.name, storage_path: path, dimensione: file.size,
+    })
+    setBusy(null)
+    if (error) { setMsg('File caricato ma registrazione fallita: ' + error.message); return }
+    caricaAllegati()
+  }
+
+  async function scaricaFile(a) {
+    const { data, error } = await supabase.storage.from('fascicoli').createSignedUrl(a.storage_path, 120)
+    if (error || !data?.signedUrl) { setMsg('Impossibile aprire il file.'); return }
+    window.open(data.signedUrl, '_blank')
+  }
+
+  async function eliminaFile(a) {
+    if (!window.confirm(`Eliminare l'allegato "${a.nome_file}"?`)) return
+    await supabase.storage.from('fascicoli').remove([a.storage_path])
+    await supabase.from('determina_allegati').delete().eq('id', a.id)
+    caricaAllegati()
   }
 
   if (voci.length === 0) {
@@ -756,8 +845,15 @@ function FascicoloChecklist({ tipo, vociExtra, checklist, setChecklist, soloLett
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {!determinaId && (
+        <div className="alert" style={{ background: '#FEF9E7', color: '#856404', fontSize: 12.5 }}>
+          Per allegare i file, salva prima la bozza (pulsante nell'ultimo step). Le spunte e le note puoi già compilarle.
+        </div>
+      )}
+      {msg && <div className="alert alert-error" style={{ fontSize: 12.5 }}>{msg}</div>}
       {voci.map((voce, i) => {
         const st = stato(voce)
+        const files = allegatiDiVoce(voce)
         return (
           <div key={i} style={{ border: '1px solid #E8ECF2', borderRadius: 8, padding: '10px 12px', background: st.spuntata ? '#F3FBF6' : '#fff' }}>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: soloLettura ? 'default' : 'pointer', fontSize: 13.5, color: '#1A3A5C' }}>
@@ -770,6 +866,29 @@ function FascicoloChecklist({ tipo, vociExtra, checklist, setChecklist, soloLett
                 value={st.nota || ''} disabled={soloLettura}
                 onChange={e => aggiorna(voce, { nota: e.target.value })}
                 placeholder="Nota (facoltativa): es. acquisiti 3 preventivi, agli atti prot. 12/2026" />
+            )}
+
+            {/* Allegati della voce */}
+            {files.length > 0 && (
+              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {files.map(a => (
+                  <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, background: '#F7F8FA', borderRadius: 6, padding: '5px 8px' }}>
+                    <span style={{ flex: 1, color: '#1A3A5C' }}>📎 {a.nome_file}</span>
+                    <button type="button" className="btn btn-sm" onClick={() => scaricaFile(a)}>Apri</button>
+                    {!soloLettura && <button type="button" className="btn btn-sm btn-danger" onClick={() => eliminaFile(a)}>✕</button>}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!soloLettura && determinaId && (
+              <div style={{ marginTop: 8 }}>
+                <label className="btn btn-sm" style={{ cursor: busy === voce ? 'default' : 'pointer' }}>
+                  {busy === voce ? 'Caricamento…' : '📎 Allega file'}
+                  <input type="file" style={{ display: 'none' }} disabled={busy === voce}
+                    onChange={e => { caricaFile(voce, e.target.files?.[0]); e.target.value = '' }} />
+                </label>
+              </div>
             )}
           </div>
         )
