@@ -193,7 +193,7 @@ export default function Organigramma() {
 
       {/* Vista organigramma a tre fasce */}
       {!loading && ruoli.length > 0 && (
-        <OrganigrammaVista ruoli={ruoli} membri={membri} />
+        <OrganigrammaVista ruoli={ruoli} membri={membri} azienda={azienda} />
       )}
 
       <div className="card">
@@ -273,10 +273,72 @@ const FASCE_VISTA = [
   { key: 'staff',      label: 'Supporto (Staff)', colore: '#2B5FA5', bg: '#EAF2FC' },
 ]
 
-function OrganigrammaVista({ ruoli, membri }) {
+function OrganigrammaVista({ ruoli, membri, azienda }) {
   const nomeMembro = (id) => {
     const m = membri.find(x => x.id === id)
     return m ? `${m.nome || ''} ${m.cognome || ''}`.trim() : null
+  }
+
+  // Stampa / PDF dell'organigramma in A4 orizzontale
+  function stampa() {
+    const esc = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const dataStr = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })
+
+    // costruisce l'HTML ricorsivo di una casella e dei suoi figli
+    const casellaHtml = (r) => {
+      const persona = r.membro_id ? nomeMembro(r.membro_id) : null
+      const figli = ruoli.filter(x => x.parent_id === r.id)
+      const box = `<div class="box${persona ? '' : ' vuoto'}">
+        <div class="sigla">${esc(r.sigla)}</div>
+        <div class="nome">${esc(r.nome)}</div>
+        <div class="persona">${persona ? esc(persona) : '— Non assegnato —'}</div>
+      </div>`
+      if (figli.length === 0) return `<div class="nodo">${box}</div>`
+      return `<div class="nodo">${box}
+        <div class="linea-v"></div>
+        <div class="figli">${figli.map(casellaHtml).join('')}</div>
+      </div>`
+    }
+
+    const bande = FASCE_VISTA.map(f => {
+      const nella = ruoli.filter(r => r.fascia === f.key)
+      const radici = nella.filter(r => !r.parent_id || !nella.some(x => x.id === r.parent_id))
+      if (nella.length === 0) return ''
+      return `<div class="banda" style="background:${f.bg}">
+        <div class="banda-tit" style="color:${f.colore}"><span class="dot" style="background:${f.colore}"></span>${f.label}</div>
+        <div class="riga">${radici.map(casellaHtml).join('')}</div>
+      </div>`
+    }).join('')
+
+    const w = window.open('', '_blank')
+    if (!w) return
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Organigramma ${esc(azienda?.nome || '')}</title>
+      <style>
+        @page { size: A4 landscape; margin: 1.2cm; }
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, Arial, sans-serif; color: #1A3A5C; margin: 0; }
+        h1 { font-size: 18px; margin: 0 0 2px; }
+        .sub { font-size: 12px; color: #8A94A0; margin-bottom: 16px; }
+        .banda { border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; page-break-inside: avoid; }
+        .banda-tit { font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; margin-bottom: 10px; }
+        .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+        .riga { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+        .nodo { display: flex; flex-direction: column; align-items: center; }
+        .box { border: 1.5px solid #CBD5E1; background: #fff; border-radius: 10px; padding: 8px 12px; min-width: 150px; max-width: 210px; text-align: center; }
+        .box.vuoto { border-color: #E5B84B; }
+        .sigla { display: inline-block; font-size: 9px; font-weight: 700; background: #1A3A5C; color: #fff; padding: 2px 8px; border-radius: 10px; margin-bottom: 4px; }
+        .nome { font-size: 12px; font-weight: 600; line-height: 1.2; }
+        .persona { font-size: 11px; color: #2B8A6B; margin-top: 3px; }
+        .box.vuoto .persona { color: #B9770E; }
+        .linea-v { width: 1px; height: 12px; background: #CBD5E1; }
+        .figli { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; border-top: 1px solid #CBD5E1; padding-top: 10px; }
+      </style></head><body>
+      <h1>Organigramma — ${esc(azienda?.nome || '')}</h1>
+      <div class="sub">Aggiornato al ${dataStr}</div>
+      ${bande}
+      <script>window.onload = function(){ window.print(); }</script>
+      </body></html>`)
+    w.document.close()
   }
 
   // Casella singola (ruolo + persona), con i figli annidati sotto
@@ -310,7 +372,10 @@ function OrganigrammaVista({ ruoli, membri }) {
 
   return (
     <div className="card" style={{ marginBottom: 18 }}>
-      <div className="card-header"><span className="card-title">📊 Organigramma</span></div>
+      <div className="card-header">
+        <span className="card-title">📊 Organigramma</span>
+        <button className="btn btn-sm" onClick={stampa}>🖨️ Stampa / PDF</button>
+      </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {FASCE_VISTA.map(f => {
           const nella = ruoli.filter(r => r.fascia === f.key)
