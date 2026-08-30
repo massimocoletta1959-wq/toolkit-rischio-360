@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
+import { FASCICOLI } from '../lib/fascicoli'
 
 // ── Costanti ────────────────────────────────────────────────────────────
 const TIPI = [
@@ -428,6 +429,25 @@ export default function NuovaDetermina() {
               ))}
             </div>
           </div>
+
+          {tipo && FASCICOLI[tipo] && (
+            <div style={{ background: '#F4F8FF', border: '1px solid #CFE0F5', borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
+              <div style={{ fontSize: 13, color: '#1A3A5C', marginBottom: 8 }}>
+                <strong>Cosa riguarda.</strong> {FASCICOLI[tipo].riguarda}
+              </div>
+              <div style={{ fontSize: 13, color: '#1A3A5C', marginBottom: 8 }}>
+                <strong>Funzionamento.</strong> {FASCICOLI[tipo].funzionamento}
+              </div>
+              <div style={{ fontSize: 13, color: '#1A3A5C', marginBottom: 10 }}>
+                <strong>Elementi chiave.</strong> {FASCICOLI[tipo].elementi}
+              </div>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: '#5A4FCF', marginBottom: 4 }}>📂 Giustificativi da conservare nel fascicolo</div>
+              <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontSize: 12.5, color: '#44506A', lineHeight: 1.6 }}>
+                {FASCICOLI[tipo].giustificativi.map((g, i) => <li key={i}>{g}</li>)}
+              </ul>
+            </div>
+          )}
+
           <div className="form-group">
             <label className="form-label">Oggetto {isCda ? 'della delibera' : 'della determina'} *</label>
             <input className="form-control" value={oggetto} onChange={e => setOggetto(e.target.value)}
