@@ -33,6 +33,7 @@ const MODULI = {
     voci: [
       { id: 'governance', label: 'Organi', icon: '⚖️' },
       { id: 'au_registro', label: 'Determine AU', icon: '📚' },
+      { id: 'modelli_determina', label: 'Modelli determine', icon: '🗂️' },
       { id: 'verbali', label: 'Assemblee e verbali', icon: '🗳️' },
       { id: 'modelli_verbale', label: 'Modelli verbale', icon: '📝' },
       { id: 'ticket', label: 'Ticket', icon: '🎫' },
@@ -60,8 +61,13 @@ export default function Layout({ children }) {
 
   // Etichetta adattiva per la voce determine/delibere in base all'organo
   const etichettaAtti = organoAmm === 'cda' ? 'Preparazione Delibere CdA' : 'Preparazione Determine AU'
+  const etichettaModelli = organoAmm === 'cda' ? 'Modelli delibere' : 'Modelli determine'
   const vociMod = mod && modulo === 'governance'
-    ? mod.voci.map(v => v.id === 'au_registro' ? { ...v, label: etichettaAtti } : v)
+    ? mod.voci.map(v => {
+        if (v.id === 'au_registro') return { ...v, label: etichettaAtti }
+        if (v.id === 'modelli_determina') return { ...v, label: etichettaModelli }
+        return v
+      })
     : (mod ? mod.voci : [])
 
   const NavItem = ({ item }) => (

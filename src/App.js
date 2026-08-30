@@ -19,6 +19,7 @@ import NuovaDetermina from './pages/NuovaDetermina'
 import Verbali from './pages/Verbali'
 import DettaglioAdunanza from './pages/DettaglioAdunanza'
 import ModelliVerbale from './pages/ModelliVerbale'
+import ModelliDetermina from './pages/ModelliDetermina'
 import Home from './pages/Home'
 import Layout from './components/Layout'
 import LayoutMembro from './components/LayoutMembro'
@@ -34,6 +35,7 @@ export default function App() {
   const [page, setPage]            = useState('home')
   const [modulo, setModulo]        = useState(null)   // null = Home; 'rischi' | 'procedure' | 'governance'
   const [determinaId, setDeterminaId] = useState(null) // id determina da aprire nel wizard (null = nuova)
+  const [determinaOrgano, setDeterminaOrgano] = useState(null) // organo dell'atto in creazione
   const [adunanzaId, setAdunanzaId] = useState(null)   // id adunanza da aprire nel dettaglio
   const [pagMembro, setPagMembro]  = useState('task') // vista membro: 'task' | 'procedure'
   const [showSetup, setShowSetup]  = useState(false)
@@ -219,9 +221,9 @@ export default function App() {
     reload: () => loadDati(session.user.id),
     page, setPage, logout,
     modulo, entraModulo, tornaHome,
-    determinaId,
+    determinaId, determinaOrgano,
     apriDetermina: (id) => { setDeterminaId(id); setPage('au_nuova') },
-    nuovaDetermina: () => { setDeterminaId(null); setPage('au_nuova') },
+    nuovaDetermina: (organo) => { setDeterminaId(null); setDeterminaOrgano(organo || null); setPage('au_nuova') },
     adunanzaId,
     apriAdunanza: (id) => { setAdunanzaId(id); setPage('adunanza') },
     onNuovaAzienda: () => setShowSetup(true),
@@ -253,6 +255,7 @@ export default function App() {
     verbali:      <Verbali />,
     adunanza:     <DettaglioAdunanza key={adunanzaId || 'nuova'} />,
     modelli_verbale: <ModelliVerbale />,
+    modelli_determina: <ModelliDetermina />,
     procedure:    <Procedure />,
     tracciamento: <TracciamentoProcedure />,
     impostazioni: <Impostazioni />,
