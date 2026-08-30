@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
 import { FASCICOLI } from '../lib/fascicoli'
@@ -147,6 +147,8 @@ export default function NuovaDetermina() {
   const [analisiFin, setAnalisiFin] = useState('')
   const [analisiEco, setAnalisiEco] = useState('')
   const [conEconomica, setConEconomica] = useState(true)  // false = delibera senza impatti economici
+  const [vociExtra, setVociExtra] = useState([])   // voci checklist aggiuntive (azienda+tipo)
+  const [nuovaVoce, setNuovaVoce] = useState('')
   const [alternative, setAlternative] = useState('')
   const [area231, setArea231] = useState('')
   const [risk, setRisk] = useState({ finanziario: 0, operativo: 0, legale_231: 0, reputazionale: 0 })
@@ -155,6 +157,35 @@ export default function NuovaDetermina() {
   const [nuovoParere, setNuovoParere] = useState({ tipo: 'legale', fonte: '', sintesi: '' })
 
   // Rileva l'organo amministrativo ATTUALE (AU o CdA) e il nominativo di riferimento
+  // Carica le voci checklist aggiuntive per (azienda, tipo)
+  const caricaVociExtra = useCallback(async () => {
+    if (!azienda?.id || !tipo) { setVociExtra([]); return }
+    const { data } = await supabase.from('checklist_voci')
+      .select('id, testo').eq('azienda_id', azienda.id).eq('tipo', tipo).order('created_at')
+    setVociExtra(data || [])
+  }, [azienda, tipo])
+  useEffect(() => { caricaVociExtra() }, [caricaVociExtra])
+
+  async function aggiungiVoceChecklist() {
+    const t = nuovaVoce.trim()
+    if (!t || !tipo) return
+    await supabase.from('checklist_voci').insert({ azienda_id: azienda.id, tipo, testo: t })
+    setNuovaVoce('')
+    caricaVociExtra()
+  }
+  async function modificaVoceChecklist(v) {
+    const t = window.prompt('Modifica la voce:', v.testo)
+    if (t == null) return
+    const val = t.trim(); if (!val) return
+    await supabase.from('checklist_voci').update({ testo: val }).eq('id', v.id)
+    caricaVociExtra()
+  }
+  async function eliminaVoceChecklist(v) {
+    if (!window.confirm(`Eliminare la voce "${v.testo}" dalla checklist di questo tipo?`)) return
+    await supabase.from('checklist_voci').delete().eq('id', v.id)
+    caricaVociExtra()
+  }
+
   useEffect(() => {
     (async () => {
       if (!azienda?.id) return
@@ -441,20 +472,39 @@ export default function NuovaDetermina() {
 
             <div style={{ flex: '1 1 340px', minWidth: 280 }}>
               {tipo && FASCICOLI[tipo] ? (
-                <div style={{ background: '#F4F8FF', border: '1px solid #CFE0F5', borderRadius: 12, padding: '14px 16px', position: 'sticky', top: 12 }}>
-                  <div style={{ fontSize: 13, color: '#1A3A5C', marginBottom: 8 }}>
+                <div style={{ background: '#F4F8FF', border: '1px solid #CFE0F5', borderRadius: 12, padding: '16px 18px', position: 'sticky', top: 12 }}>
+                  <div style={{ fontSize: 14.5, color: '#1A3A5C', marginBottom: 10, lineHeight: 1.55 }}>
                     <strong>Cosa riguarda.</strong> {FASCICOLI[tipo].riguarda}
                   </div>
-                  <div style={{ fontSize: 13, color: '#1A3A5C', marginBottom: 8 }}>
+                  <div style={{ fontSize: 14.5, color: '#1A3A5C', marginBottom: 10, lineHeight: 1.55 }}>
                     <strong>Funzionamento.</strong> {FASCICOLI[tipo].funzionamento}
                   </div>
-                  <div style={{ fontSize: 13, color: '#1A3A5C', marginBottom: 10 }}>
+                  <div style={{ fontSize: 14.5, color: '#1A3A5C', marginBottom: 12, lineHeight: 1.55 }}>
                     <strong>Elementi chiave.</strong> {FASCICOLI[tipo].elementi}
                   </div>
-                  <div style={{ fontSize: 12.5, fontWeight: 700, color: '#5A4FCF', marginBottom: 4 }}>📂 Giustificativi da conservare nel fascicolo</div>
-                  <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontSize: 12.5, color: '#44506A', lineHeight: 1.6 }}>
-                    {FASCICOLI[tipo].giustificativi.map((g, i) => <li key={i}>{g}</li>)}
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#5A4FCF', marginBottom: 6 }}>📂 Giustificativi da conservare nel fascicolo</div>
+                  <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontSize: 14, color: '#44506A', lineHeight: 1.7 }}>
+                    {FASCICOLI[tipo].giustificativi.map((g, i) => <li key={'b' + i}>{g}</li>)}
+                    {vociExtra.map(v => (
+                      <li key={v.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                        <span style={{ flex: 1 }}>{v.testo} <span style={{ fontSize: 11, color: '#8A93A5' }}>(aggiunta)</span></span>
+                        <button type="button" title="Modifica" onClick={() => modificaVoceChecklist(v)}
+                          style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: '#5A4FCF', padding: 0 }}>✎</button>
+                        <button type="button" title="Elimina" onClick={() => eliminaVoceChecklist(v)}
+                          style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: '#C0392B', padding: 0 }}>✕</button>
+                      </li>
+                    ))}
                   </ul>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
+                    <input className="form-control" style={{ fontSize: 13, padding: '6px 10px' }}
+                      value={nuovaVoce} onChange={e => setNuovaVoce(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); aggiungiVoceChecklist() } }}
+                      placeholder="Aggiungi un giustificativo a questo tipo…" />
+                    <button type="button" className="btn btn-sm btn-primary" onClick={aggiungiVoceChecklist} disabled={!nuovaVoce.trim()}>+ Aggiungi</button>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#8A93A5', marginTop: 6 }}>
+                    Le voci aggiunte valgono per le prossime {isCda ? 'delibere' : 'determine'} di questo tipo (solo per questa azienda). Le voci di base non sono modificabili.
+                  </div>
                 </div>
               ) : (
                 <div style={{ background: '#F7F8FA', border: '1px dashed #D5DCE6', borderRadius: 12, padding: '24px 16px', textAlign: 'center', color: '#9AA5B4', fontSize: 13 }}>
