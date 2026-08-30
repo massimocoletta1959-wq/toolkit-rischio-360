@@ -145,6 +145,7 @@ export default function NuovaDetermina() {
   const [valore, setValore] = useState('')
   const [analisiFin, setAnalisiFin] = useState('')
   const [analisiEco, setAnalisiEco] = useState('')
+  const [conEconomica, setConEconomica] = useState(true)  // false = delibera senza impatti economici
   const [alternative, setAlternative] = useState('')
   const [area231, setArea231] = useState('')
   const [risk, setRisk] = useState({ finanziario: 0, operativo: 0, legale_231: 0, reputazionale: 0 })
@@ -190,6 +191,7 @@ export default function NuovaDetermina() {
       setValore(det.valore == null ? '' : String(det.valore))
       setAnalisiFin(det.analisi_finanziaria || '')
       setAnalisiEco(det.analisi_economica || '')
+      if (det.con_analisi_economica === false) setConEconomica(false)
       setAlternative(det.alternative || '')
       setArea231(det.area_231 || '')
       if (det.stato === 'firmata' || det.stato === 'annullata') setSoloLettura(true)
@@ -268,7 +270,7 @@ export default function NuovaDetermina() {
     setErrore(null)
     if (!tipo) { setStep(1); setErrore('Seleziona il tipo di determina, poi riprova.'); return }
     if (!oggetto.trim()) { setStep(1); setErrore("Manca l'oggetto della determina: lo trovi qui sotto. Compilalo e riprova — il resto del lavoro è al sicuro."); return }
-    if (firma && serveParere && pareri.length === 0) {
+    if (firma && conEconomica && serveParere && pareri.length === 0) {
       setStep(4); setErrore(isCda ? 'Rischio alto/critico rilevato: è obbligatorio allegare almeno un parere prima di protocollare.' : 'Rischio alto/critico rilevato: è obbligatorio allegare almeno un parere prima di firmare.'); return
     }
 
@@ -288,7 +290,10 @@ export default function NuovaDetermina() {
       const campi = {
         azienda_id: azienda.id, anno, tipo, organo: organoAtto, oggetto: oggetto.trim(), descrizione: descrizione || null,
         valore: valore === '' ? null : Number(valore),
-        analisi_finanziaria: analisiFin || null, analisi_economica: analisiEco || null, alternative: alternative || null,
+        con_analisi_economica: conEconomica,
+        analisi_finanziaria: conEconomica ? (analisiFin || null) : null,
+        analisi_economica: conEconomica ? (analisiEco || null) : null,
+        alternative: conEconomica ? (alternative || null) : null,
         area_231: area231 || null, corpo_html: corpo, stato,
       }
       // il numero/hash/data si scrivono solo alla firma (una bozza non li ha)
@@ -390,10 +395,12 @@ export default function NuovaDetermina() {
         {STEPS.map((s, i) => {
           const n = i + 1
           const active = n === step, done = n < step
+          const disabilitato = !conEconomica && (n === 2 || n === 3 || n === 4)
           return (
-            <div key={s} onClick={() => setStep(n)}
+            <div key={s} onClick={() => { if (!disabilitato) setStep(n) }}
               style={{
-                flex: 1, padding: '9px 6px', textAlign: 'center', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                flex: 1, padding: '9px 6px', textAlign: 'center', fontSize: 12, fontWeight: 600,
+                cursor: disabilitato ? 'not-allowed' : 'pointer', opacity: disabilitato ? 0.4 : 1,
                 background: active ? '#7F77DD' : done ? '#EDEBFA' : '#F7F8FA',
                 color: active ? '#fff' : done ? '#5A4FCF' : '#999',
               }}>{n} · {s}</div>
@@ -424,12 +431,23 @@ export default function NuovaDetermina() {
             </div>
           </div>
           <div className="form-group">
-            <label className="form-label">Oggetto della determina *</label>
+            <label className="form-label">Oggetto {isCda ? 'della delibera' : 'della determina'} *</label>
             <input className="form-control" value={oggetto} onChange={e => setOggetto(e.target.value)}
               placeholder="es. Contratto di leasing macchinario CNC" />
           </div>
+          <div className="form-group" style={{ background: '#F7F8FA', borderRadius: 10, padding: '12px 14px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13.5 }}>
+              <input type="checkbox" checked={conEconomica} onChange={e => setConEconomica(e.target.checked)} />
+              <span>Questa {isCda ? 'delibera' : 'determina'} ha <strong>impatti economici</strong> da analizzare</span>
+            </label>
+            <div style={{ fontSize: 11.5, color: '#999', marginTop: 6 }}>
+              {conEconomica
+                ? 'Verranno chiesti analisi economico-finanziaria, valutazione del rischio ed eventuali pareri.'
+                : 'Istruttoria semplificata: si passa direttamente alla redazione del testo (es. preparazione all\'approvazione del bilancio).'}
+            </div>
+          </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="btn btn-primary" onClick={() => setStep(2)}>Avanti →</button>
+            <button className="btn btn-primary" onClick={() => setStep(conEconomica ? 2 : 5)}>Avanti →</button>
           </div>
         </div>
       )}
@@ -581,7 +599,7 @@ export default function NuovaDetermina() {
           }}>{generaCorpo(null)}</pre>
           <div style={{ fontSize: 11.5, color: '#999', marginTop: 8 }}>Il numero definitivo verrà assegnato alla {isCda ? 'protocollazione' : 'firma'}. Puoi ancora tornare indietro per modificare i dati.</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14 }}>
-            <button className="btn" onClick={() => setStep(4)}>← Indietro</button>
+            <button className="btn" onClick={() => setStep(conEconomica ? 4 : 1)}>← Indietro</button>
             <button className="btn btn-primary" onClick={() => setStep(6)}>Avanti →</button>
           </div>
         </div>
