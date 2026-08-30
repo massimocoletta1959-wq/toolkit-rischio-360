@@ -274,6 +274,7 @@ const FASCE_VISTA = [
 ]
 
 function OrganigrammaVista({ ruoli, membri, azienda }) {
+  const [vista, setVista] = useState('fasce')   // 'fasce' | 'albero'
   const nomeMembro = (id) => {
     const m = membri.find(x => x.id === id)
     return m ? `${m.nome || ''} ${m.cognome || ''}`.trim() : null
@@ -304,7 +305,9 @@ function OrganigrammaVista({ ruoli, membri, azienda }) {
       const nella = ruoli.filter(r => r.fascia === f.key)
       const radici = nella.filter(r => !r.parent_id || !nella.some(x => x.id === r.parent_id))
       if (nella.length === 0) return ''
-      return `<div class="banda" style="background:${f.bg}">
+      const connettore = vista === 'albero' && f.key !== (FASCE_VISTA.find(x => ruoli.some(r => r.fascia === x.key))?.key)
+        ? '<div class="linea-tra"></div>' : ''
+      return `${connettore}<div class="banda" style="background:${f.bg}">
         <div class="banda-tit" style="color:${f.colore}"><span class="dot" style="background:${f.colore}"></span>${f.label}</div>
         <div class="riga">${radici.map(casellaHtml).join('')}</div>
       </div>`
@@ -330,8 +333,9 @@ function OrganigrammaVista({ ruoli, membri, azienda }) {
         .nome { font-size: 12px; font-weight: 600; line-height: 1.2; }
         .persona { font-size: 11px; color: #2B8A6B; margin-top: 3px; }
         .box.vuoto .persona { color: #B9770E; }
-        .linea-v { width: 1px; height: 12px; background: #CBD5E1; }
-        .figli { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; border-top: 1px solid #CBD5E1; padding-top: 10px; }
+        .linea-tra { width: 1.5px; height: 20px; background: #CBD5E1; margin: 0 auto; }
+        .linea-v { width: 1.5px; height: 12px; background: #CBD5E1; }
+        .figli { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; border-top: 1.5px solid #CBD5E1; padding-top: 10px; }
       </style></head><body>
       <h1>Organigramma — ${esc(azienda?.nome || '')}</h1>
       <div class="sub">Aggiornato al ${dataStr}</div>
@@ -346,7 +350,7 @@ function OrganigrammaVista({ ruoli, membri, azienda }) {
     const persona = r.membro_id ? nomeMembro(r.membro_id) : null
     const figli = ruoli.filter(x => x.parent_id === r.id)
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div className="og-node">
         <div style={{
           border: `1.5px solid ${persona ? '#CBD5E1' : '#E5B84B'}`,
           background: '#fff', borderRadius: 10, padding: '10px 14px', minWidth: 170, maxWidth: 220,
@@ -360,9 +364,14 @@ function OrganigrammaVista({ ruoli, membri, azienda }) {
         </div>
         {figli.length > 0 && (
           <>
-            <div style={{ width: 1, height: 14, background: '#CBD5E1' }} />
-            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center', borderTop: figli.length > 1 ? '1px solid #CBD5E1' : 'none', paddingTop: figli.length > 1 ? 14 : 0 }}>
-              {figli.map(f => <Casella key={f.id} r={f} livello={livello + 1} />)}
+            <div className="og-connect" />
+            <div className={`og-children${figli.length > 1 ? ' multi' : ''}`}>
+              {figli.map(f => (
+                <div key={f.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  {figli.length > 1 && <div className="og-connect" style={{ height: 12, marginTop: -16 }} />}
+                  <Casella r={f} livello={livello + 1} />
+                </div>
+              ))}
             </div>
           </>
         )}
@@ -372,31 +381,81 @@ function OrganigrammaVista({ ruoli, membri, azienda }) {
 
   return (
     <div className="card" style={{ marginBottom: 18 }}>
+      <style>{`
+        .og-node { display: flex; flex-direction: column; align-items: center; }
+        .og-children { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; align-items: flex-start; position: relative; }
+        .og-children.multi { border-top: 1.5px solid #CBD5E1; padding-top: 16px; }
+        .og-connect { width: 1.5px; height: 16px; background: #CBD5E1; }
+      `}</style>
       <div className="card-header">
         <span className="card-title">📊 Organigramma</span>
-        <button className="btn btn-sm" onClick={stampa}>🖨️ Stampa / PDF</button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', border: '1px solid #D5DCE6', borderRadius: 8, overflow: 'hidden' }}>
+            <button className="btn btn-sm" style={{ borderRadius: 0, background: vista === 'fasce' ? '#7F77DD' : '#fff', color: vista === 'fasce' ? '#fff' : '#1A3A5C' }} onClick={() => setVista('fasce')}>Fasce</button>
+            <button className="btn btn-sm" style={{ borderRadius: 0, background: vista === 'albero' ? '#7F77DD' : '#fff', color: vista === 'albero' ? '#fff' : '#1A3A5C' }} onClick={() => setVista('albero')}>Albero</button>
+          </div>
+          <button className="btn btn-sm" onClick={stampa}>🖨️ Stampa / PDF</button>
+        </div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {FASCE_VISTA.map(f => {
-          const nella = ruoli.filter(r => r.fascia === f.key)
-          const radici = nella.filter(r => !r.parent_id || !nella.some(x => x.id === r.parent_id))
-          if (nella.length === 0) return null
-          return (
-            <div key={f.key} style={{ background: f.bg, borderRadius: 12, padding: '14px 16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <span style={{ width: 10, height: 10, borderRadius: '50%', background: f.colore }} />
-                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: f.colore }}>{f.label}</span>
+
+      {vista === 'albero' ? (
+        <AlberoVista ruoli={ruoli} Casella={Casella} />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {FASCE_VISTA.map(f => {
+            const nella = ruoli.filter(r => r.fascia === f.key)
+            const radici = nella.filter(r => !r.parent_id || !nella.some(x => x.id === r.parent_id))
+            if (nella.length === 0) return null
+            return (
+              <div key={f.key} style={{ background: f.bg, borderRadius: 12, padding: '14px 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: f.colore }} />
+                  <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: f.colore }}>{f.label}</span>
+                </div>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                  {radici.map(r => <Casella key={r.id} r={r} livello={0} />)}
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                {radici.map(r => <Casella key={r.id} r={r} livello={0} />)}
-              </div>
+            )
+          })}
+          {ruoli.every(r => !r.fascia) && (
+            <div style={{ fontSize: 13, color: '#999' }}>Assegna una fascia ai ruoli (qui sotto) per vederli comparire nell'organigramma.</div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Vista ad albero (Modo 2): le tre fasce impilate come livelli, collegate da linee
+function AlberoVista({ ruoli, Casella }) {
+  const perFascia = (key) => {
+    const nella = ruoli.filter(r => r.fascia === key)
+    return nella.filter(r => !r.parent_id || !nella.some(x => x.id === r.parent_id))
+  }
+  const livelli = FASCE_VISTA
+    .map(f => ({ ...f, radici: perFascia(f.key) }))
+    .filter(l => l.radici.length > 0)
+
+  if (livelli.length === 0) {
+    return <div style={{ fontSize: 13, color: '#999' }}>Assegna una fascia ai ruoli per vedere l'albero.</div>
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, overflowX: 'auto', padding: '8px 0' }}>
+      {livelli.map((l, i) => (
+        <React.Fragment key={l.key}>
+          {i > 0 && <div style={{ width: 1.5, height: 22, background: '#CBD5E1' }} />}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: l.colore, marginBottom: 8 }}>
+              <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: l.colore, marginRight: 6 }} />{l.label}
             </div>
-          )
-        })}
-        {ruoli.every(r => !r.fascia) && (
-          <div style={{ fontSize: 13, color: '#999' }}>Assegna una fascia ai ruoli (qui sotto) per vederli comparire nell'organigramma.</div>
-        )}
-      </div>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'flex-start', background: l.bg, borderRadius: 12, padding: '14px 16px', width: '100%' }}>
+              {l.radici.map(r => <Casella key={r.id} r={r} livello={0} />)}
+            </div>
+          </div>
+        </React.Fragment>
+      ))}
     </div>
   )
 }
