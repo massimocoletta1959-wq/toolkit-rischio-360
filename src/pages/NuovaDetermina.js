@@ -412,48 +412,59 @@ export default function NuovaDetermina() {
       {/* STEP 1 — Tipo */}
       {step === 1 && (
         <div className="card">
-          <div className="form-group">
-            <label className="form-label">Tipo di determina *</label>
-            <div className="grid-2" style={{ gap: 10 }}>
-              {TIPI.map(t => (
-                <div key={t.id} onClick={() => setTipo(t.id)}
-                  style={{
-                    border: `1.5px solid ${tipo === t.id ? '#7F77DD' : '#E0E0E0'}`,
-                    background: tipo === t.id ? '#EDEBFA' : '#fff',
-                    borderRadius: 10, padding: 14, cursor: 'pointer',
-                  }}>
-                  <div style={{ fontSize: 20, marginBottom: 4 }}>{t.icon}</div>
-                  <div style={{ fontWeight: 600, fontSize: 13, color: '#1A3A5C' }}>{t.label}</div>
-                  <div style={{ fontSize: 11.5, color: '#666', marginTop: 2 }}>{t.desc}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {tipo && FASCICOLI[tipo] && (
-            <div style={{ background: '#F4F8FF', border: '1px solid #CFE0F5', borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
-              <div style={{ fontSize: 13, color: '#1A3A5C', marginBottom: 8 }}>
-                <strong>Cosa riguarda.</strong> {FASCICOLI[tipo].riguarda}
-              </div>
-              <div style={{ fontSize: 13, color: '#1A3A5C', marginBottom: 8 }}>
-                <strong>Funzionamento.</strong> {FASCICOLI[tipo].funzionamento}
-              </div>
-              <div style={{ fontSize: 13, color: '#1A3A5C', marginBottom: 10 }}>
-                <strong>Elementi chiave.</strong> {FASCICOLI[tipo].elementi}
-              </div>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: '#5A4FCF', marginBottom: 4 }}>📂 Giustificativi da conservare nel fascicolo</div>
-              <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontSize: 12.5, color: '#44506A', lineHeight: 1.6 }}>
-                {FASCICOLI[tipo].giustificativi.map((g, i) => <li key={i}>{g}</li>)}
-              </ul>
-            </div>
-          )}
-
+          {/* Oggetto in cima, piena larghezza */}
           <div className="form-group">
             <label className="form-label">Oggetto {isCda ? 'della delibera' : 'della determina'} *</label>
             <input className="form-control" value={oggetto} onChange={e => setOggetto(e.target.value)}
               placeholder="es. Contratto di leasing macchinario CNC" />
           </div>
-          <div className="form-group" style={{ background: '#F7F8FA', borderRadius: 10, padding: '12px 14px' }}>
+
+          {/* Due colonne: sinistra i tipi (stretti, 2 colonne), destra la guida */}
+          <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <div style={{ flex: '1 1 340px', minWidth: 280 }}>
+              <label className="form-label">Tipo di {isCda ? 'delibera' : 'determina'} *</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {TIPI.map(t => (
+                  <div key={t.id} onClick={() => setTipo(t.id)}
+                    style={{
+                      border: `1.5px solid ${tipo === t.id ? '#7F77DD' : '#E0E0E0'}`,
+                      background: tipo === t.id ? '#EDEBFA' : '#fff',
+                      borderRadius: 10, padding: '10px 12px', cursor: 'pointer',
+                    }}>
+                    <div style={{ fontSize: 18, marginBottom: 2 }}>{t.icon}</div>
+                    <div style={{ fontWeight: 600, fontSize: 12.5, color: '#1A3A5C', lineHeight: 1.25 }}>{t.label}</div>
+                    <div style={{ fontSize: 11, color: '#666', marginTop: 2, lineHeight: 1.3 }}>{t.desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ flex: '1 1 340px', minWidth: 280 }}>
+              {tipo && FASCICOLI[tipo] ? (
+                <div style={{ background: '#F4F8FF', border: '1px solid #CFE0F5', borderRadius: 12, padding: '14px 16px', position: 'sticky', top: 12 }}>
+                  <div style={{ fontSize: 13, color: '#1A3A5C', marginBottom: 8 }}>
+                    <strong>Cosa riguarda.</strong> {FASCICOLI[tipo].riguarda}
+                  </div>
+                  <div style={{ fontSize: 13, color: '#1A3A5C', marginBottom: 8 }}>
+                    <strong>Funzionamento.</strong> {FASCICOLI[tipo].funzionamento}
+                  </div>
+                  <div style={{ fontSize: 13, color: '#1A3A5C', marginBottom: 10 }}>
+                    <strong>Elementi chiave.</strong> {FASCICOLI[tipo].elementi}
+                  </div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: '#5A4FCF', marginBottom: 4 }}>📂 Giustificativi da conservare nel fascicolo</div>
+                  <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontSize: 12.5, color: '#44506A', lineHeight: 1.6 }}>
+                    {FASCICOLI[tipo].giustificativi.map((g, i) => <li key={i}>{g}</li>)}
+                  </ul>
+                </div>
+              ) : (
+                <div style={{ background: '#F7F8FA', border: '1px dashed #D5DCE6', borderRadius: 12, padding: '24px 16px', textAlign: 'center', color: '#9AA5B4', fontSize: 13 }}>
+                  Scegli un tipo per vedere cosa riguarda e quali giustificativi conservare nel fascicolo.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="form-group" style={{ background: '#F7F8FA', borderRadius: 10, padding: '12px 14px', marginTop: 16 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13.5 }}>
               <input type="checkbox" checked={conEconomica} onChange={e => setConEconomica(e.target.checked)} />
               <span>Questa {isCda ? 'delibera' : 'determina'} ha <strong>impatti economici</strong> da analizzare</span>
