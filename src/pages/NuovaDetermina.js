@@ -236,7 +236,6 @@ export default function NuovaDetermina() {
   }
 
   function generaCorpo(numero) {
-    const dataOggi = new Date().toLocaleDateString('it-IT')
     const num = numero != null ? String(numero).padStart(3, '0') : '—'
     const chiRischi = RISK_CATS.filter(c => risk[c.id] > 0)
       .map(c => `${c.label.toLowerCase()}: ${LIV_LABEL[risk[c.id]]}`).join('; ')
@@ -245,9 +244,8 @@ export default function NuovaDetermina() {
       : ''
     return [
       isCda
-        ? `DELIBERA DEL CONSIGLIO DI AMMINISTRAZIONE N. ${num}/${anno}`
+        ? `Proposta di DELIBERA DEL CONSIGLIO DI AMMINISTRAZIONE N. ${num}/${anno}`
         : `DETERMINA DELL'AMMINISTRATORE UNICO N. ${num}/${anno}`,
-      `${azienda?.nome || ''}${azienda?.settore ? ' · ' + azienda.settore : ''} · ${dataOggi}`,
       ``,
       isCda
         ? `PREMESSA. Il Consiglio di Amministrazione di ${azienda?.nome || 'questa società'}, riunitosi e validamente costituito, avendo valutato la necessità e l'opportunità dell'operazione di seguito descritta;`
