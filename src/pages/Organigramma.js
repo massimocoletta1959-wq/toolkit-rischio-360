@@ -301,17 +301,20 @@ function OrganigrammaVista({ ruoli, membri, azienda }) {
       </div>`
     }
 
+    const primaFascia = FASCE_VISTA.find(x => ruoli.some(r => r.fascia === x.key))?.key
     const bande = FASCE_VISTA.map(f => {
       const nella = ruoli.filter(r => r.fascia === f.key)
       const radici = nella.filter(r => !r.parent_id || !nella.some(x => x.id === r.parent_id))
       if (nella.length === 0) return ''
-      const connettore = vista === 'albero' && f.key !== (FASCE_VISTA.find(x => ruoli.some(r => r.fascia === x.key))?.key)
-        ? '<div class="linea-tra"></div>' : ''
+      const connettore = (vista === 'albero' && f.key !== primaFascia) ? '<div class="linea-tra"></div>' : ''
       return `${connettore}<div class="banda" style="background:${f.bg}">
         <div class="banda-tit" style="color:${f.colore}"><span class="dot" style="background:${f.colore}"></span>${f.label}</div>
         <div class="riga">${radici.map(casellaHtml).join('')}</div>
       </div>`
     }).join('')
+    const contenuto = vista === 'albero'
+      ? `<div class="albero">${bande}</div>`
+      : bande
 
     const w = window.open('', '_blank')
     if (!w) return
@@ -334,12 +337,15 @@ function OrganigrammaVista({ ruoli, membri, azienda }) {
         .persona { font-size: 11px; color: #2B8A6B; margin-top: 3px; }
         .box.vuoto .persona { color: #B9770E; }
         .linea-tra { width: 1.5px; height: 20px; background: #CBD5E1; margin: 0 auto; }
+        .albero { display: flex; flex-direction: column; align-items: center; }
+        .albero .banda { width: auto; max-width: 100%; display: inline-block; text-align: center; }
+        .albero .riga { justify-content: center; }
         .linea-v { width: 1.5px; height: 12px; background: #CBD5E1; }
         .figli { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; border-top: 1.5px solid #CBD5E1; padding-top: 10px; }
       </style></head><body>
       <h1>Organigramma — ${esc(azienda?.nome || '')}</h1>
       <div class="sub">Aggiornato al ${dataStr}</div>
-      ${bande}
+      ${contenuto}
       <script>window.onload = function(){ window.print(); }</script>
       </body></html>`)
     w.document.close()
