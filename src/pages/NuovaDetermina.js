@@ -218,6 +218,21 @@ export default function NuovaDetermina() {
     setNuovoParere({ tipo: 'legale', fonte: '', sintesi: '' })
   }
 
+  async function elimina() {
+    if (!window.confirm(`Eliminare definitivamente questa bozza di ${isCda ? 'delibera' : 'determina'}? L'operazione non è reversibile.`)) return
+    setSaving(true)
+    try {
+      await supabase.from('governance_eventi').insert({
+        azienda_id: azienda.id, determina_id: determinaId,
+        evento: 'eliminazione_bozza', dettaglio: oggetto || '(senza oggetto)',
+      })
+    } catch (_e) { /* l'evento è accessorio */ }
+    const { error } = await supabase.from('determine').delete().eq('id', determinaId)
+    setSaving(false)
+    if (error) { setErrore(error.message); return }
+    setPage('au_registro')
+  }
+
   function generaCorpo(numero) {
     const dataOggi = new Date().toLocaleDateString('it-IT')
     const num = numero != null ? String(numero).padStart(3, '0') : '—'
@@ -357,7 +372,10 @@ export default function NuovaDetermina() {
               {titolareNome ? (isCda ? ` · Presidente: ${titolareNome}` : ` · AU: ${titolareNome}`) : ''} · Anno {anno}
             </p>
           </div>
-          <button className="btn btn-sm" onClick={() => setPage('au_registro')}>← Registro</button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {determinaId && !soloLettura && <button className="btn btn-sm btn-danger" onClick={elimina} disabled={saving}>🗑 Elimina bozza</button>}
+            <button className="btn btn-sm" onClick={() => setPage('au_registro')}>← Registro</button>
+          </div>
         </div>
       </div>
 
