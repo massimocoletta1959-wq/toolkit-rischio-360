@@ -334,7 +334,6 @@ export default function NuovaDetermina() {
     if (step === 6 && !determinaId && !bozzaProvvId && !soloLettura && oggetto.trim()) {
       assicuraBozzaProvvisoria()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step])
 
   // Uscita dal wizard: se c'è una bozza provvisoria non confermata, la elimino
