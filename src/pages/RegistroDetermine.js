@@ -79,7 +79,7 @@ export default function RegistroDetermine() {
 
   // Etichette adattive in base all'organo attuale
   const isCda = organoAzienda === 'cda'
-  const titoloRegistro = isCda ? 'Registro Delibere CdA' : 'Registro Determine AU'
+  const titoloRegistro = isCda ? 'Preparazione Delibere CdA' : 'Preparazione Determine AU'
   const sottotitoloRegistro = isCda
     ? 'Delibere del Consiglio di Amministrazione di'
     : "Determine dell'Amministratore Unico di"

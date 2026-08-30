@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
 
 // Funzioni comuni, disponibili sia dalla Home sia dentro un modulo
@@ -42,8 +43,26 @@ const MODULI = {
 export default function Layout({ children }) {
   const { azienda, aziende, profilo, page, setPage, logout, switchAzienda, onNuovaAzienda, modulo, tornaHome } = useApp()
   const [showSwitch, setShowSwitch] = useState(false)
+  const [organoAmm, setOrganoAmm] = useState(null) // 'amministratore_unico' | 'cda' | null
+
+  // Rileva l'organo amministrativo attuale dell'azienda (per l'etichetta del menù)
+  useEffect(() => {
+    (async () => {
+      if (!azienda?.id) { setOrganoAmm(null); return }
+      const { data } = await supabase.from('organi')
+        .select('tipo').eq('azienda_id', azienda.id)
+        .in('tipo', ['amministratore_unico', 'cda'])
+      setOrganoAmm(data && data.length ? data[0].tipo : null)
+    })()
+  }, [azienda])
 
   const mod = modulo ? MODULI[modulo] : null
+
+  // Etichetta adattiva per la voce determine/delibere in base all'organo
+  const etichettaAtti = organoAmm === 'cda' ? 'Preparazione Delibere CdA' : 'Preparazione Determine AU'
+  const vociMod = mod && modulo === 'governance'
+    ? mod.voci.map(v => v.id === 'au_registro' ? { ...v, label: etichettaAtti } : v)
+    : (mod ? mod.voci : [])
 
   const NavItem = ({ item }) => (
     <div className={`nav-item${page === item.id ? ' active' : ''}`} onClick={() => setPage(item.id)}>
@@ -99,7 +118,7 @@ export default function Layout({ children }) {
                 <span style={{ width: 9, height: 9, borderRadius: '50%', background: mod.colore }} />
                 <span style={{ fontSize: 11, letterSpacing: 0.5, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>{mod.label}</span>
               </div>
-              {mod.voci.map(item => <NavItem key={item.id} item={item} />)}
+              {vociMod.map(item => <NavItem key={item.id} item={item} />)}
             </>
           ) : (
             <>
