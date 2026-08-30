@@ -76,6 +76,24 @@ export const RUOLI_STANDARD_PER_SETTORE = {
   Hotel:    RUOLI_HOTEL,
 }
 
+// Classificazione di default in base alla sigla (poi correggibile a mano)
+const FASCE = [
+  ['governance', 'Governance'],
+  ['core', 'Operative (Core)'],
+  ['staff', 'Supporto (Staff)'],
+]
+const FASCIA_LABEL = Object.fromEntries(FASCE)
+
+const SIGLE_GOVERNANCE = ['CDA', 'DL', 'DG', 'VD', 'DIR']
+const SIGLE_STAFF = ['AMM', 'CG', 'HR', 'IT', 'RSPP', 'RSGI', 'DPO', 'MC', 'RLS', 'SA8000', 'HACCP', 'SEC', 'MAINT']
+// tutto il resto (commerciale, tecnico, produzione, cantiere, ecc.) -> core
+function fasciaDaSigla(sigla) {
+  const s = (sigla || '').toUpperCase()
+  if (SIGLE_GOVERNANCE.includes(s)) return 'governance'
+  if (SIGLE_STAFF.includes(s)) return 'staff'
+  return 'core'
+}
+
 export default function Organigramma() {
   const { azienda } = useApp()
   const [ruoli, setRuoli]     = useState([])
@@ -102,7 +120,7 @@ export default function Organigramma() {
     setLoading(true); setError(null)
     const esistenti = new Set(ruoli.map(r => r.sigla))
     const setRuoliStd = RUOLI_STANDARD_PER_SETTORE[azienda.settore] || RUOLI_STANDARD
-    const payload = setRuoliStd.filter(r => !esistenti.has(r.sigla)).map(r => ({ ...r, azienda_id: azienda.id }))
+    const payload = setRuoliStd.filter(r => !esistenti.has(r.sigla)).map(r => ({ ...r, azienda_id: azienda.id, fascia: fasciaDaSigla(r.sigla) }))
     if (payload.length > 0) {
       const { error: err } = await supabase.from('ruoli').insert(payload)
       if (err) setError(err.message)
@@ -112,6 +130,15 @@ export default function Organigramma() {
 
   async function assegna(ruolo, membroId) {
     await supabase.from('ruoli').update({ membro_id: membroId || null }).eq('id', ruolo.id)
+    load()
+  }
+
+  async function cambiaFascia(ruolo, fascia) {
+    await supabase.from('ruoli').update({ fascia: fascia || null }).eq('id', ruolo.id)
+    load()
+  }
+  async function cambiaParent(ruolo, parentId) {
+    await supabase.from('ruoli').update({ parent_id: parentId || null }).eq('id', ruolo.id)
     load()
   }
 
@@ -125,6 +152,7 @@ export default function Organigramma() {
     if (!nuovo.sigla.trim() || !nuovo.nome.trim()) return
     const { error: err } = await supabase.from('ruoli').insert({
       azienda_id: azienda.id, sigla: nuovo.sigla.trim().toUpperCase(), nome: nuovo.nome.trim(),
+      fascia: fasciaDaSigla(nuovo.sigla),
     })
     if (err) {
       setError(err.message.includes('duplicate') || err.message.includes('unique') ? 'Sigla già presente in questa azienda.' : err.message)
@@ -192,7 +220,7 @@ export default function Organigramma() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {ruoli.map(r => (
-              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 8, background: r.membro_id ? '#F7FBF8' : '#FDF9F3', border: `1px solid ${r.membro_id ? '#CBE8D5' : '#F0E0C0'}` }}>
+              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 8, background: r.membro_id ? '#F7FBF8' : '#FDF9F3', border: `1px solid ${r.membro_id ? '#CBE8D5' : '#F0E0C0'}` }}>
                 <span style={{ fontWeight: 700, fontSize: 12, background: '#1A3A5C', color: 'white', padding: '3px 10px', borderRadius: 12, minWidth: 52, textAlign: 'center' }}>{r.sigla}</span>
                 {editNome?.id === r.id ? (
                   <>
@@ -203,7 +231,17 @@ export default function Organigramma() {
                 ) : (
                   <span style={{ flex: 1, fontSize: 14, fontWeight: 500, cursor: 'pointer' }} title="Clicca per rinominare" onClick={() => setEditNome({ id: r.id, nome: r.nome })}>{r.nome}</span>
                 )}
-                <select className="form-control" style={{ width: 220 }} value={r.membro_id || ''} onChange={e => assegna(r, e.target.value)}>
+                <select className="form-control" style={{ width: 150 }} value={r.fascia || ''} onChange={e => cambiaFascia(r, e.target.value)} title="Fascia">
+                  <option value="">— Fascia —</option>
+                  {FASCE.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+                <select className="form-control" style={{ width: 180 }} value={r.parent_id || ''} onChange={e => cambiaParent(r, e.target.value)} title="Riporta a (secondo livello)">
+                  <option value="">— Primo livello —</option>
+                  {ruoli.filter(x => x.id !== r.id && x.fascia === r.fascia).map(x => (
+                    <option key={x.id} value={x.id}>↳ {x.sigla}</option>
+                  ))}
+                </select>
+                <select className="form-control" style={{ width: 200 }} value={r.membro_id || ''} onChange={e => assegna(r, e.target.value)}>
                   <option value="">— Non assegnato —</option>
                   {membri.map(m => <option key={m.id} value={m.id}>{m.nome} {m.cognome}</option>)}
                 </select>
