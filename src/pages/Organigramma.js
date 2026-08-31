@@ -98,19 +98,23 @@ export default function Organigramma() {
   const { azienda } = useApp()
   const [ruoli, setRuoli]     = useState([])
   const [membri, setMembri]   = useState([])
+  const [procedure, setProcedure] = useState([])
   const [loading, setLoading] = useState(true)
   const [nuovo, setNuovo]     = useState(null)
   const [editNome, setEditNome] = useState(null)
   const [error, setError]     = useState(null)
+  const [modoPagina, setModoPagina] = useState('organigramma')  // 'organigramma' | 'funzionigramma'
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [r, m] = await Promise.all([
+    const [r, m, p] = await Promise.all([
       supabase.from('ruoli').select('*').eq('azienda_id', azienda.id).order('sigla'),
       supabase.from('membri').select('id, nome, cognome').eq('azienda_id', azienda.id).order('cognome'),
+      supabase.from('procedure_azienda').select('codice, titolo, stato, ruolo_id').eq('azienda_id', azienda.id).not('ruolo_id', 'is', null),
     ])
     setRuoli(r.data || [])
     setMembri(m.data || [])
+    setProcedure(p.data || [])
     setLoading(false)
   }, [azienda.id])
 
@@ -171,9 +175,15 @@ export default function Organigramma() {
 
   return (
     <div>
-      <div className="page-header">
-        <h2>Organigramma</h2>
-        <p>Ruoli e funzioni aziendali — la base per procedure e responsabilità</p>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h2>{modoPagina === 'funzionigramma' ? 'Funzionigramma' : 'Organigramma'}</h2>
+          <p>{modoPagina === 'funzionigramma' ? 'Chi è responsabile di quali procedure' : 'Ruoli e funzioni aziendali — la base per procedure e responsabilità'}</p>
+        </div>
+        <div style={{ display: 'flex', border: '1px solid #D5DCE6', borderRadius: 8, overflow: 'hidden' }}>
+          <button className="btn btn-sm" style={{ borderRadius: 0, background: modoPagina === 'organigramma' ? '#1A3A5C' : '#fff', color: modoPagina === 'organigramma' ? '#fff' : '#1A3A5C' }} onClick={() => setModoPagina('organigramma')}>Organigramma</button>
+          <button className="btn btn-sm" style={{ borderRadius: 0, background: modoPagina === 'funzionigramma' ? '#1A3A5C' : '#fff', color: modoPagina === 'funzionigramma' ? '#fff' : '#1A3A5C' }} onClick={() => setModoPagina('funzionigramma')}>Funzionigramma</button>
+        </div>
       </div>
 
       <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 18 }}>
@@ -191,9 +201,12 @@ export default function Organigramma() {
         </div>
       </div>
 
-      {/* Vista organigramma a tre fasce */}
-      {!loading && ruoli.length > 0 && (
+      {/* Vista: organigramma a fasce/albero, oppure funzionigramma */}
+      {!loading && ruoli.length > 0 && modoPagina === 'organigramma' && (
         <OrganigrammaVista ruoli={ruoli} membri={membri} azienda={azienda} />
+      )}
+      {!loading && ruoli.length > 0 && modoPagina === 'funzionigramma' && (
+        <FunzionigrammaVista ruoli={ruoli} membri={membri} procedure={procedure} azienda={azienda} />
       )}
 
       <div className="card">
@@ -462,6 +475,99 @@ function AlberoVista({ ruoli, Casella }) {
           </div>
         </React.Fragment>
       ))}
+    </div>
+  )
+}
+
+// ── Vista Funzionigramma: per ogni ruolo, le procedure di cui è responsabile ──
+function FunzionigrammaVista({ ruoli, membri, procedure, azienda }) {
+  const nomeMembro = (id) => {
+    const m = membri.find(x => x.id === id)
+    return m ? `${m.nome || ''} ${m.cognome || ''}`.trim() : null
+  }
+  const procDiRuolo = (ruoloId) => procedure.filter(p => p.ruolo_id === ruoloId)
+
+  // solo i ruoli che hanno almeno una procedura, ordinati per sigla
+  const ruoliConProc = ruoli
+    .map(r => ({ ...r, proc: procDiRuolo(r.id) }))
+    .filter(r => r.proc.length > 0)
+    .sort((a, b) => (a.sigla || '').localeCompare(b.sigla || ''))
+
+  function stampa() {
+    const esc = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const dataStr = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })
+    const blocchi = ruoliConProc.map(r => {
+      const persona = r.membro_id ? nomeMembro(r.membro_id) : null
+      const righe = r.proc.map(p => `<tr><td class="cod">${esc(p.codice || '')}</td><td>${esc(p.titolo || '')}</td><td class="st">${esc(p.stato || '')}</td></tr>`).join('')
+      return `<div class="ruolo">
+        <div class="rt"><span class="sig">${esc(r.sigla)}</span> ${esc(r.nome)} ${persona ? '— <b>' + esc(persona) + '</b>' : '<span class="na">— non assegnato —</span>'}</div>
+        <table><thead><tr><th>Codice</th><th>Procedura</th><th>Stato</th></tr></thead><tbody>${righe}</tbody></table>
+      </div>`
+    }).join('')
+    const w = window.open('', '_blank'); if (!w) return
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Funzionigramma ${esc(azienda?.nome || '')}</title>
+      <style>
+        @page { size: A4 portrait; margin: 1.5cm; }
+        body { font-family: -apple-system, Arial, sans-serif; color: #1A3A5C; }
+        h1 { font-size: 18px; margin: 0 0 2px; } .sub { font-size: 12px; color: #8A94A0; margin-bottom: 18px; }
+        .ruolo { margin-bottom: 18px; page-break-inside: avoid; }
+        .rt { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+        .sig { display: inline-block; font-size: 10px; font-weight: 700; background: #1A3A5C; color: #fff; padding: 2px 8px; border-radius: 10px; }
+        .na { color: #B9770E; font-weight: 400; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th { text-align: left; background: #F2F5F9; padding: 5px 8px; font-size: 11px; color: #5B6673; }
+        td { padding: 5px 8px; border-bottom: 1px solid #EEE; }
+        .cod { font-weight: 700; color: #1D9E75; white-space: nowrap; } .st { color: #666; white-space: nowrap; }
+      </style></head><body>
+      <h1>Funzionigramma — ${esc(azienda?.nome || '')}</h1>
+      <div class="sub">Chi è responsabile di quali procedure · aggiornato al ${dataStr}</div>
+      ${blocchi || '<p style="font-size:13px;color:#999">Nessuna procedura con responsabile assegnato.</p>'}
+      <script>window.onload=function(){window.print()}</script>
+      </body></html>`)
+    w.document.close()
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 18 }}>
+      <div className="card-header">
+        <span className="card-title">🗂️ Funzionigramma</span>
+        <button className="btn btn-sm" onClick={stampa}>🖨️ Stampa / PDF</button>
+      </div>
+      {ruoliConProc.length === 0 ? (
+        <div className="empty-state">
+          <p>Nessuna procedura ha ancora un responsabile assegnato. Assegna il responsabile alle procedure (in Procedure → colonna Responsabile) per popolare il funzionigramma.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {ruoliConProc.map(r => {
+            const persona = r.membro_id ? nomeMembro(r.membro_id) : null
+            return (
+              <div key={r.id} style={{ border: '1px solid #E8ECF2', borderRadius: 10, overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#F7F8FA', borderBottom: '1px solid #E8ECF2' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, background: '#1A3A5C', color: '#fff', padding: '2px 9px', borderRadius: 10 }}>{r.sigla}</span>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>{r.nome}</span>
+                  <span style={{ fontSize: 12, color: persona ? '#2B8A6B' : '#B9770E', marginLeft: 'auto' }}>{persona || '— non assegnato —'}</span>
+                  <span style={{ fontSize: 12, color: '#8A94A0' }}>· {r.proc.length} {r.proc.length === 1 ? 'procedura' : 'procedure'}</span>
+                </div>
+                <div className="table-wrap">
+                  <table>
+                    <thead><tr><th style={{ width: 110 }}>Codice</th><th>Procedura</th><th style={{ width: 120 }}>Stato</th></tr></thead>
+                    <tbody>
+                      {r.proc.map((p, i) => (
+                        <tr key={i}>
+                          <td style={{ fontWeight: 700, color: '#1D9E75', fontSize: 12 }}>{p.codice}</td>
+                          <td style={{ fontSize: 13 }}>{p.titolo}</td>
+                          <td style={{ fontSize: 12, color: '#666' }}>{p.stato}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
