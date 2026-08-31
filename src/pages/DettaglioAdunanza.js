@@ -35,6 +35,8 @@ export default function DettaglioAdunanza() {
   const [templateId, setTemplateId] = useState('') // modello selezionato
   const [componenti, setComponenti] = useState([]) // membri dell'organo (per circolarizzare)
   const [ticketCirc, setTicketCirc] = useState([]) // ticket di questa adunanza (tracciamento)
+  const [delibRichiamate, setDelibRichiamate] = useState([]) // delibere preparate richiamate in trattazione
+  const [delibDisponibili, setDelibDisponibili] = useState([]) // delibere preparate richiamabili
   const [circMsg, setCircMsg] = useState(null)
 
   // Carica i modelli di verbale dell'azienda
@@ -60,6 +62,9 @@ export default function DettaglioAdunanza() {
       const { data: org } = await supabase.from('organi').select('*').eq('id', a.organo_id).single()
       setOrgano(org || null)
 
+      // Delibere preparate richiamate in questa seduta + quelle richiamabili
+      await caricaDelibere(org)
+
       // componenti dell'organo (per circolarizzare ai membri)
       const { data: comp } = await supabase.from('organo_membri')
         .select('membro_id, ruolo, membri(nome,cognome,email)').eq('organo_id', a.organo_id)
@@ -82,6 +87,53 @@ export default function DettaglioAdunanza() {
   }, [adunanzaId])
 
   const setTestata = (k, v) => setAd(a => ({ ...a, [k]: v }))
+
+  // Carica le delibere richiamate in questa seduta e quelle richiamabili
+  async function caricaDelibere(org) {
+    if (!adunanzaId || !azienda?.id) return
+    // richiamate: legami di questa adunanza + dati della determina
+    const { data: legami } = await supabase.from('adunanza_delibere')
+      .select('*, determine(oggetto, tipo, organo, stato, numero, anno)')
+      .eq('adunanza_id', adunanzaId).order('ordine')
+    setDelibRichiamate(legami || [])
+
+    // organi da cui questa seduta può richiamare (regola: stesso organo,
+    // + l'assemblea può richiamare anche cda e amministratore_unico)
+    const tipo = org?.tipo || organo?.tipo
+    let organiAmmessi = [tipo]
+    if (tipo === 'assemblea') organiAmmessi = ['assemblea', 'cda', 'amministratore_unico']
+
+    // disponibili: determine dell'azienda con organo ammesso, non già richiamate qui
+    const giaRichiamate = new Set((legami || []).map(l => l.determina_id))
+    const { data: dets } = await supabase.from('determine')
+      .select('id, oggetto, tipo, organo, stato, numero, anno')
+      .eq('azienda_id', azienda.id).in('organo', organiAmmessi)
+      .order('created_at', { ascending: false })
+    setDelibDisponibili((dets || []).filter(d => !giaRichiamate.has(d.id)))
+  }
+
+  async function richiamaDelibera(determinaId) {
+    const det = delibDisponibili.find(d => d.id === determinaId)
+    const ordine = delibRichiamate.length + 1
+    await supabase.from('adunanza_delibere').insert({
+      azienda_id: azienda.id, adunanza_id: adunanzaId, determina_id: determinaId,
+      testo_odg: det?.oggetto || '', ordine,
+    })
+    // aggiungo anche il punto all'OdG (stato locale), poi l'utente può ritoccarlo
+    setPunti(p => [...p, { titolo: det?.oggetto || 'Delibera', relatore: '', con_delibera: true }])
+    caricaDelibere(organo)
+  }
+
+  async function aggiornaTestoOdg(legameId, testo) {
+    await supabase.from('adunanza_delibere').update({ testo_odg: testo }).eq('id', legameId)
+    setDelibRichiamate(prev => prev.map(l => l.id === legameId ? { ...l, testo_odg: testo } : l))
+  }
+
+  async function rimuoviRichiamo(legame) {
+    if (!window.confirm('Rimuovere questa delibera dalla trattazione della seduta? (la delibera preparata e i suoi allegati restano, viene tolto solo il richiamo qui)')) return
+    await supabase.from('adunanza_delibere').delete().eq('id', legame.id)
+    caricaDelibere(organo)
+  }
 
   async function caricaTicket() {
     if (!adunanzaId) return
@@ -484,6 +536,51 @@ export default function DettaglioAdunanza() {
             <input className="form-control" value={ad.ora_chiusura || ''} disabled={soloLettura} onChange={e => setTestata('ora_chiusura', e.target.value)} placeholder="es. 18:30" />
           </div>
         </div>
+      </div>
+
+      {/* Delibere in trattazione (richiamo delibere preparate) */}
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">Delibere in trattazione</span>
+        </div>
+        <p style={{ fontSize: 12, color: '#999', marginBottom: 10 }}>
+          Richiama le delibere/determine già preparate (con il loro fascicolo di supporto) da mettere all'ordine del giorno di questa seduta. Puoi poi completare l'OdG con punti liberi qui sotto.
+        </p>
+        {!soloLettura && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+            <select className="form-control" style={{ flex: 1, minWidth: 220 }} value="" onChange={e => { if (e.target.value) richiamaDelibera(e.target.value) }}>
+              <option value="">+ Richiama una delibera preparata…</option>
+              {delibDisponibili.map(d => (
+                <option key={d.id} value={d.id}>
+                  {d.oggetto || '(senza oggetto)'}{d.organo && d.organo !== organo?.tipo ? ` · da ${ORGANO_LABEL[d.organo] || d.organo}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        {delibRichiamate.length === 0 ? (
+          <div style={{ fontSize: 13, color: '#999' }}>Nessuna delibera preparata richiamata in questa seduta.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {delibRichiamate.map(l => (
+              <div key={l.id} style={{ border: '1px solid #E8ECF2', borderRadius: 8, padding: '10px 12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#1A3A5C', flex: 1 }}>
+                    📎 {l.determine?.oggetto || 'Delibera'}
+                    {l.determine?.organo && l.determine.organo !== organo?.tipo && (
+                      <span style={{ fontSize: 11, color: '#8A6D3B', marginLeft: 6 }}>· da {ORGANO_LABEL[l.determine.organo] || l.determine.organo}</span>
+                    )}
+                  </span>
+                  {!soloLettura && <button className="btn btn-sm btn-danger" onClick={() => rimuoviRichiamo(l)}>Rimuovi</button>}
+                </div>
+                <label style={{ fontSize: 11, color: '#8A94A0' }}>Testo del punto all'ordine del giorno (modificabile)</label>
+                <input className="form-control" style={{ fontSize: 13, marginTop: 4 }} value={l.testo_odg || ''} disabled={soloLettura}
+                  onChange={e => aggiornaTestoOdg(l.id, e.target.value)}
+                  placeholder="Es. Deliberazioni in merito ai contratti di fornitura" />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Ordine del giorno */}
