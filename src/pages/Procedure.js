@@ -124,7 +124,7 @@ export default function Procedure() {
       supabase.from('procedure_azienda').select('*').eq('azienda_id', azienda.id),
       supabase.from('ruoli').select('id, sigla, nome, membro_id').eq('azienda_id', azienda.id).order('sigla'),
       supabase.from('membri').select('id, nome, cognome, email').eq('azienda_id', azienda.id).order('cognome'),
-      supabase.from('procedure_catalogo').select('codice, area, titolo, funzioni')
+      supabase.from('procedure_catalogo').select('codice, area, titolo, funzioni, settore')
         .in('settore', [azienda.settore, 'generico'].filter(Boolean)).eq('attivo', true).order('codice'),
     ])
     const map = {}
@@ -132,7 +132,17 @@ export default function Procedure() {
     setAdozioni(map)
     setRuoli(r.data || [])
     setMembri(m.data || [])
-    setCatalogo(c.data || [])
+    // Dedup per codice: se un codice esiste sia nel settore dell'azienda sia in
+    // 'generico', tengo SOLO la versione del settore specifico (che ha priorità).
+    const perCodice = {}
+    ;(c.data || []).forEach(p => {
+      const esist = perCodice[p.codice]
+      if (!esist) { perCodice[p.codice] = p; return }
+      // preferisci il settore dell'azienda rispetto al generico
+      if (p.settore === azienda.settore) perCodice[p.codice] = p
+    })
+    const catalogoDedup = Object.values(perCodice).sort((a, b) => a.codice.localeCompare(b.codice))
+    setCatalogo(catalogoDedup)
     setLoading(false)
   }, [azienda.id])
 
