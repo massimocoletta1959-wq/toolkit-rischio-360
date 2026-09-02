@@ -38,19 +38,13 @@ function DistribuzioneModal({ proc, defaultMembroId, membri, aziendaId, onClose,
     const righe = dest.map(m => ({
       azienda_id: aziendaId,
       membro_id: m.id,
-      titolo: 'Presa visione: ' + proc.titolo,
+      titolo: `Presa visione ${proc.codice}: ${proc.titolo}`,
       istruzioni: `Prendi visione della procedura ${proc.codice} — ${proc.titolo}, poi segna il ticket come "Completato" per confermare.`,
       tipo: 'presa_visione',
-      procedura_id: proc.codice,
       priorita: 'Media',
       stato: 'Aperto',
     }))
-    let { data: creati, error } = await supabase.from('ticket').insert(righe).select('id')
-    if (error && /procedura_id|column|type|invalid|uuid/i.test(error.message)) {
-      // ripiego: alcune installazioni hanno procedura_id non testuale
-      const righe2 = righe.map(({ procedura_id, ...r }) => r)
-      ;({ data: creati, error } = await supabase.from('ticket').insert(righe2).select('id'))
-    }
+    const { data: creati, error } = await supabase.from('ticket').insert(righe).select('id')
     if (error) { setLoading(false); setErr(error.message); return }
 
     // Avvisa via email (stesso meccanismo dei ticket manuali)

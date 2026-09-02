@@ -7,7 +7,9 @@ import { CATALOGO_PROCEDURE, AREE_PROCEDURE } from '../lib/procedure'
 // Estrae il codice procedura (es. PRO-AMM-004) da un ticket di presa visione
 function codiceDaTicket(t) {
   const src = `${t.procedura_id || ''} ${t.istruzioni || ''} ${t.titolo || ''}`
-  const m = src.match(/PRO-[A-Z0-9]+-\d+/)
+  // codice procedura: sigla area (2-6 lettere maiuscole) + trattino + numero, es. AMM-01, ACQ-3
+  // (riconosce anche il vecchio formato PRO-AMM-004)
+  const m = src.match(/\b[A-Z]{2,6}-\d{1,3}\b/)
   return m ? m[0] : null
 }
 
