@@ -174,29 +174,47 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
         }
       }
 
-      // 3) GOVERNANCE: se attivo e c'e' la visura, crea organo + componenti (dati reali dalla visura)
+      // 3) GOVERNANCE: se attivo e c'e' la visura, crea organo/i + componenti (dati reali dalla visura)
       if (modGovernance && visuraData?.componenti?.length) {
         try {
           const org = visuraData.organo || {}
+          const isSindaco = c => /sindaco|presidente collegio sindacale/i.test(c.ruolo || '')
+          const componentiCda       = visuraData.componenti.filter(c => !isSindaco(c))
+          const componentiSindacali = visuraData.componenti.filter(isSindaco)
+
+          async function creaComponenti(organoId, lista, ruoloDefault) {
+            for (const c of lista) {
+              const { data: m } = await supabase.from('membri').insert({
+                azienda_id: aziendaId,
+                nome: c.nome || '', cognome: c.cognome || '',
+                email: c.pec || null, pec: c.pec || null,
+                ruolo: c.ruolo || ruoloDefault,
+              }).select().single()
+              if (organoId && m) {
+                await supabase.from('organo_membri').insert({
+                  organo_id: organoId, membro_id: m.id, ruolo: c.ruolo || 'Componente',
+                  data_nomina: c.data_nomina || null,
+                })
+              }
+            }
+          }
+
           const { data: organo } = await supabase.from('organi').insert({
             azienda_id: aziendaId,
             tipo: org.tipo || 'cda',
             nome: org.nome || 'Consiglio di Amministrazione',
             monocratico: org.tipo === 'amministratore_unico',
           }).select().single()
-          for (const c of visuraData.componenti) {
-            const { data: m } = await supabase.from('membri').insert({
+          await creaComponenti(organo?.id, componentiCda, 'Amministratore')
+
+          if (componentiSindacali.length) {
+            const { data: collegio } = await supabase.from('organi').insert({
               azienda_id: aziendaId,
-              nome: c.nome || '', cognome: c.cognome || '',
-              email: c.pec || null, pec: c.pec || null,
-              ruolo: c.ruolo || 'Amministratore',
+              tipo: 'collegio_sindacale',
+              nome: 'Collegio Sindacale',
+              monocratico: false,
             }).select().single()
-            if (organo && m) {
-              await supabase.from('organo_membri').insert({
-                organo_id: organo.id, membro_id: m.id, ruolo: c.ruolo || 'Componente',
-                data_nomina: c.data_nomina || null,
-              })
-            }
+            await creaComponenti(collegio?.id, componentiSindacali, 'Sindaco')
           }
         } catch (gErr) { console.error('Governance da visura:', gErr) }
       }
