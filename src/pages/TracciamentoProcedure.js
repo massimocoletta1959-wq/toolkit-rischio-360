@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
-import { CATALOGO_PROCEDURE, AREE_PROCEDURE } from '../lib/procedure'
+import { AREE_PROCEDURE } from '../lib/procedure'
 
 const EDGE = 'https://vwbixmbbcutjcplskjvg.supabase.co/functions/v1/invia-email'
 
-// Codice procedura (es. PRO-AMM-004) da un ticket di presa visione
+// Codice procedura (es. AMM-01, ACQ-3; riconosce anche il vecchio formato PRO-AMM-004) da un ticket di presa visione
 function codiceDaTicket(t) {
   const src = `${t.procedura_id || ''} ${t.istruzioni || ''} ${t.titolo || ''}`
-  const m = src.match(/PRO-[A-Z0-9]+-\d+/)
+  const m = src.match(/\b[A-Z]{2,6}-\d{1,3}\b/)
   return m ? m[0] : null
 }
 
@@ -29,9 +29,18 @@ export default function TracciamentoProcedure() {
       supabase.from('procedure_azienda').select('codice, stato').eq('azienda_id', A),
       supabase.from('ticket').select('id, procedura_id, istruzioni, titolo, membro_id, stato, data_presa_visione').eq('azienda_id', A).eq('tipo', 'presa_visione'),
       supabase.from('membri').select('id, nome, cognome, email').eq('azienda_id', A),
+      supabase.from('procedure_catalogo').select('codice, area, titolo, settore')
+        .in('settore', [azienda.settore, 'generico'].filter(Boolean)).eq('attivo', true),
     ])
     const val = i => (res[i].status === 'fulfilled' ? (res[i].value.data || []) : [])
-    const pa = val(0), tk = val(1), mb = val(2)
+    const pa = val(0), tk = val(1), mb = val(2), cat = val(3)
+
+    // Dedup per codice: priorità al settore specifico dell'azienda rispetto al generico
+    const perCodiceCatalogo = {}
+    cat.forEach(p => {
+      if (!perCodiceCatalogo[p.codice] || p.settore === azienda.settore) perCodiceCatalogo[p.codice] = p
+    })
+    const catalogo = Object.values(perCodiceCatalogo)
 
     const nomeMembro = id => {
       const m = mb.find(x => x.id === id)
@@ -51,7 +60,7 @@ export default function TracciamentoProcedure() {
 
     // Costruisci una riga per ogni procedura rilevante (adottata o distribuita)
     const out = []
-    CATALOGO_PROCEDURE.forEach(p => {
+    catalogo.forEach(p => {
       const stato = adozione[p.codice]
       const adottata = stato === 'Adottata' || stato === 'Personalizzata'
       const ticketsP = perCodice[p.codice] || []
