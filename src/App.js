@@ -143,7 +143,10 @@ export default function App() {
 
     const savedId = localStorage.getItem('azienda_attiva')
     const saved   = tutteAziende.find(a => a.id === savedId)
-    setAziendaState(saved || tutteAziende[0] || null)
+    const attiva  = saved || tutteAziende[0] || null
+    setAziendaState(attiva)
+    if (attiva) localStorage.setItem('azienda_attiva', attiva.id)
+    else localStorage.removeItem('azienda_attiva')
   }
 
   // Elimina le bozze provvisorie orfane di un'azienda (fascicoli inclusi)
