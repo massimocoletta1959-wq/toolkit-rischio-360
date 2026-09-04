@@ -178,7 +178,7 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
       if (modGovernance && visuraData?.componenti?.length) {
         try {
           const org = visuraData.organo || {}
-          const isSindaco = c => /sindaco|presidente collegio sindacale/i.test(c.ruolo || '')
+          const isSindaco = c => /sindaco|sindaca|collegio sindacale/i.test(c.ruolo || '')
           const componentiCda       = visuraData.componenti.filter(c => !isSindaco(c))
           const componentiSindacali = visuraData.componenti.filter(isSindaco)
 
