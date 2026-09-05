@@ -217,6 +217,7 @@ export default function PianoAzione() {
     if (filterTier === '12') return t.tier === 'Tier 1' || t.tier === 'Tier 2'
     if (filterTier === '1')  return t.tier === 'Tier 1'
     if (filterTier === '2')  return t.tier === 'Tier 2'
+    if (filterTier === '3')  return t.tier === 'Tier 3'
     return true
   }).sort((a, b) => {
     const ta = getTier(a.probabilita, a.impatto)
@@ -242,7 +243,7 @@ export default function PianoAzione() {
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        {[['12','Tier 1 + 2'], ['1','Solo Tier 1'], ['2','Solo Tier 2'], ['all','Tutti']].map(([v, l]) => (
+        {[['12','Tier 1 + 2'], ['1','Solo Tier 1'], ['2','Solo Tier 2'], ['3','Solo Tier 3'], ['all','Tutti']].map(([v, l]) => (
           <button key={v} className={`btn btn-sm${filterTier === v ? ' btn-primary' : ''}`} onClick={() => setFilterTier(v)}>{l}</button>
         ))}
         <select className="form-control" style={{ maxWidth: 220, marginLeft: 8 }} value={filterCategoria} onChange={e => setFilterCategoria(e.target.value)}>
