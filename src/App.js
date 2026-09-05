@@ -123,8 +123,30 @@ export default function App() {
   }
 
   async function loadDati(userId) {
-    const { data: prof } = await supabase
+    let { data: prof } = await supabase
       .from('profili').select('*').eq('id', userId).single()
+
+    if (!prof) {
+      // Ripara un membro già collegato (membri.user_id = userId) ma senza
+      // profilo/utente_aziende — es. profilo perso in passato — invece di
+      // trattarlo come un consulente nuovo e mandarlo su Setup.
+      const { data: mieiMembri } = await supabase
+        .from('membri').select('id, azienda_id, email').eq('user_id', userId)
+      if (mieiMembri && mieiMembri.length > 0) {
+        const { data: { user } } = await supabase.auth.getUser()
+        const primo = mieiMembri[0]
+        await supabase.from('profili').insert({
+          id: userId, email: user?.email || primo.email || '', nome: '',
+          azienda_id: primo.azienda_id, ruolo: 'membro', membro_id: primo.id,
+        })
+        for (const m of mieiMembri) {
+          await supabase.from('utente_aziende').upsert({
+            utente_id: userId, azienda_id: m.azienda_id, ruolo: 'membro',
+          }, { onConflict: 'utente_id,azienda_id' })
+        }
+        ;({ data: prof } = await supabase.from('profili').select('*').eq('id', userId).single())
+      }
+    }
 
     if (!prof) {
       setProfilo(null); setAziende([]); setAziendaState(null)
