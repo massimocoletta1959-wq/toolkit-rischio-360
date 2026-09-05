@@ -212,6 +212,7 @@ export default function GestioneTicket() {
   const [filterPriorita, setFilterPriorita] = useState('')
   const [filterMembro, setFilterMembro]   = useState('')
   const [filterCategoria, setFilterCategoria] = useState('')
+  const [filterTier, setFilterTier]       = useState('')
   const [delConfirm, setDelConfirm]       = useState(null)
   const [tab, setTab]           = useState('tutti') // tutti | miei
 
@@ -253,6 +254,10 @@ export default function GestioneTicket() {
     if (filterPriorita && t.priorita !== filterPriorita) return false
     if (filterMembro && t.membro_id !== filterMembro) return false
     if (filterCategoria && t.rischi?.categoria !== filterCategoria) return false
+    if (filterTier) {
+      if (!t.rischi?.probabilita || !t.rischi?.impatto) return false
+      if (getTier(t.rischi.probabilita, t.rischi.impatto).tier !== `Tier ${filterTier}`) return false
+    }
     return true
   })
 
@@ -305,8 +310,15 @@ export default function GestioneTicket() {
               <option key={cat} value={cat}>{cat}</option>
             ))}
           </select>
-          {(filterStato || filterPriorita || filterMembro || filterCategoria) && (
-            <button className="btn btn-sm" onClick={() => { setFilterStato(''); setFilterPriorita(''); setFilterMembro(''); setFilterCategoria('') }}>✕ Reset</button>
+          <select className="form-control" style={{ maxWidth: 140 }} value={filterTier} onChange={e => setFilterTier(e.target.value)}>
+            <option value="">Tutti i tier</option>
+            <option value="1">Tier 1</option>
+            <option value="2">Tier 2</option>
+            <option value="3">Tier 3</option>
+            <option value="4">Tier 4</option>
+          </select>
+          {(filterStato || filterPriorita || filterMembro || filterCategoria || filterTier) && (
+            <button className="btn btn-sm" onClick={() => { setFilterStato(''); setFilterPriorita(''); setFilterMembro(''); setFilterCategoria(''); setFilterTier('') }}>✕ Reset</button>
           )}
         </div>
 
@@ -350,15 +362,6 @@ export default function GestioneTicket() {
                         {t.email_inviata && <span style={{ fontSize: 11, color: '#27AE60' }}>✓ Email inviata</span>}
                         {t.created_at && <span style={{ fontSize: 12, color: '#999' }}>🕓 Creato il {new Date(t.created_at).toLocaleDateString('it-IT')}</span>}
                       </div>
-                      {t.rischi && (
-                        <div style={{ marginTop: 6, fontSize: 12, color: '#888' }}>
-                          🔗 {t.rischi.descrizione.substring(0, 60)}{t.rischi.descrizione.length > 60 ? '…' : ''}
-                          {t.rischi.probabilita && t.rischi.impatto && (() => {
-                            const tier = getTier(t.rischi.probabilita, t.rischi.impatto)
-                            return <span className="badge" style={{ background: tier.bg, color: tier.color, marginLeft: 6, fontSize: 10 }}>{tier.tier}</span>
-                          })()}
-                        </div>
-                      )}
                       {((t.ticket_note && t.ticket_note.length > 0) || t.note_membro) && (
                         <div style={{ marginTop: 8, padding: '8px 12px', background: '#F7F8FA', borderRadius: 6, fontSize: 12, color: '#555' }}>
                           <strong style={{ fontSize: 11, color: '#888', display: 'block', marginBottom: 4 }}>💬 STORICO AGGIORNAMENTI</strong>
@@ -371,10 +374,22 @@ export default function GestioneTicket() {
                         </div>
                       )}
                     </div>
-                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                      <button className="btn btn-sm btn-icon" title="Aggiungi nota" onClick={() => setNotaModal(t)}>💬</button>
-                      <button className="btn btn-sm btn-icon" onClick={() => setModal(t)}>✏️</button>
-                      <button className="btn btn-sm btn-icon btn-danger" onClick={() => setDelConfirm(t)}>🗑️</button>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
+                      {t.rischi && (
+                        <div style={{ textAlign: 'right', maxWidth: 220 }}>
+                          {t.rischi.categoria && <div style={{ fontSize: 11, color: '#888' }}>{t.rischi.categoria}</div>}
+                          <div style={{ fontSize: 12, color: '#555' }}>{t.rischi.descrizione.substring(0, 60)}{t.rischi.descrizione.length > 60 ? '…' : ''}</div>
+                          {t.rischi.probabilita && t.rischi.impatto && (() => {
+                            const tier = getTier(t.rischi.probabilita, t.rischi.impatto)
+                            return <span className="badge" style={{ background: tier.bg, color: tier.color, fontSize: 10 }}>{tier.tier}</span>
+                          })()}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button className="btn btn-sm btn-icon" title="Aggiungi nota" onClick={() => setNotaModal(t)}>💬</button>
+                        <button className="btn btn-sm btn-icon" onClick={() => setModal(t)}>✏️</button>
+                        <button className="btn btn-sm btn-icon btn-danger" onClick={() => setDelConfirm(t)}>🗑️</button>
+                      </div>
                     </div>
                   </div>
                 </div>
