@@ -36,6 +36,7 @@ const MODULI = {
       { id: 'modelli_determina', label: 'Modelli determine', icon: '🗂️' },
       { id: 'verbali', label: 'Assemblee e verbali', icon: '🗳️' },
       { id: 'modelli_verbale', label: 'Modelli verbale', icon: '📝' },
+      { id: 'dossier_bjr', label: 'Dossier BJR', icon: '📁' },
       { id: 'ticket', label: 'Ticket', icon: '🎫' },
     ],
   },

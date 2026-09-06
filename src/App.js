@@ -19,6 +19,7 @@ import NuovaDetermina from './pages/NuovaDetermina'
 import Verbali from './pages/Verbali'
 import DettaglioAdunanza from './pages/DettaglioAdunanza'
 import ModelliVerbale from './pages/ModelliVerbale'
+import DossierBJR from './pages/DossierBJR'
 import ModelliDetermina from './pages/ModelliDetermina'
 import Home from './pages/Home'
 import Layout from './components/Layout'
@@ -298,6 +299,7 @@ export default function App() {
     verbali:      <Verbali />,
     adunanza:     <DettaglioAdunanza key={adunanzaId || 'nuova'} />,
     modelli_verbale: <ModelliVerbale />,
+    dossier_bjr: <DossierBJR />,
     modelli_determina: <ModelliDetermina />,
     procedure:    <Procedure />,
     tracciamento: <TracciamentoProcedure />,
