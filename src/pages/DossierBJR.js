@@ -129,6 +129,100 @@ export default function DossierBJR() {
 
   const score = dossier ? calcolaScore(dossier) : null
 
+  function stampaFascicolo() {
+    if (!dossier || !score) return
+    const esc = s => (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const { ad, organo, isAssemblea, delibere, richiami, componenti, presenze, ticket, eventi, voti, allegati, rischi, pareri } = dossier
+
+    const criteriHtml = score.criteri.map(c =>
+      `<tr><td>${Math.round(c.valore * 100)}%</td><td>${esc(c.label)}</td><td>${esc(c.dettaglio)}</td></tr>`
+    ).join('')
+
+    const presenzeHtml = (isAssemblea && componenti.length > 0) ? `
+      <h2>Presenze soci</h2>
+      <table><thead><tr><th>Socio</th><th>Quota</th><th>Presenza</th></tr></thead><tbody>
+      ${componenti.map(c => {
+        const p = presenze.find(x => x.membro_id === c.membro_id)
+        const stato = p ? (p.modalita === 'delega' ? `Per delega${p.delegato ? ` (${esc(p.delegato)})` : ''}` : 'In presenza') : 'Non dichiarato'
+        return `<tr><td>${esc(nomeDi(c.membri))}</td><td>${c.quota != null ? c.quota + '%' : '—'}</td><td>${stato}</td></tr>`
+      }).join('')}
+      </tbody></table>` : ''
+
+    const deliberetHtml = delibere.map(del => {
+      const votiDel = voti.filter(v => v.delibera_id === del.id)
+      const richiamo = richiami.find(r => (r.testo_odg || '').trim() === (del.oggetto || '').trim()) || null
+      const det = richiamo?.determine || null
+      const allegatiDet = det ? allegati.filter(a => a.determina_id === det.id) : []
+      const rischiDet = det ? rischi.filter(r => r.determina_id === det.id) : []
+      const pareriDet = det ? pareri.filter(p => p.determina_id === det.id) : []
+      const votiHtml = votiDel.length ? `<div class="voti">${votiDel.map(v => {
+        const c = componenti.find(x => x.membro_id === v.membro_id)
+        return `${esc(c ? nomeDi(c.membri) : '—')}: <b>${esc(v.voto)}</b>`
+      }).join('<br>')}</div>` : `<div class="nota">solo totale aggregato, nessun voto nominativo</div>`
+      const attoHtml = det ? `<div class="atto"><b>Atto istruito:</b> ${esc(det.oggetto)}${det.valore ? ` — € ${Number(det.valore).toLocaleString('it-IT')}` : ''}
+        ${rischiDet.length ? `<br>Rischi: ${rischiDet.map(r => `${esc(r.categoria)} (liv. ${r.livello})`).join(', ')}` : ''}
+        <br>Pareri: ${pareriDet.length ? pareriDet.map(p => esc(p.tipo)).join(', ') : 'nessuno'} · Allegati: ${allegatiDet.length}</div>` : ''
+      return `<div class="delibera">
+        <div class="dt"><span>${esc(del.oggetto)}</span><span class="esito ${esc(del.esito)}">${esc(del.esito)}</span></div>
+        ${del.testo ? `<p>${esc(del.testo)}</p>` : ''}
+        <div class="totali">Favorevoli${isAssemblea ? ' (%)' : ''}: <b>${del.favorevoli}</b> · Contrari: <b>${del.contrari}</b> · Astenuti: <b>${del.astenuti}</b></div>
+        ${votiHtml}
+        ${attoHtml}
+      </div>`
+    }).join('')
+
+    const circHtml = ticket.length ? `
+      <h2>Circolarizzazione e presa visione</h2>
+      <table><thead><tr><th>Destinatario</th><th>Tipo</th><th>Titolo</th><th>Presa visione</th></tr></thead><tbody>
+      ${ticket.map(t => `<tr><td>${esc(nomeDi(t.membri))}</td><td>${esc(t.tipo)}</td><td>${esc(t.titolo)}</td><td>${t.data_presa_visione ? dataFmt(t.data_presa_visione) : 'in attesa'}</td></tr>`).join('')}
+      </tbody></table>` : ''
+
+    const eventiHtml = eventi.length ? `
+      <h2>Cronologia</h2>
+      ${eventi.map(e => `<div class="evento">${dataFmt(e.created_at)} — <b>${esc(e.evento)}</b>${e.dettaglio ? ` — ${esc(e.dettaglio)}` : ''}</div>`).join('')}` : ''
+
+    const w = window.open('', '_blank')
+    if (!w) return
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Dossier BJR — ${esc(ad.titolo)}</title>
+      <style>
+        @page { size: A4 portrait; margin: 1.6cm; }
+        body { font-family: -apple-system, Arial, sans-serif; color: #1A3A5C; font-size: 12px; line-height: 1.5; }
+        h1 { font-size: 18px; margin: 0 0 2px; }
+        .sub { font-size: 12px; color: #8A94A0; margin-bottom: 4px; }
+        .hash { font-size: 9px; color: #999; font-family: monospace; word-break: break-all; margin-bottom: 16px; }
+        .score { text-align: center; font-size: 30px; font-weight: 800; margin: 10px 0 2px; }
+        .scoreLbl { text-align: center; font-size: 11px; color: #999; margin-bottom: 14px; }
+        h2 { font-size: 14px; color: #1A3A5C; border-bottom: 1px solid #CBD5E1; padding-bottom: 4px; margin-top: 22px; }
+        table { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-top: 6px; }
+        th { text-align: left; background: #F2F5F9; padding: 5px 8px; font-size: 11px; color: #5B6673; }
+        td { padding: 5px 8px; border-bottom: 1px solid #EEE; }
+        .delibera { border: 1px solid #E0E0E0; border-radius: 6px; padding: 10px 12px; margin-top: 10px; page-break-inside: avoid; }
+        .dt { display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 4px; }
+        .esito { font-size: 10px; padding: 2px 8px; border-radius: 10px; }
+        .esito.approvata { background: #E9F7EF; color: #1E8449; } .esito.respinta { background: #FDEDEC; color: #C0392B; } .esito.rinviata { background: #FEF9E7; color: #856404; }
+        .totali { font-size: 11.5px; color: #555; margin: 6px 0; }
+        .voti { background: #F7F8FA; border-radius: 5px; padding: 6px 8px; font-size: 11px; margin-bottom: 6px; }
+        .nota { font-size: 11px; color: #B7791F; margin-bottom: 6px; }
+        .atto { border-top: 1px dashed #E0E0E0; padding-top: 6px; font-size: 11.5px; color: #555; }
+        .evento { font-size: 11px; color: #555; margin-bottom: 2px; }
+      </style></head><body>
+      <h1>Dossier BJR — ${esc(ad.titolo)}</h1>
+      <div class="sub">${esc(ORGANO_LABEL[organo?.tipo] || 'Organo')} · N. ${numFmt(ad)} · Verbalizzata il ${dataFmt(ad.data_verbale)}</div>
+      ${ad.hash_documento ? `<div class="hash">SHA-256: ${esc(ad.hash_documento)}</div>` : ''}
+      <div class="score" style="color:${scoreColore(score.punteggio)}">${score.punteggio != null ? score.punteggio + '%' : '—'}</div>
+      <div class="scoreLbl">score conformità</div>
+      <h2>Criteri verificati</h2>
+      <table><thead><tr><th style="width:60px">%</th><th>Criterio</th><th>Dettaglio</th></tr></thead><tbody>${criteriHtml}</tbody></table>
+      ${presenzeHtml}
+      <h2>Delibere trattate</h2>
+      ${deliberetHtml || '<p>Nessuna delibera registrata.</p>'}
+      ${circHtml}
+      ${eventiHtml}
+      <script>window.onload = function(){ window.print(); }</script>
+      </body></html>`)
+    w.document.close()
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -176,6 +270,7 @@ export default function DossierBJR() {
               </div>
               <div style={{ fontSize: 11, color: '#999' }}>score conformità</div>
             </div>
+            <button className="btn btn-sm" onClick={stampaFascicolo}>🖨️ Stampa / PDF</button>
           </div>
 
           {/* Criteri dello score */}
