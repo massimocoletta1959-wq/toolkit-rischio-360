@@ -98,25 +98,35 @@ export default function Organigramma() {
   const { azienda } = useApp()
   const [ruoli, setRuoli]     = useState([])
   const [membri, setMembri]   = useState([])
+  const [team, setTeam]       = useState([])   // ruolo_team: membri aggiuntivi oltre al responsabile
   const [procedure, setProcedure] = useState([])
   const [loading, setLoading] = useState(true)
   const [nuovo, setNuovo]     = useState(null)
   const [editNome, setEditNome] = useState(null)
   const [error, setError]     = useState(null)
   const [modoPagina, setModoPagina] = useState('organigramma')  // 'organigramma' | 'funzionigramma'
+  const [promuovi, setPromuovi] = useState(null)  // ruolo per cui va scelto il nuovo responsabile
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [r, m, p] = await Promise.all([
+    const [r, m, t, p] = await Promise.all([
       supabase.from('ruoli').select('*').eq('azienda_id', azienda.id).order('sigla'),
       supabase.from('membri').select('id, nome, cognome').eq('azienda_id', azienda.id).order('cognome'),
+      supabase.from('ruolo_team').select('*').eq('azienda_id', azienda.id),
       supabase.from('procedure_azienda').select('codice, titolo, stato, ruolo_id').eq('azienda_id', azienda.id).not('ruolo_id', 'is', null),
     ])
     setRuoli(r.data || [])
     setMembri(m.data || [])
+    setTeam(t.data || [])
     setProcedure(p.data || [])
     setLoading(false)
   }, [azienda.id])
+
+  const teamDiRuolo = (ruoloId) => team.filter(t => t.ruolo_id === ruoloId)
+  const nomeMembro = (id) => {
+    const m = membri.find(x => x.id === id)
+    return m ? `${m.nome || ''} ${m.cognome || ''}`.trim() : null
+  }
 
   useEffect(() => { load() }, [load])
 
@@ -133,7 +143,37 @@ export default function Organigramma() {
   }
 
   async function assegna(ruolo, membroId) {
+    // Rimozione del responsabile con team non vuoto: va scelto chi lo sostituisce
+    if (!membroId && ruolo.membro_id && teamDiRuolo(ruolo.id).length > 0) {
+      setPromuovi(ruolo)
+      return
+    }
+    // Se il nuovo responsabile era già nel team, lo tolgo da lì (evita doppia presenza)
+    const eraNelTeam = team.find(t => t.ruolo_id === ruolo.id && t.membro_id === membroId)
+    if (eraNelTeam) await supabase.from('ruolo_team').delete().eq('id', eraNelTeam.id)
     await supabase.from('ruoli').update({ membro_id: membroId || null }).eq('id', ruolo.id)
+    load()
+  }
+
+  // Scelta del nuovo responsabile dopo la rimozione del precedente (tra i membri del team, o nessuno)
+  async function promuoviResponsabile(ruolo, nuovoMembroId) {
+    if (nuovoMembroId) {
+      const riga = team.find(t => t.ruolo_id === ruolo.id && t.membro_id === nuovoMembroId)
+      if (riga) await supabase.from('ruolo_team').delete().eq('id', riga.id)
+    }
+    await supabase.from('ruoli').update({ membro_id: nuovoMembroId || null }).eq('id', ruolo.id)
+    setPromuovi(null); load()
+  }
+
+  async function aggiungiAlTeam(ruolo, membroId) {
+    if (!membroId) return
+    const { error: err } = await supabase.from('ruolo_team').insert({ azienda_id: azienda.id, ruolo_id: ruolo.id, membro_id: membroId })
+    if (err) { setError(err.message); return }
+    load()
+  }
+
+  async function rimuoviDalTeam(teamId) {
+    await supabase.from('ruolo_team').delete().eq('id', teamId)
     load()
   }
 
@@ -203,7 +243,7 @@ export default function Organigramma() {
 
       {/* Vista: organigramma a fasce/albero, oppure funzionigramma */}
       {!loading && ruoli.length > 0 && modoPagina === 'organigramma' && (
-        <OrganigrammaVista ruoli={ruoli} membri={membri} azienda={azienda} />
+        <OrganigrammaVista ruoli={ruoli} membri={membri} team={team} azienda={azienda} />
       )}
       {!loading && ruoli.length > 0 && modoPagina === 'funzionigramma' && (
         <FunzionigrammaVista ruoli={ruoli} membri={membri} procedure={procedure} azienda={azienda} />
@@ -259,11 +299,29 @@ export default function Organigramma() {
                     <option key={x.id} value={x.id}>↳ {x.sigla}</option>
                   ))}
                 </select>
+                <span style={{ fontSize: 11, color: '#999' }}>Responsabile</span>
                 <select className="form-control" style={{ width: 200 }} value={r.membro_id || ''} onChange={e => assegna(r, e.target.value)}>
                   <option value="">— Non assegnato —</option>
                   {membri.map(m => <option key={m.id} value={m.id}>{m.nome} {m.cognome}</option>)}
                 </select>
                 <button className="btn btn-sm btn-icon btn-danger" onClick={() => elimina(r.id)}>🗑️</button>
+
+                <div style={{ width: '100%', marginTop: 4, paddingTop: 8, borderTop: '1px dashed #E0E0E0', display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: '#999' }}>Team:</span>
+                  {teamDiRuolo(r.id).map(t => (
+                    <span key={t.id} className="badge" style={{ background: '#EAF2FC', color: '#2B5FA5', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      {nomeMembro(t.membro_id) || '—'}
+                      <button onClick={() => rimuoviDalTeam(t.id)} title="Rimuovi dal team"
+                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#C0392B', fontSize: 12, padding: 0, lineHeight: 1 }}>×</button>
+                    </span>
+                  ))}
+                  <select className="form-control" style={{ width: 170, fontSize: 12 }} value=""
+                    onChange={e => aggiungiAlTeam(r, e.target.value)}>
+                    <option value="">+ Aggiungi al team</option>
+                    {membri.filter(m => m.id !== r.membro_id && !teamDiRuolo(r.id).some(t => t.membro_id === m.id))
+                      .map(m => <option key={m.id} value={m.id}>{m.nome} {m.cognome}</option>)}
+                  </select>
+                </div>
               </div>
             ))}
           </div>
@@ -273,6 +331,29 @@ export default function Organigramma() {
       {membri.length === 0 && !loading && (
         <div className="alert alert-info" style={{ marginTop: 14 }}>
           💡 Non ci sono ancora membri in questa azienda: crea prima i membri in <strong>Membri</strong>, poi torna qui per assegnarli ai ruoli.
+        </div>
+      )}
+
+      {promuovi && (
+        <div className="modal-overlay" onClick={() => setPromuovi(null)}>
+          <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+            <h3 className="modal-title" style={{ marginBottom: 8 }}>Chi diventa responsabile di {promuovi.sigla}?</h3>
+            <p style={{ fontSize: 13, color: '#666', marginBottom: 14 }}>
+              Stai rimuovendo {nomeMembro(promuovi.membro_id) || 'il responsabile attuale'}. Scegli chi prende il suo posto tra i membri del team, oppure lascia il ruolo scoperto.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+              {teamDiRuolo(promuovi.id).map(t => (
+                <button key={t.id} className="btn btn-sm" style={{ justifyContent: 'flex-start' }}
+                  onClick={() => promuoviResponsabile(promuovi, t.membro_id)}>
+                  {nomeMembro(t.membro_id) || '—'}
+                </button>
+              ))}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-sm" onClick={() => promuoviResponsabile(promuovi, null)}>Lascia il ruolo scoperto</button>
+              <button className="btn" onClick={() => setPromuovi(null)}>Annulla</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -286,7 +367,7 @@ const FASCE_VISTA = [
   { key: 'staff',      label: 'Supporto (Staff)', colore: '#2B5FA5', bg: '#EAF2FC' },
 ]
 
-function OrganigrammaVista({ ruoli, membri, azienda }) {
+function OrganigrammaVista({ ruoli, membri, team = [], azienda }) {
   const [vista, setVista] = useState('fasce')   // 'fasce' | 'albero'
   const nomeMembro = (id) => {
     const m = membri.find(x => x.id === id)
@@ -367,6 +448,7 @@ function OrganigrammaVista({ ruoli, membri, azienda }) {
   // Casella singola (ruolo + persona), con i figli annidati sotto
   const Casella = ({ r, livello }) => {
     const persona = r.membro_id ? nomeMembro(r.membro_id) : null
+    const teamCount = team.filter(t => t.ruolo_id === r.id).length
     const figli = ruoli.filter(x => x.parent_id === r.id)
     return (
       <div className="og-node">
@@ -379,6 +461,7 @@ function OrganigrammaVista({ ruoli, membri, azienda }) {
           <div style={{ fontSize: 13, fontWeight: 600, color: '#1A3A5C', lineHeight: 1.25 }}>{r.nome}</div>
           <div style={{ fontSize: 12, color: persona ? '#2B8A6B' : '#B9770E', marginTop: 4 }}>
             {persona || '— Non assegnato —'}
+            {teamCount > 0 && <span style={{ marginLeft: 4, fontSize: 11, color: '#8A94A0' }}>+{teamCount}</span>}
           </div>
         </div>
         {figli.length > 0 && (
