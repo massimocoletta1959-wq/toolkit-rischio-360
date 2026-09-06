@@ -564,21 +564,27 @@ function OrganigrammaVista({ ruoli, membri, team = [], azienda }) {
   // Casella singola (ruolo + persona), con i figli annidati sotto
   const Casella = ({ r, livello }) => {
     const persona = r.membro_id ? nomeMembro(r.membro_id) : null
-    const teamCount = team.filter(t => t.ruolo_id === r.id).length
+    const teamMembri = team.filter(t => t.ruolo_id === r.id).map(t => nomeMembro(t.membro_id)).filter(Boolean)
     const figli = ruoli.filter(x => x.parent_id === r.id)
     return (
       <div className="og-node">
         <div style={{
           border: `1.5px solid ${persona ? '#CBD5E1' : '#E5B84B'}`,
-          background: '#fff', borderRadius: 10, padding: '10px 14px', minWidth: 170, maxWidth: 220,
+          background: '#fff', borderRadius: 10, padding: '10px 14px', minWidth: 170, maxWidth: 240,
           textAlign: 'center', boxShadow: '0 1px 3px rgba(26,58,92,0.08)',
         }}>
           <div style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, background: '#1A3A5C', color: '#fff', padding: '2px 8px', borderRadius: 10, marginBottom: 5 }}>{r.sigla}</div>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#1A3A5C', lineHeight: 1.25 }}>{r.nome}</div>
           <div style={{ fontSize: 12, color: persona ? '#2B8A6B' : '#B9770E', marginTop: 4 }}>
             {persona || '— Non assegnato —'}
-            {teamCount > 0 && <span style={{ marginLeft: 4, fontSize: 11, color: '#8A94A0' }}>+{teamCount}</span>}
           </div>
+          {teamMembri.length > 0 && (
+            <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed #E2E8F0' }}>
+              {teamMembri.map((nome, i) => (
+                <div key={i} style={{ fontSize: 11, color: '#8A94A0', lineHeight: 1.5 }}>{nome}</div>
+              ))}
+            </div>
+          )}
         </div>
         {figli.length > 0 && (
           <>
