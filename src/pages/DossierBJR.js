@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
 
@@ -71,6 +72,7 @@ export default function DossierBJR() {
   const [selId, setSelId] = useState('')
   const [dossier, setDossier] = useState(null)
   const [loadingDossier, setLoadingDossier] = useState(false)
+  const [generandoPdf, setGenerandoPdf] = useState(false)
 
   const load = useCallback(async () => {
     if (!azienda?.id) return
@@ -133,6 +135,161 @@ export default function DossierBJR() {
     const { data, error } = await supabase.storage.from('fascicoli').createSignedUrl(allegato.storage_path, 120)
     if (error || !data?.signedUrl) return
     window.open(data.signedUrl, '_blank')
+  }
+
+  // Genera un unico PDF che fonde il testo del fascicolo con il contenuto degli allegati:
+  // le pagine dei PDF vengono fuse, le immagini incorporate come pagina; i formati non
+  // incorporabili (Word, Excel, ecc.) restano solo elencati in coda con il riferimento.
+  async function generaPdfCompleto() {
+    if (!dossier || !score) return
+    setGenerandoPdf(true)
+    try {
+      const pdfDoc = await PDFDocument.create()
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+      const PAGE_W = 595.28, PAGE_H = 841.89, MARGIN = 50
+      const MAX_W = PAGE_W - MARGIN * 2
+      const colTitolo = rgb(0.10, 0.23, 0.36), colGrigio = rgb(0.55, 0.58, 0.63), colAvviso = rgb(0.6, 0.45, 0.05)
+
+      let page = pdfDoc.addPage([PAGE_W, PAGE_H])
+      let y = PAGE_H - MARGIN
+      const newPage = () => { page = pdfDoc.addPage([PAGE_W, PAGE_H]); y = PAGE_H - MARGIN }
+      const ensureSpace = h => { if (y - h < MARGIN) newPage() }
+
+      // Costruisce riga per riga controllando la larghezza col font scelto (word-wrap manuale)
+      function drawText(text, { size = 9.5, f = font, color = rgb(0.15, 0.15, 0.18), gap = 3 } = {}) {
+        String(text).split('\n').forEach(paragraph => {
+          let line = ''
+          const words = paragraph.split(/\s+/).filter(Boolean)
+          const flush = () => { if (line) { ensureSpace(size + gap); page.drawText(line, { x: MARGIN, y, size, font: f, color }); y -= size + gap; line = '' } }
+          if (words.length === 0) { ensureSpace(size + gap); y -= size + gap; return }
+          words.forEach(w => {
+            const test = line ? line + ' ' + w : w
+            if (f.widthOfTextAtSize(test, size) > MAX_W && line) { flush(); line = w } else { line = test }
+          })
+          flush()
+        })
+      }
+      function drawHeading(text) {
+        ensureSpace(26); y -= 6
+        page.drawText(text, { x: MARGIN, y, size: 13, font: fontBold, color: colTitolo })
+        y -= 4
+        page.drawLine({ start: { x: MARGIN, y }, end: { x: PAGE_W - MARGIN, y }, thickness: 0.5, color: rgb(0.8, 0.8, 0.85) })
+        y -= 14
+      }
+      const spacer = (h = 8) => { y -= h }
+
+      drawText(`Dossier BJR — ${dossier.ad.titolo}`, { size: 16, f: fontBold, color: colTitolo })
+      drawText(`${ORGANO_LABEL[dossier.organo?.tipo] || 'Organo'} · N. ${numFmt(dossier.ad)} · Verbalizzata il ${dataFmt(dossier.ad.data_verbale)}`, { size: 10, color: colGrigio })
+      if (dossier.ad.hash_documento) drawText(`SHA-256: ${dossier.ad.hash_documento}`, { size: 7, color: colGrigio })
+      spacer(6)
+      drawText(`Score conformità: ${score.punteggio != null ? score.punteggio + '%' : '—'}`, { size: 14, f: fontBold })
+      spacer(10)
+
+      drawHeading('Criteri verificati')
+      score.criteri.forEach(c => drawText(`${Math.round(c.valore * 100)}%  ${c.label} — ${c.dettaglio}`))
+
+      if (dossier.isAssemblea && dossier.componenti.length) {
+        spacer(8); drawHeading('Presenze soci')
+        dossier.componenti.forEach(c => {
+          const p = dossier.presenze.find(x => x.membro_id === c.membro_id)
+          const stato = p ? (p.modalita === 'delega' ? `Per delega${p.delegato ? ` (${p.delegato})` : ''}` : 'In presenza') : 'Non dichiarato'
+          drawText(`${nomeDi(c.membri)}${c.quota != null ? ` — ${c.quota}%` : ''} — ${stato}`)
+        })
+      }
+
+      spacer(8); drawHeading('Delibere trattate')
+      const daIncorporare = []   // allegati da tentare di incorporare, con riferimento alla delibera
+      if (dossier.delibere.length === 0) drawText('Nessuna delibera registrata in questa seduta.')
+      dossier.delibere.forEach(del => {
+        const votiDel = dossier.voti.filter(v => v.delibera_id === del.id)
+        const richiamo = dossier.richiami.find(r => (r.testo_odg || '').trim() === (del.oggetto || '').trim()) || null
+        const det = richiamo?.determine || null
+        const allegatiDet = det ? dossier.allegati.filter(a => a.determina_id === det.id) : []
+        const rischiDet = det ? dossier.rischi.filter(r => r.determina_id === det.id) : []
+        const pareriDet = det ? dossier.pareri.filter(p => p.determina_id === det.id) : []
+
+        drawText(`${del.oggetto}  [${del.esito}]`, { size: 11, f: fontBold })
+        drawText(del.testo || 'Nessun testo registrato per questa delibera.', del.testo ? {} : { color: colAvviso })
+        drawText(`Favorevoli${dossier.isAssemblea ? ' (%)' : ''}: ${del.favorevoli} · Contrari: ${del.contrari} · Astenuti: ${del.astenuti}`, { size: 9 })
+        if (votiDel.length) {
+          votiDel.forEach(v => {
+            const c = dossier.componenti.find(x => x.membro_id === v.membro_id)
+            drawText(`  • ${c ? nomeDi(c.membri) : '—'}: ${v.voto}`, { size: 9 })
+          })
+        } else {
+          drawText('  solo totale aggregato, nessun voto nominativo', { size: 9, color: colAvviso })
+        }
+        if (det) {
+          drawText(`Atto istruito: ${det.oggetto}${det.valore ? ` — € ${Number(det.valore).toLocaleString('it-IT')}` : ''}`, { size: 9 })
+          if (rischiDet.length) drawText(`Rischi: ${rischiDet.map(r => `${r.categoria} (liv. ${r.livello})`).join(', ')}`, { size: 9 })
+          drawText(`Pareri: ${pareriDet.length ? pareriDet.map(p => p.tipo).join(', ') : 'nessuno'}`, { size: 9 })
+          drawText(`Allegati: ${allegatiDet.length ? allegatiDet.map(a => a.nome_file).join(', ') : 'nessuno'}`, { size: 9 })
+          allegatiDet.forEach(a => daIncorporare.push({ ...a, deliberaOggetto: del.oggetto }))
+        }
+        spacer(10)
+      })
+
+      drawHeading('Circolarizzazione e presa visione')
+      if (dossier.ticket.length === 0) drawText('Nessun ticket di circolarizzazione collegato a questa seduta.')
+      dossier.ticket.forEach(t => drawText(`${nomeDi(t.membri)} — ${t.tipo} — ${t.titolo} — ${t.data_presa_visione ? dataFmt(t.data_presa_visione) : 'in attesa'}`, { size: 9 }))
+
+      spacer(8); drawHeading('Cronologia')
+      if (dossier.eventi.length === 0) drawText('Nessun evento registrato.')
+      dossier.eventi.forEach(e => drawText(`${dataFmt(e.created_at)} — ${e.evento}${e.dettaglio ? ` — ${e.dettaglio}` : ''}`, { size: 9 }))
+
+      // ── Allegati incorporati (una copertina + contenuto per ciascuno) ──
+      const nonIncorporabili = []
+      for (const a of daIncorporare) {
+        const ext = (a.nome_file.split('.').pop() || '').toLowerCase()
+        const embeddable = ext === 'pdf' || ext === 'png' || ext === 'jpg' || ext === 'jpeg'
+        if (!embeddable) { nonIncorporabili.push(a); continue }
+        try {
+          const { data: blob, error } = await supabase.storage.from('fascicoli').download(a.storage_path)
+          if (error || !blob) { nonIncorporabili.push(a); continue }
+          const bytes = new Uint8Array(await blob.arrayBuffer())
+          if (ext === 'pdf') {
+            const src = await PDFDocument.load(bytes)
+            const pagineCopiate = await pdfDoc.copyPages(src, src.getPageIndices())
+            newPage()
+            drawText(`Allegato: ${a.nome_file}`, { size: 12, f: fontBold, color: colTitolo })
+            drawText(`Riferito a: ${a.deliberaOggetto}`, { size: 9, color: colGrigio })
+            pagineCopiate.forEach(p => pdfDoc.addPage(p))
+          } else {
+            const img = ext === 'png' ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes)
+            newPage()
+            drawText(`Allegato: ${a.nome_file}`, { size: 12, f: fontBold, color: colTitolo })
+            drawText(`Riferito a: ${a.deliberaOggetto}`, { size: 9, color: colGrigio })
+            newPage()
+            const scale = Math.min(MAX_W / img.width, (PAGE_H - MARGIN * 2) / img.height, 1)
+            const w = img.width * scale, h = img.height * scale
+            page.drawImage(img, { x: (PAGE_W - w) / 2, y: (PAGE_H - h) / 2, width: w, height: h })
+          }
+        } catch (e) {
+          nonIncorporabili.push(a)
+        }
+      }
+
+      if (nonIncorporabili.length) {
+        newPage()
+        drawHeading('Allegati non incorporabili in questo PDF')
+        drawText('Formato non incorporabile (es. Word/Excel): apri il file originale dal fascicolo a schermo.', { size: 9, color: colGrigio })
+        spacer(6)
+        nonIncorporabili.forEach(a => drawText(`${a.nome_file} — riferito a: ${a.deliberaOggetto}`, { size: 9.5 }))
+      }
+
+      const bytes = await pdfDoc.save()
+      const blob = new Blob([bytes], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `Dossier-BJR-${(dossier.ad.titolo || 'seduta').replace(/[^\w-]+/g, '_')}.pdf`
+      document.body.appendChild(link); link.click(); document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      alert('Errore nella generazione del PDF: ' + (e.message || e))
+    }
+    setGenerandoPdf(false)
   }
 
   function stampaFascicolo() {
@@ -278,7 +435,12 @@ export default function DossierBJR() {
               </div>
               <div style={{ fontSize: 11, color: '#999' }}>score conformità</div>
             </div>
-            <button className="btn btn-sm" onClick={stampaFascicolo}>🖨️ Stampa / PDF</button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <button className="btn btn-sm" onClick={stampaFascicolo}>🖨️ Stampa rapida</button>
+              <button className="btn btn-sm btn-primary" onClick={generaPdfCompleto} disabled={generandoPdf}>
+                {generandoPdf ? 'Generazione…' : '📄 PDF con allegati'}
+              </button>
+            </div>
           </div>
 
           {/* Criteri dello score */}
