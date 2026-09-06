@@ -129,6 +129,12 @@ export default function DossierBJR() {
 
   const score = dossier ? calcolaScore(dossier) : null
 
+  async function apriAllegato(allegato) {
+    const { data, error } = await supabase.storage.from('fascicoli').createSignedUrl(allegato.storage_path, 120)
+    if (error || !data?.signedUrl) return
+    window.open(data.signedUrl, '_blank')
+  }
+
   function stampaFascicolo() {
     if (!dossier || !score) return
     const esc = s => (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -161,10 +167,11 @@ export default function DossierBJR() {
       }).join('<br>')}</div>` : `<div class="nota">solo totale aggregato, nessun voto nominativo</div>`
       const attoHtml = det ? `<div class="atto"><b>Atto istruito:</b> ${esc(det.oggetto)}${det.valore ? ` — € ${Number(det.valore).toLocaleString('it-IT')}` : ''}
         ${rischiDet.length ? `<br>Rischi: ${rischiDet.map(r => `${esc(r.categoria)} (liv. ${r.livello})`).join(', ')}` : ''}
-        <br>Pareri: ${pareriDet.length ? pareriDet.map(p => esc(p.tipo)).join(', ') : 'nessuno'} · Allegati: ${allegatiDet.length}</div>` : ''
+        <br>Pareri: ${pareriDet.length ? pareriDet.map(p => esc(p.tipo)).join(', ') : 'nessuno'}
+        <br>Allegati: ${allegatiDet.length ? allegatiDet.map(a => esc(a.nome_file)).join(', ') : 'nessuno'}</div>` : ''
       return `<div class="delibera">
         <div class="dt"><span>${esc(del.oggetto)}</span><span class="esito ${esc(del.esito)}">${esc(del.esito)}</span></div>
-        ${del.testo ? `<p>${esc(del.testo)}</p>` : ''}
+        ${del.testo ? `<div class="testoLbl">TESTO DELLA DELIBERA</div><p>${esc(del.testo)}</p>` : '<p class="nota">Nessun testo registrato per questa delibera.</p>'}
         <div class="totali">Favorevoli${isAssemblea ? ' (%)' : ''}: <b>${del.favorevoli}</b> · Contrari: <b>${del.contrari}</b> · Astenuti: <b>${del.astenuti}</b></div>
         ${votiHtml}
         ${attoHtml}
@@ -203,6 +210,7 @@ export default function DossierBJR() {
         .totali { font-size: 11.5px; color: #555; margin: 6px 0; }
         .voti { background: #F7F8FA; border-radius: 5px; padding: 6px 8px; font-size: 11px; margin-bottom: 6px; }
         .nota { font-size: 11px; color: #B7791F; margin-bottom: 6px; }
+        .testoLbl { font-size: 10px; font-weight: 700; color: #888; margin-top: 4px; }
         .atto { border-top: 1px dashed #E0E0E0; padding-top: 6px; font-size: 11.5px; color: #555; }
         .evento { font-size: 11px; color: #555; margin-bottom: 2px; }
       </style></head><body>
@@ -327,7 +335,14 @@ export default function DossierBJR() {
                         <span style={{ fontWeight: 700, flex: 1 }}>{del.oggetto}</span>
                         <span className="badge" style={ESITO_STYLE[del.esito]}>{del.esito}</span>
                       </div>
-                      {del.testo && <p style={{ fontSize: 13, color: '#444', marginBottom: 8, whiteSpace: 'pre-wrap' }}>{del.testo}</p>}
+                      {del.testo ? (
+                        <div style={{ marginBottom: 8 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#888' }}>TESTO DELLA DELIBERA</div>
+                          <p style={{ fontSize: 13, color: '#444', margin: '2px 0 0', whiteSpace: 'pre-wrap' }}>{del.testo}</p>
+                        </div>
+                      ) : (
+                        <p style={{ fontSize: 12, color: '#B7791F', marginBottom: 8, fontStyle: 'italic' }}>Nessun testo registrato per questa delibera.</p>
+                      )}
                       <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
                         Favorevoli{dossier.isAssemblea ? ' (%)' : ''}: <strong>{del.favorevoli}</strong> · Contrari: <strong>{del.contrari}</strong> · Astenuti: <strong>{del.astenuti}</strong>
                         {votiDel.length === 0 && <span style={{ color: '#B7791F' }}> — solo totale aggregato, nessun voto nominativo</span>}
@@ -344,7 +359,17 @@ export default function DossierBJR() {
                         <div style={{ borderTop: '1px dashed #E0E0E0', paddingTop: 8, marginTop: 4, fontSize: 12.5, color: '#555' }}>
                           <div><strong>Atto istruito:</strong> {det.oggetto} {det.valore ? `— € ${Number(det.valore).toLocaleString('it-IT')}` : ''}</div>
                           {rischiDet.length > 0 && <div>Rischi valutati: {rischiDet.map(r => `${r.categoria} (liv. ${r.livello})`).join(', ')}</div>}
-                          <div>Pareri: {pareriDet.length > 0 ? pareriDet.map(p => p.tipo).join(', ') : 'nessuno'} · Allegati: {allegatiDet.length}</div>
+                          <div>Pareri: {pareriDet.length > 0 ? pareriDet.map(p => p.tipo).join(', ') : 'nessuno'}</div>
+                          <div style={{ marginTop: 4 }}>
+                            Allegati: {allegatiDet.length === 0 ? 'nessuno' : (
+                              <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 6, verticalAlign: 'middle' }}>
+                                {allegatiDet.map(a => (
+                                  <button key={a.id} type="button" className="btn btn-sm" style={{ fontSize: 11, padding: '2px 8px' }}
+                                    onClick={() => apriAllegato(a)}>📎 {a.nome_file}</button>
+                                ))}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
