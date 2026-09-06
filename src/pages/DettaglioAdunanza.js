@@ -29,7 +29,9 @@ export default function DettaglioAdunanza() {
   const [ad, setAd] = useState(null)         // testata adunanza
   const [organo, setOrgano] = useState(null)
   const [punti, setPunti] = useState([])     // [{titolo, relatore, con_delibera}]
-  const [delibere, setDelibere] = useState([]) // [{oggetto, testo, favorevoli, contrari, astenuti, esito}]
+  const [delibere, setDelibere] = useState([]) // [{id, oggetto, testo, favorevoli, contrari, astenuti, esito}]
+  const [voti, setVoti] = useState([])         // voti nominativi delle delibere di questa adunanza
+  const [presenze, setPresenze] = useState([]) // presenza/delega dei soci (solo assemblea)
   const [verbale, setVerbale] = useState('')
   const [modelli, setModelli] = useState([])       // modelli di verbale dell'azienda
   const [templateId, setTemplateId] = useState('') // modello selezionato
@@ -65,9 +67,9 @@ export default function DettaglioAdunanza() {
       // Delibere preparate richiamate in questa seduta + quelle richiamabili
       await caricaDelibere(org)
 
-      // componenti dell'organo (per circolarizzare ai membri)
+      // componenti dell'organo (per circolarizzare ai membri, e per i voti nominativi)
       const { data: comp } = await supabase.from('organo_membri')
-        .select('membro_id, ruolo, membri(nome,cognome,email)').eq('organo_id', a.organo_id)
+        .select('membro_id, ruolo, quota, membri(nome,cognome,email)').eq('organo_id', a.organo_id)
       setComponenti(comp || [])
 
       // ticket già circolarizzati per questa adunanza (tracciamento)
@@ -78,9 +80,17 @@ export default function DettaglioAdunanza() {
 
       const { data: dd } = await supabase.from('delibere').select('*').eq('adunanza_id', adunanzaId).order('created_at')
       setDelibere((dd || []).map(d => ({
-        oggetto: d.oggetto, testo: d.testo || '', favorevoli: d.favorevoli, contrari: d.contrari,
+        id: d.id, oggetto: d.oggetto, testo: d.testo || '', favorevoli: d.favorevoli, contrari: d.contrari,
         astenuti: d.astenuti, esito: d.esito, area_231: d.area_231 || '',
       })))
+      const idDelibere = (dd || []).map(d => d.id)
+      if (idDelibere.length) {
+        const { data: vv } = await supabase.from('voti').select('*').in('delibera_id', idDelibere)
+        setVoti(vv || [])
+      } else setVoti([])
+
+      const { data: pr } = await supabase.from('adunanza_presenze').select('*').eq('adunanza_id', adunanzaId)
+      setPresenze(pr || [])
 
       setCaricata(true)
     })()
@@ -234,6 +244,58 @@ export default function DettaglioAdunanza() {
   const addDelibera = () => setDelibere(d => [...d, { oggetto: '', testo: '', favorevoli: 0, contrari: 0, astenuti: 0, esito: 'approvata', area_231: '' }])
   const setDel = (i, k, v) => setDelibere(d => d.map((x, j) => j === i ? { ...x, [k]: v } : x))
   const delDelibera = i => setDelibere(d => d.filter((_, j) => j !== i))
+
+  // ── Voti nominativi (tabella voti: assenza di riga = assente) ──
+  const isAssemblea = organo?.tipo === 'assemblea'
+  const votiDiDelibera = (deliberaId) => voti.filter(v => v.delibera_id === deliberaId)
+  const votoDi = (deliberaId, membroId) => votiDiDelibera(deliberaId).find(v => v.membro_id === membroId)?.voto || ''
+
+  // Ricalcola favorevoli/contrari/astenuti dai voti nominativi — per testa negli organi
+  // collegiali, in % di quota per l'assemblea — e li salva subito sulla delibera.
+  async function ricalcolaTotali(delibera, votiDelibera) {
+    let favorevoli, contrari, astenuti
+    if (isAssemblea) {
+      const quotaTot = componenti.reduce((s, c) => s + (Number(c.quota) || 0), 0) || 100
+      const quotaDi = (membroId) => Number(componenti.find(c => c.membro_id === membroId)?.quota) || 0
+      const percentuale = (voto) => Math.round((votiDelibera.filter(v => v.voto === voto).reduce((s, v) => s + quotaDi(v.membro_id), 0) / quotaTot) * 100)
+      favorevoli = percentuale('favorevole'); contrari = percentuale('contrario'); astenuti = percentuale('astenuto')
+    } else {
+      favorevoli = votiDelibera.filter(v => v.voto === 'favorevole').length
+      contrari = votiDelibera.filter(v => v.voto === 'contrario').length
+      astenuti = votiDelibera.filter(v => v.voto === 'astenuto').length
+    }
+    setDelibere(d => d.map(x => x.id === delibera.id ? { ...x, favorevoli, contrari, astenuti } : x))
+    await supabase.from('delibere').update({ favorevoli, contrari, astenuti }).eq('id', delibera.id)
+  }
+
+  async function impostaVoto(delibera, membroId, valore) {
+    if (!delibera.id) return
+    if (valore) {
+      await supabase.from('voti').upsert(
+        { azienda_id: azienda.id, delibera_id: delibera.id, membro_id: membroId, voto: valore },
+        { onConflict: 'delibera_id,membro_id' }
+      )
+    } else {
+      await supabase.from('voti').delete().eq('delibera_id', delibera.id).eq('membro_id', membroId)
+    }
+    const { data: vv } = await supabase.from('voti').select('*').eq('delibera_id', delibera.id)
+    setVoti(v => [...v.filter(x => x.delibera_id !== delibera.id), ...(vv || [])])
+    ricalcolaTotali(delibera, vv || [])
+  }
+
+  // ── Presenza/delega dei soci (solo assemblea) ──
+  const presenzaDi = (membroId) => presenze.find(p => p.membro_id === membroId) || { modalita: 'presenza', delegato: '' }
+
+  async function impostaPresenza(membroId, patch) {
+    const attuale = presenzaDi(membroId)
+    const nuova = { ...attuale, ...patch }
+    const { data, error } = await supabase.from('adunanza_presenze').upsert(
+      { azienda_id: azienda.id, adunanza_id: adunanzaId, membro_id: membroId, modalita: nuova.modalita, delegato: nuova.delegato || null },
+      { onConflict: 'adunanza_id,membro_id' }
+    ).select().single()
+    if (error) return
+    setPresenze(p => [...p.filter(x => x.membro_id !== membroId), data])
+  }
 
   // Applica un modello (facsimile con segnaposti) riempiendolo coi dati correnti
   function applicaModello(tpl) {
@@ -419,16 +481,30 @@ export default function DettaglioAdunanza() {
         if (error) throw error
       }
 
-      // sync delibere (delete + insert)
-      await supabase.from('delibere').delete().eq('adunanza_id', adunanzaId)
-      if (delibere.length) {
-        const rows = delibere.map(d => ({
+      // sync delibere: aggiorna quelle esistenti e inserisce le nuove, mantenendo
+      // stabile l'id (serve per non perdere l'aggancio dei voti nominativi registrati).
+      // Elimina solo quelle rimosse dall'utente, insieme ai loro voti (nessuna cascade in DB).
+      const { data: esistenti } = await supabase.from('delibere').select('id').eq('adunanza_id', adunanzaId)
+      const idAttuali = new Set(delibere.filter(d => d.id).map(d => d.id))
+      const daEliminare = (esistenti || []).map(e => e.id).filter(id => !idAttuali.has(id))
+      if (daEliminare.length) {
+        await supabase.from('voti').delete().in('delibera_id', daEliminare)
+        await supabase.from('delibere').delete().in('id', daEliminare)
+      }
+      for (const d of delibere) {
+        const payload = {
           adunanza_id: adunanzaId, azienda_id: azienda.id, oggetto: d.oggetto || 'Delibera',
           testo: d.testo || null, favorevoli: Number(d.favorevoli) || 0, contrari: Number(d.contrari) || 0,
           astenuti: Number(d.astenuti) || 0, esito: d.esito, area_231: d.area_231 || null,
-        }))
-        const { error } = await supabase.from('delibere').insert(rows)
-        if (error) throw error
+        }
+        if (d.id) {
+          const { error } = await supabase.from('delibere').update(payload).eq('id', d.id)
+          if (error) throw error
+        } else {
+          const { data: nuova, error } = await supabase.from('delibere').insert(payload).select().single()
+          if (error) throw error
+          d.id = nuova.id
+        }
       }
 
       await supabase.from('governance_eventi').insert({
@@ -608,6 +684,36 @@ export default function DettaglioAdunanza() {
         componenti={componenti} ticket={ticketCirc} messaggio={circMsg}
         soloLettura={soloLettura} onInvia={circolarizza} onSollecita={sollecita} organoNome={organo?.nome} />
 
+      {/* Presenze soci (solo assemblea) */}
+      {isAssemblea && componenti.length > 0 && (
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Presenze soci</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {componenti.map(c => {
+              const nome = c.membri ? `${c.membri.nome || ''} ${c.membri.cognome || ''}`.trim() : 'Socio'
+              const p = presenzaDi(c.membro_id)
+              return (
+                <div key={c.membro_id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 13 }}>
+                  <span style={{ flex: 1, minWidth: 160 }}>{nome}{c.quota != null ? ` — ${c.quota}%` : ''}</span>
+                  <select className="form-control" style={{ width: 140, fontSize: 12 }} disabled={soloLettura}
+                    value={p.modalita} onChange={e => impostaPresenza(c.membro_id, { modalita: e.target.value })}>
+                    <option value="presenza">In presenza</option>
+                    <option value="delega">Per delega</option>
+                  </select>
+                  {p.modalita === 'delega' && (
+                    <input className="form-control" style={{ width: 200, fontSize: 12 }} disabled={soloLettura}
+                      value={p.delegato || ''} onChange={e => impostaPresenza(c.membro_id, { delegato: e.target.value })}
+                      placeholder="Nome del delegato" />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Delibere */}
       <div className="card">
         <div className="card-header">
@@ -629,16 +735,16 @@ export default function DettaglioAdunanza() {
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
               <div className="form-group" style={{ marginBottom: 0, width: 90 }}>
-                <label className="form-label">Favorevoli</label>
-                <input className="form-control" type="number" min="0" value={d.favorevoli} disabled={soloLettura} onChange={e => setDel(i, 'favorevoli', e.target.value)} />
+                <label className="form-label">Favorevoli{isAssemblea ? ' (%)' : ''}</label>
+                <input className="form-control" type="number" min="0" value={d.favorevoli} disabled={soloLettura || votiDiDelibera(d.id).length > 0} onChange={e => setDel(i, 'favorevoli', e.target.value)} />
               </div>
               <div className="form-group" style={{ marginBottom: 0, width: 90 }}>
-                <label className="form-label">Contrari</label>
-                <input className="form-control" type="number" min="0" value={d.contrari} disabled={soloLettura} onChange={e => setDel(i, 'contrari', e.target.value)} />
+                <label className="form-label">Contrari{isAssemblea ? ' (%)' : ''}</label>
+                <input className="form-control" type="number" min="0" value={d.contrari} disabled={soloLettura || votiDiDelibera(d.id).length > 0} onChange={e => setDel(i, 'contrari', e.target.value)} />
               </div>
               <div className="form-group" style={{ marginBottom: 0, width: 90 }}>
-                <label className="form-label">Astenuti</label>
-                <input className="form-control" type="number" min="0" value={d.astenuti} disabled={soloLettura} onChange={e => setDel(i, 'astenuti', e.target.value)} />
+                <label className="form-label">Astenuti{isAssemblea ? ' (%)' : ''}</label>
+                <input className="form-control" type="number" min="0" value={d.astenuti} disabled={soloLettura || votiDiDelibera(d.id).length > 0} onChange={e => setDel(i, 'astenuti', e.target.value)} />
               </div>
               <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: 130 }}>
                 <label className="form-label">Esito</label>
@@ -646,6 +752,42 @@ export default function DettaglioAdunanza() {
                   <option value="approvata">Approvata</option><option value="respinta">Respinta</option><option value="rinviata">Rinviata</option>
                 </select>
               </div>
+            </div>
+            {votiDiDelibera(d.id).length > 0 && (
+              <div style={{ fontSize: 11, color: '#8A94A0', marginTop: 4 }}>Calcolati automaticamente dai voti nominativi qui sotto.</div>
+            )}
+
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed #E0E0E0' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#5A4FCF', marginBottom: 6 }}>
+                Voti nominativi {isAssemblea ? '(soci, pesati per quota)' : '(componenti)'}
+              </div>
+              {!d.id ? (
+                <div style={{ fontSize: 12, color: '#999' }}>Salva prima la bozza per poter registrare i voti nominativi di questa delibera.</div>
+              ) : componenti.length === 0 ? (
+                <div style={{ fontSize: 12, color: '#999' }}>Nessun componente/socio in questo organo.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {componenti.map(c => {
+                    const nome = c.membri ? `${c.membri.nome || ''} ${c.membri.cognome || ''}`.trim() : 'Componente'
+                    const p = isAssemblea ? presenzaDi(c.membro_id) : null
+                    return (
+                      <div key={c.membro_id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                        <span style={{ flex: 1 }}>
+                          {nome}{isAssemblea && c.quota != null ? ` — ${c.quota}%` : ''}
+                          {p && p.modalita === 'delega' && <span style={{ color: '#8A94A0', fontSize: 11 }}> — per delega{p.delegato ? ` (${p.delegato})` : ''}</span>}
+                        </span>
+                        <select className="form-control" style={{ width: 150, fontSize: 12 }} disabled={soloLettura}
+                          value={votoDi(d.id, c.membro_id)} onChange={e => impostaVoto(d, c.membro_id, e.target.value)}>
+                          <option value="">Assente</option>
+                          <option value="favorevole">Favorevole</option>
+                          <option value="contrario">Contrario</option>
+                          <option value="astenuto">Astenuto</option>
+                        </select>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
         ))}
