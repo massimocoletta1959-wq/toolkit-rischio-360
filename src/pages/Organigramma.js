@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
 
@@ -106,6 +107,7 @@ export default function Organigramma() {
   const [error, setError]     = useState(null)
   const [modoPagina, setModoPagina] = useState('organigramma')  // 'organigramma' | 'funzionigramma'
   const [promuovi, setPromuovi] = useState(null)  // ruolo per cui va scelto il nuovo responsabile
+  const [importModal, setImportModal] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -254,6 +256,7 @@ export default function Organigramma() {
           <span className="card-title">🏛️ Ruoli dell'azienda</span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-sm" onClick={caricaStandard}>⬇️ Carica i ruoli standard</button>
+            <button className="btn btn-sm" onClick={() => setImportModal(true)}>📥 Importa da Excel</button>
             <button className="btn btn-sm btn-primary" onClick={() => { setNuovo({ sigla: '', nome: '' }); setError(null) }}>+ Ruolo</button>
           </div>
         </div>
@@ -356,6 +359,119 @@ export default function Organigramma() {
           </div>
         </div>
       )}
+
+      {importModal && (
+        <ImportExcelModal azienda={azienda} ruoli={ruoli} membri={membri}
+          onClose={() => setImportModal(false)} onDone={load} />
+      )}
+    </div>
+  )
+}
+
+// ── Import membri da Excel/CSV ──────────────────────────────────────────
+function ImportExcelModal({ azienda, ruoli, membri, onClose, onDone }) {
+  const [file, setFile] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [errore, setErrore] = useState(null)
+  const [risultato, setRisultato] = useState(null)  // { importati, saltati, errori }
+
+  function valore(row, ...nomiPossibili) {
+    const chiave = Object.keys(row).find(k => nomiPossibili.includes(k.trim().toLowerCase()))
+    return chiave != null ? String(row[chiave] ?? '').trim() : ''
+  }
+
+  async function elabora() {
+    if (!file) return
+    setLoading(true); setErrore(null); setRisultato(null)
+    try {
+      const buf = await file.arrayBuffer()
+      const wb = XLSX.read(buf, { type: 'array' })
+      const foglio = wb.Sheets[wb.SheetNames[0]]
+      const righe = XLSX.utils.sheet_to_json(foglio, { defval: '' })
+
+      const importati = [], saltati = [], errori = []
+      const emailViste = new Set(membri.map(m => (m.email || '').trim().toLowerCase()).filter(Boolean))
+      const respPerRuolo = {}
+      ruoli.forEach(r => { respPerRuolo[r.id] = r.membro_id })
+
+      for (let i = 0; i < righe.length; i++) {
+        const numRiga = i + 2   // +1 per l'header, +1 perché i è 0-based
+        try {
+          const reparto = valore(righe[i], 'reparto').toUpperCase()
+          const nome = valore(righe[i], 'nome')
+          const cognome = valore(righe[i], 'cognome')
+          const email = valore(righe[i], 'email').toLowerCase()
+
+          if (!reparto) { errori.push({ riga: numRiga, motivo: 'Reparto mancante' }); continue }
+          const ruolo = ruoli.find(r => (r.sigla || '').toUpperCase() === reparto)
+          if (!ruolo) { errori.push({ riga: numRiga, motivo: `Reparto "${reparto}" non esiste per questa azienda` }); continue }
+          if (!nome || !cognome) { errori.push({ riga: numRiga, motivo: 'Nome o cognome mancante' }); continue }
+          if (email && emailViste.has(email)) { saltati.push({ riga: numRiga, motivo: `Email "${email}" già esistente in questa azienda` }); continue }
+
+          const { data: nuovo, error: errIns } = await supabase.from('membri')
+            .insert({ azienda_id: azienda.id, nome, cognome, email: email || null }).select().single()
+          if (errIns) { errori.push({ riga: numRiga, motivo: errIns.message }); continue }
+          if (email) emailViste.add(email)
+
+          if (!respPerRuolo[ruolo.id]) {
+            await supabase.from('ruoli').update({ membro_id: nuovo.id }).eq('id', ruolo.id)
+            respPerRuolo[ruolo.id] = nuovo.id
+          } else {
+            await supabase.from('ruolo_team').insert({ azienda_id: azienda.id, ruolo_id: ruolo.id, membro_id: nuovo.id })
+          }
+          importati.push({ riga: numRiga, nome, cognome, reparto })
+        } catch (e) {
+          errori.push({ riga: numRiga, motivo: e.message || 'Errore imprevisto' })
+        }
+      }
+
+      setRisultato({ importati, saltati, errori })
+      onDone()
+    } catch (e) {
+      setErrore('File non leggibile: ' + (e.message || e))
+    }
+    setLoading(false)
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title">📥 Importa membri da Excel</h3>
+          <button className="btn btn-icon" onClick={onClose}>✕</button>
+        </div>
+        <p style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>
+          Il file (.xlsx, .xls o .csv) deve avere le colonne <strong>Reparto, Nome, Cognome, email</strong>. "Reparto" deve corrispondere alla sigla di un ruolo già esistente in questa azienda (es. AMM, IT).
+        </p>
+
+        {!risultato ? (
+          <>
+            <input type="file" accept=".xlsx,.xls,.csv" onChange={e => setFile(e.target.files?.[0] || null)} />
+            {errore && <div className="alert alert-error" style={{ marginTop: 12 }}>{errore}</div>}
+            <div className="modal-footer">
+              <button className="btn" onClick={onClose}>Annulla</button>
+              <button className="btn btn-primary" onClick={elabora} disabled={!file || loading}>{loading ? 'Importazione…' : 'Importa'}</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+              <span className="badge" style={{ background: '#D5F5E3', color: '#1E8449' }}>{risultato.importati.length} importati</span>
+              <span className="badge" style={{ background: '#FEF9E7', color: '#856404' }}>{risultato.saltati.length} saltati</span>
+              <span className="badge" style={{ background: '#FADBD8', color: '#C0392B' }}>{risultato.errori.length} errori</span>
+            </div>
+            {(risultato.saltati.length > 0 || risultato.errori.length > 0) && (
+              <div style={{ maxHeight: 220, overflowY: 'auto', fontSize: 12.5, background: '#F7F8FA', borderRadius: 8, padding: '8px 12px', marginBottom: 14 }}>
+                {risultato.saltati.map((s, i) => <div key={'s' + i} style={{ color: '#856404', padding: '2px 0' }}>Riga {s.riga}: saltata — {s.motivo}</div>)}
+                {risultato.errori.map((e, i) => <div key={'e' + i} style={{ color: '#C0392B', padding: '2px 0' }}>Riga {e.riga}: errore — {e.motivo}</div>)}
+              </div>
+            )}
+            <div className="modal-footer">
+              <button className="btn btn-primary" onClick={onClose}>Chiudi</button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
