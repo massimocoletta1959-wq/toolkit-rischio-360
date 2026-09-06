@@ -157,6 +157,10 @@ export default function NuovaDetermina() {
   const [mit, setMit] = useState({})
   const [pareri, setPareri] = useState([])
   const [nuovoParere, setNuovoParere] = useState({ tipo: 'legale', fonte: '', sintesi: '' })
+  const [corpoTesto, setCorpoTesto] = useState('')       // testo del documento, modificabile a mano
+  const [modelli, setModelli] = useState([])             // determina_template dell'organo attivo
+  const [templateId, setTemplateId] = useState('')       // modello scelto per "Importa modello"
+  const [tipiCustom, setTipiCustom] = useState([])       // tipi aggiunti dall'azienda, solo per il suo organo
 
   // Rileva l'organo amministrativo ATTUALE (AU o CdA) e il nominativo di riferimento
   // Carica le voci checklist aggiuntive per (azienda, tipo)
@@ -167,6 +171,20 @@ export default function NuovaDetermina() {
     setVociExtra(data || [])
   }, [azienda, tipo])
   useEffect(() => { caricaVociExtra() }, [caricaVociExtra])
+
+  // Modelli (determina_template) e tipi personalizzati dell'organo attivo
+  useEffect(() => {
+    (async () => {
+      if (!azienda?.id || organoAzienda === undefined) { setModelli([]); setTipiCustom([]); return }
+      const org = determinaOrgano || organoAzienda || 'amministratore_unico'
+      const [{ data: tpl }, { data: tc }] = await Promise.all([
+        supabase.from('determina_template').select('*').eq('azienda_id', azienda.id).eq('organo', org).order('created_at'),
+        supabase.from('determina_tipi_custom').select('*').eq('azienda_id', azienda.id).eq('organo', org).order('created_at'),
+      ])
+      setModelli(tpl || [])
+      setTipiCustom(tc || [])
+    })()
+  }, [azienda, organoAzienda, determinaOrgano])
 
   async function aggiungiVoceChecklist() {
     const t = nuovaVoce.trim()
@@ -229,6 +247,7 @@ export default function NuovaDetermina() {
       if (Array.isArray(det.checklist)) setChecklist(det.checklist)
       setAlternative(det.alternative || '')
       setArea231(det.area_231 || '')
+      setCorpoTesto(det.corpo_html || '')
       if (det.stato === 'firmata' || det.stato === 'annullata') setSoloLettura(true)
 
       const { data: rr } = await supabase.from('determina_rischi').select('*').eq('determina_id', determinaId)
@@ -253,6 +272,55 @@ export default function NuovaDetermina() {
     if (!nuovoParere.fonte.trim()) return
     setPareri(p => [...p, nuovoParere])
     setNuovoParere({ tipo: 'legale', fonte: '', sintesi: '' })
+  }
+
+  // Precompila i campi del wizard da un modello della libreria (determina_template)
+  function applicaModello(tpl) {
+    setTipo(tpl.tipo || tipo)
+    if (tpl.oggetto) setOggetto(tpl.oggetto)
+    setDescrizione(tpl.descrizione || '')
+    setConEconomica(tpl.con_analisi_economica !== false)
+    setAnalisiFin(tpl.analisi_finanziaria || '')
+    setAnalisiEco(tpl.analisi_economica || '')
+    setAlternative(tpl.alternative || '')
+    setArea231(tpl.area_231 || '')
+    const rk = { finanziario: 0, operativo: 0, legale_231: 0, reputazionale: 0 }
+    const mt = {}
+    ;(tpl.rischi || []).forEach(r => { if (r.categoria) { rk[r.categoria] = r.livello || 0; if (r.mitigazione) mt[r.categoria] = r.mitigazione } })
+    setRisk(rk); setMit(mt)
+    setCorpoTesto('')   // si rigenera dai nuovi campi con "↻ Genera" allo step Redazione
+  }
+
+  // Salva i campi correnti come nuovo modello riutilizzabile (determina_template)
+  async function salvaComeModello() {
+    const nome = window.prompt('Nome del modello:', oggetto ? `Modello: ${oggetto}` : '')
+    if (!nome || !nome.trim()) return
+    const rischi = RISK_CATS.filter(c => risk[c.id] > 0).map(c => ({ categoria: c.id, livello: risk[c.id], mitigazione: mit[c.id] || null }))
+    const payload = {
+      azienda_id: azienda.id, organo: organoAtto, nome: nome.trim(), tipo: tipo || null,
+      oggetto: oggetto || null, descrizione: descrizione || null,
+      con_analisi_economica: conEconomica,
+      analisi_finanziaria: conEconomica ? (analisiFin || null) : null,
+      analisi_economica: conEconomica ? (analisiEco || null) : null,
+      alternative: conEconomica ? (alternative || null) : null,
+      area_231: area231 || null, rischi,
+    }
+    const { data, error } = await supabase.from('determina_template').insert(payload).select().single()
+    if (error) { setErrore(error.message); return }
+    setModelli(m => [...m, data])
+  }
+
+  // Aggiunge un tipo personalizzato, valido solo per questa azienda e questo organo
+  async function aggiungiTipoCustom() {
+    const label = window.prompt(`Nome del nuovo tipo di ${isCda ? 'delibera' : 'determina'} (solo per questa azienda):`)
+    if (!label || !label.trim()) return
+    const descrizione = window.prompt('Descrizione (facoltativa): a cosa serve questo tipo?') || ''
+    const { data, error } = await supabase.from('determina_tipi_custom')
+      .insert({ azienda_id: azienda.id, organo: organoAtto, label: label.trim(), descrizione: descrizione.trim() || null })
+      .select().single()
+    if (error) { setErrore(error.message); return }
+    setTipiCustom(tc => [...tc, data])
+    setTipo('custom:' + data.id)
   }
 
   async function elimina() {
@@ -312,7 +380,7 @@ export default function NuovaDetermina() {
       analisi_finanziaria: conEconomica ? (analisiFin || null) : null,
       analisi_economica: conEconomica ? (analisiEco || null) : null,
       alternative: conEconomica ? (alternative || null) : null,
-      area_231: area231 || null, corpo_html: generaCorpo(null),
+      area_231: area231 || null, corpo_html: corpoTesto && corpoTesto.trim() ? corpoTesto : generaCorpo(null),
       stato: 'bozza', provvisoria: true,
     }
     const { data, error } = await supabase.from('determine').insert(campi).select().single()
@@ -334,6 +402,11 @@ export default function NuovaDetermina() {
     if (step === 6 && !determinaId && !bozzaProvvId && !soloLettura && oggetto.trim()) {
       assicuraBozzaProvvisoria()
     }
+  }, [step])
+
+  // Precompila il testo la prima volta che si arriva allo step di Redazione
+  useEffect(() => {
+    if (step === 5 && !corpoTesto && !soloLettura) setCorpoTesto(generaCorpo(null))
   }, [step])
 
   // Uscita dal wizard: se c'è una bozza provvisoria non confermata, la elimino
@@ -361,15 +434,16 @@ export default function NuovaDetermina() {
     setSaving(true)
     try {
       let numero = null, data_firma = null, hash = null, stato = 'bozza'
+      let corpo = corpoTesto && corpoTesto.trim() ? corpoTesto : generaCorpo(null)
       if (firma) {
         const { data: n, error: eN } = await supabase.rpc('prossimo_numero_determina', { p_azienda: azienda.id, p_anno: anno, p_organo: organoAtto })
         if (eN) throw eN
         numero = n
         data_firma = new Date().toISOString()
         stato = 'firmata'
-        hash = await sha256(generaCorpo(numero))
+        corpo = corpo.replace('N. —/', `N. ${String(numero).padStart(3, '0')}/`)
+        hash = await sha256(corpo)
       }
-      const corpo = generaCorpo(numero)
 
       const campi = {
         azienda_id: azienda.id, anno, tipo, organo: organoAtto, oggetto: oggetto.trim(), descrizione: descrizione || null,
@@ -418,7 +492,7 @@ export default function NuovaDetermina() {
       await supabase.from('governance_eventi').insert({
         azienda_id: azienda.id, determina_id: detId,
         evento: firma ? 'firma' : (determinaId ? 'aggiornamento_bozza' : 'creazione_bozza'),
-        dettaglio: `${TIPO_LABEL[tipo] || tipo} — ${oggetto.trim()}`,
+        dettaglio: `${labelDiTipo(tipo)} — ${oggetto.trim()}`,
       })
 
       setPage('au_registro')
@@ -433,6 +507,9 @@ export default function NuovaDetermina() {
   const organoAtto = determinaOrgano || organoAzienda || 'amministratore_unico'
   const attoId = determinaId || bozzaProvvId   // id per allegati/fascicolo
   const isCda = organoAtto === 'cda'
+  // Tipi standard + personalizzati di questa azienda, ed etichetta unificata
+  const tipiTutti = [...TIPI, ...tipiCustom.map(c => ({ id: 'custom:' + c.id, label: c.label, icon: '🏷️', desc: c.descrizione || 'Tipo personalizzato per questa azienda' }))]
+  const labelDiTipo = (t) => TIPO_LABEL[t] || tipiTutti.find(x => x.id === t)?.label || t
 
   // GUARDIA DI ACCESSO (solo in creazione nuova; le bozze/atti esistenti si aprono sempre)
   if (!determinaId && organoAzienda !== undefined && organoAzienda && determinaOrgano && determinaOrgano !== organoAzienda) {
@@ -459,7 +536,7 @@ export default function NuovaDetermina() {
             <h2>{soloLettura ? (isCda ? 'Delibera CdA' : 'Determina AU') : determinaId ? (isCda ? 'Modifica Delibera CdA' : 'Modifica Determina AU') : (isCda ? 'Nuova Delibera CdA' : 'Nuova Determina AU')}</h2>
             <p>
               {tipo
-                ? <>{TIPI.find(t => t.id === tipo)?.icon} <strong>{TIPO_LABEL[tipo]}</strong> · {azienda?.nome}</>
+                ? <>{tipiTutti.find(t => t.id === tipo)?.icon} <strong>{labelDiTipo(tipo)}</strong> · {azienda?.nome}</>
                 : <>Flusso guidato · {azienda?.nome}</>}
               {titolareNome ? (isCda ? ` · Presidente: ${titolareNome}` : ` · AU: ${titolareNome}`) : ''} · Anno {anno}
             </p>
@@ -500,6 +577,18 @@ export default function NuovaDetermina() {
       {/* STEP 1 — Tipo */}
       {step === 1 && (
         <div className="card">
+          {modelli.length > 0 && !soloLettura && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
+              <select className="form-control" style={{ width: 'auto', minWidth: 240 }} value={templateId} onChange={e => setTemplateId(e.target.value)}>
+                <option value="">— Parti da zero —</option>
+                {modelli.map(m => <option key={m.id} value={m.id}>Modello: {m.nome}</option>)}
+              </select>
+              <button className="btn btn-sm" disabled={!templateId}
+                onClick={() => { const tpl = modelli.find(m => m.id === templateId); if (tpl) applicaModello(tpl) }}>
+                ↩ Importa modello
+              </button>
+            </div>
+          )}
           {/* Oggetto in cima, piena larghezza */}
           <div className="form-group">
             <label className="form-label">Oggetto {isCda ? 'della delibera' : 'della determina'} *</label>
@@ -512,7 +601,7 @@ export default function NuovaDetermina() {
             <div style={{ flex: '1 1 340px', minWidth: 280 }}>
               <label className="form-label">Tipo di {isCda ? 'delibera' : 'determina'} *</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {TIPI.map(t => (
+                {tipiTutti.map(t => (
                   <div key={t.id} onClick={() => setTipo(t.id)}
                     style={{
                       border: `1.5px solid ${tipo === t.id ? '#7F77DD' : '#E0E0E0'}`,
@@ -524,6 +613,16 @@ export default function NuovaDetermina() {
                     <div style={{ fontSize: 11, color: '#666', marginTop: 2, lineHeight: 1.3 }}>{t.desc}</div>
                   </div>
                 ))}
+                {!soloLettura && (
+                  <div onClick={aggiungiTipoCustom}
+                    style={{
+                      border: '1.5px dashed #B9C2D0', borderRadius: 10, padding: '10px 12px', cursor: 'pointer',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#7F8B9E',
+                    }}>
+                    <div style={{ fontSize: 18 }}>➕</div>
+                    <div style={{ fontWeight: 600, fontSize: 12.5 }}>Nuovo tipo</div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -561,6 +660,35 @@ export default function NuovaDetermina() {
                   </div>
                   <div style={{ fontSize: 11, color: '#8A93A5', marginTop: 6 }}>
                     Le voci aggiunte valgono per le prossime {isCda ? 'delibere' : 'determine'} di questo tipo (solo per questa azienda). Le voci di base non sono modificabili.
+                  </div>
+                </div>
+              ) : tipo ? (
+                <div style={{ background: '#F4F8FF', border: '1px solid #CFE0F5', borderRadius: 12, padding: '16px 18px' }}>
+                  <div style={{ fontSize: 14.5, color: '#1A3A5C', lineHeight: 1.55 }}>
+                    <strong>Tipo personalizzato.</strong> {tipiCustom.find(c => 'custom:' + c.id === tipo)?.descrizione || 'Nessuna descrizione inserita.'}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#8A93A5', marginTop: 10 }}>
+                    Nessun giustificativo predefinito per i tipi personalizzati: puoi comunque aggiungerne uno qui sotto.
+                  </div>
+                  {vociExtra.length > 0 && (
+                    <ul style={{ margin: '10px 0 0', paddingLeft: 18, fontSize: 14, color: '#44506A', lineHeight: 1.7 }}>
+                      {vociExtra.map(v => (
+                        <li key={v.id}>
+                          {v.testo}
+                          <button type="button" title="Modifica" onClick={() => modificaVoceChecklist(v)}
+                            style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: '#5A4FCF', padding: '0 2px', marginLeft: 4 }}>✎</button>
+                          <button type="button" title="Elimina" onClick={() => eliminaVoceChecklist(v)}
+                            style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: '#C0392B', padding: '0 2px' }}>✕</button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
+                    <input className="form-control" style={{ fontSize: 13, padding: '6px 10px' }}
+                      value={nuovaVoce} onChange={e => setNuovaVoce(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); aggiungiVoceChecklist() } }}
+                      placeholder="Aggiungi un giustificativo a questo tipo…" />
+                    <button type="button" className="btn btn-sm btn-primary" onClick={aggiungiVoceChecklist} disabled={!nuovaVoce.trim()}>+ Aggiungi</button>
                   </div>
                 </div>
               ) : (
@@ -728,12 +856,16 @@ export default function NuovaDetermina() {
       {/* STEP 5 — Redazione */}
       {step === 5 && (
         <div className="card">
-          <label className="form-label">Anteprima {isCda ? 'delibera' : 'determina'}</label>
-          <pre style={{
-            whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 13, lineHeight: 1.7, color: '#333',
-            background: '#F7F8FA', border: '1px solid #E0E0E0', borderRadius: 8, padding: 16, marginTop: 6,
-          }}>{generaCorpo(null)}</pre>
-          <div style={{ fontSize: 11.5, color: '#999', marginTop: 8 }}>Il numero definitivo verrà assegnato alla {isCda ? 'protocollazione' : 'firma'}. Puoi ancora tornare indietro per modificare i dati.</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <label className="form-label" style={{ marginBottom: 0 }}>Testo {isCda ? 'della delibera' : 'della determina'}</label>
+            {!soloLettura && <button className="btn btn-sm" onClick={() => setCorpoTesto(generaCorpo(null))}>↻ Genera</button>}
+          </div>
+          <p style={{ fontSize: 12, color: '#999', margin: '4px 0 8px' }}>
+            Genera il testo dai dati inseriti, poi modificalo liberamente. Alla {isCda ? 'protocollazione' : 'firma'} il numero definitivo viene inserito e il documento congelato con un hash.
+          </p>
+          <textarea className="form-control" style={{ minHeight: 300, fontFamily: 'inherit', lineHeight: 1.7, fontSize: 13 }}
+            value={corpoTesto} disabled={soloLettura} onChange={e => setCorpoTesto(e.target.value)}
+            placeholder="Clicca «↻ Genera» per una prima bozza dai dati inseriti, poi modificala liberamente." />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14 }}>
             <button className="btn" onClick={() => setStep(conEconomica ? 4 : 1)}>← Indietro</button>
             <button className="btn btn-primary" onClick={vaiAlFascicolo}>Avanti →</button>
@@ -767,7 +899,7 @@ export default function NuovaDetermina() {
             {isCda ? 'La chiusura dell\'istruttoria assegna il numero progressivo definitivo e congela il documento preparatorio con un hash SHA-256.' : 'La firma assegna il numero progressivo definitivo e congela il documento con un hash SHA-256.'} La bozza resta modificabile.
           </div>
           <div style={{ display: 'inline-flex', gap: 8, marginBottom: 18, flexWrap: 'wrap', justifyContent: 'center' }}>
-            <span className="badge" style={{ background: '#E9F7EF', color: '#1E8449' }}>Tipo: {TIPO_LABEL[tipo] || '—'}</span>
+            <span className="badge" style={{ background: '#E9F7EF', color: '#1E8449' }}>Tipo: {labelDiTipo(tipo) || '—'}</span>
             {eur(valore) && <span className="badge" style={{ background: '#EBF4FC', color: '#2B5FA5' }}>{eur(valore)}</span>}
             {maxRisk > 0 && <span className="badge" style={livStyle(maxRisk)}>Rischio max: {LIV_LABEL[maxRisk]}</span>}
             {pareri.length > 0 && <span className="badge" style={{ background: '#EDEBFA', color: '#5A4FCF' }}>{pareri.length} parere/i</span>}
@@ -776,8 +908,9 @@ export default function NuovaDetermina() {
             <button className="btn" onClick={() => salva(false)} disabled={saving || soloLettura}>{saving ? 'Salvataggio…' : '💾 Salva come bozza'}</button>
             <button className="btn btn-primary" onClick={() => salva(true)} disabled={saving || soloLettura}>{saving ? 'Salvataggio…' : (isCda ? '📋 Chiudi l\'istruttoria e protocolla' : '✍️ Firma e registra')}</button>
           </div>
-          <div style={{ marginTop: 14 }}>
+          <div style={{ marginTop: 14, display: 'flex', gap: 8, justifyContent: 'center' }}>
             <button className="btn btn-sm" onClick={() => setStep(6)}>← Indietro</button>
+            {!soloLettura && <button className="btn btn-sm" onClick={salvaComeModello}>💾 Salva come modello</button>}
           </div>
         </div>
       )}

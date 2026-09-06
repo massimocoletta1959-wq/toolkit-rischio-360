@@ -25,12 +25,15 @@ export default function ModelliDetermina() {
   const { azienda } = useApp()
   const [organoAzienda, setOrganoAzienda] = useState(undefined)
   const [modelli, setModelli] = useState([])
+  const [tipiCustom, setTipiCustom] = useState([])
   const [loading, setLoading] = useState(true)
   const [edit, setEdit] = useState(null)       // null | {} nuovo | {...} esistente
   const [daEsistente, setDaEsistente] = useState(false)
 
   const isCda = organoAzienda === 'cda'
   const nomeAtto = isCda ? 'delibera' : 'determina'
+  const tipiTutti = [...TIPI, ...tipiCustom.map(c => ({ id: 'custom:' + c.id, label: c.label }))]
+  const labelDiTipo = t => TIPO_LABEL[t] || tipiTutti.find(x => x.id === t)?.label || t
 
   const load = useCallback(async () => {
     if (!azienda?.id) return
@@ -40,11 +43,14 @@ export default function ModelliDetermina() {
       .in('tipo', ['amministratore_unico', 'cda'])
     const org = orgs && orgs.length ? orgs[0].tipo : null
     setOrganoAzienda(org)
-    const { data } = await supabase.from('determina_template')
-      .select('*').eq('azienda_id', azienda.id)
-      .eq('organo', org || 'amministratore_unico')
-      .order('created_at')
+    const [{ data }, { data: tc }] = await Promise.all([
+      supabase.from('determina_template').select('*').eq('azienda_id', azienda.id)
+        .eq('organo', org || 'amministratore_unico').order('created_at'),
+      supabase.from('determina_tipi_custom').select('*').eq('azienda_id', azienda.id)
+        .eq('organo', org || 'amministratore_unico').order('created_at'),
+    ])
     setModelli(data || [])
+    setTipiCustom(tc || [])
     setLoading(false)
   }, [azienda])
 
@@ -87,7 +93,7 @@ export default function ModelliDetermina() {
                 {modelli.map(m => (
                   <tr key={m.id}>
                     <td style={{ fontWeight: 600 }}>{m.nome}</td>
-                    <td style={{ fontSize: 12, color: '#666' }}>{TIPO_LABEL[m.tipo] || m.tipo || '—'}</td>
+                    <td style={{ fontSize: 12, color: '#666' }}>{m.tipo ? labelDiTipo(m.tipo) : '—'}</td>
                     <td style={{ fontSize: 12, color: '#666' }}>{m.con_analisi_economica ? 'Sì' : 'No'}</td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
@@ -104,7 +110,7 @@ export default function ModelliDetermina() {
       )}
 
       {edit !== null && (
-        <ModelloEditor azienda={azienda} organo={organoAzienda || 'amministratore_unico'} modello={edit}
+        <ModelloEditor azienda={azienda} organo={organoAzienda || 'amministratore_unico'} modello={edit} tipiCustom={tipiCustom}
           onSaved={() => { setEdit(null); load() }} onClose={() => setEdit(null)} />
       )}
 
@@ -118,7 +124,7 @@ export default function ModelliDetermina() {
 }
 
 // ── Editor modello ──────────────────────────────────────────────────────
-function ModelloEditor({ azienda, organo, modello, onSaved, onClose }) {
+function ModelloEditor({ azienda, organo, modello, tipiCustom = [], onSaved, onClose }) {
   const editing = !!modello?.id
   const [nome, setNome] = useState(modello?.nome || '')
   const [tipo, setTipo] = useState(modello?.tipo || '')
@@ -172,6 +178,7 @@ function ModelloEditor({ azienda, organo, modello, onSaved, onClose }) {
             <select className="form-control" value={tipo} onChange={e => setTipo(e.target.value)}>
               <option value="">— Tipo —</option>
               {TIPI.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              {tipiCustom.map(c => <option key={c.id} value={'custom:' + c.id}>{c.label}</option>)}
             </select>
           </div>
         </div>
