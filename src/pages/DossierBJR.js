@@ -17,6 +17,10 @@ const ESITO_STYLE = {
 const numFmt = a => `${a.numero != null ? String(a.numero).padStart(2, '0') : '—'}/${a.anno}`
 const dataFmt = d => d ? new Date(d).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
 const nomeDi = m => m ? `${m.nome || ''} ${m.cognome || ''}`.trim() : '—'
+// Numero con cui l'atto istruito (delibera/determina) e' stato protocollato/firmato, se già assegnato
+const numeroAttoLabel = det => det?.numero != null
+  ? `${det.organo === 'cda' ? 'Delibera' : 'Determina'} n. ${String(det.numero).padStart(3, '0')}/${det.anno}`
+  : null
 
 // Calcola lo score di conformità solo sui criteri applicabili e verificabili sui dati reali.
 // Ogni criterio pesa uguale; un criterio non applicabile (dato non pertinente a questa seduta) viene escluso.
@@ -97,7 +101,7 @@ export default function DossierBJR() {
 
     const [{ data: delibere }, { data: richiami }, { data: componenti }, { data: presenzeRes }, { data: ticket }, { data: eventi }] = await Promise.all([
       supabase.from('delibere').select('*').eq('adunanza_id', adunanzaId).order('created_at'),
-      supabase.from('adunanza_delibere').select('*, determine(id,oggetto,tipo,stato,valore,descrizione,area_231)').eq('adunanza_id', adunanzaId).order('ordine'),
+      supabase.from('adunanza_delibere').select('*, determine(id,oggetto,tipo,stato,valore,descrizione,area_231,numero,anno,organo)').eq('adunanza_id', adunanzaId).order('ordine'),
       supabase.from('organo_membri').select('membro_id, ruolo, quota, membri(nome,cognome,email)').eq('organo_id', ad.organo_id),
       isAssemblea ? supabase.from('adunanza_presenze').select('*').eq('adunanza_id', adunanzaId) : Promise.resolve({ data: [] }),
       supabase.from('ticket').select('*, membri(nome,cognome,email)').eq('riunione_id', adunanzaId).order('created_at'),
@@ -221,7 +225,7 @@ export default function DossierBJR() {
           drawText('  solo totale aggregato, nessun voto nominativo', { size: 9, color: colAvviso })
         }
         if (det) {
-          drawText(`Atto istruito: ${det.oggetto}${det.valore ? ` — € ${Number(det.valore).toLocaleString('it-IT')}` : ''}`, { size: 9 })
+          drawText(`Atto istruito: ${det.oggetto}${numeroAttoLabel(det) ? ` — ${numeroAttoLabel(det)}` : ' — non ancora protocollato'}${det.valore ? ` — € ${Number(det.valore).toLocaleString('it-IT')}` : ''}`, { size: 9 })
           if (rischiDet.length) drawText(`Rischi: ${rischiDet.map(r => `${r.categoria} (liv. ${r.livello})`).join(', ')}`, { size: 9 })
           drawText(`Pareri: ${pareriDet.length ? pareriDet.map(p => p.tipo).join(', ') : 'nessuno'}`, { size: 9 })
           drawText(`Allegati: ${allegatiDet.length ? allegatiDet.map(a => a.nome_file).join(', ') : 'nessuno'}`, { size: 9 })
@@ -322,7 +326,7 @@ export default function DossierBJR() {
         const c = componenti.find(x => x.membro_id === v.membro_id)
         return `${esc(c ? nomeDi(c.membri) : '—')}: <b>${esc(v.voto)}</b>`
       }).join('<br>')}</div>` : `<div class="nota">solo totale aggregato, nessun voto nominativo</div>`
-      const attoHtml = det ? `<div class="atto"><b>Atto istruito:</b> ${esc(det.oggetto)}${det.valore ? ` — € ${Number(det.valore).toLocaleString('it-IT')}` : ''}
+      const attoHtml = det ? `<div class="atto"><b>Atto istruito:</b> ${esc(det.oggetto)} — ${numeroAttoLabel(det) ? esc(numeroAttoLabel(det)) : 'non ancora protocollato'}${det.valore ? ` — € ${Number(det.valore).toLocaleString('it-IT')}` : ''}
         ${rischiDet.length ? `<br>Rischi: ${rischiDet.map(r => `${esc(r.categoria)} (liv. ${r.livello})`).join(', ')}` : ''}
         <br>Pareri: ${pareriDet.length ? pareriDet.map(p => esc(p.tipo)).join(', ') : 'nessuno'}
         <br>Allegati: ${allegatiDet.length ? allegatiDet.map(a => esc(a.nome_file)).join(', ') : 'nessuno'}</div>` : ''
@@ -519,7 +523,7 @@ export default function DossierBJR() {
                       )}
                       {det && (
                         <div style={{ borderTop: '1px dashed #E0E0E0', paddingTop: 8, marginTop: 4, fontSize: 12.5, color: '#555' }}>
-                          <div><strong>Atto istruito:</strong> {det.oggetto} {det.valore ? `— € ${Number(det.valore).toLocaleString('it-IT')}` : ''}</div>
+                          <div><strong>Atto istruito:</strong> {det.oggetto} — {numeroAttoLabel(det) || 'non ancora protocollato'} {det.valore ? `— € ${Number(det.valore).toLocaleString('it-IT')}` : ''}</div>
                           {rischiDet.length > 0 && <div>Rischi valutati: {rischiDet.map(r => `${r.categoria} (liv. ${r.livello})`).join(', ')}</div>}
                           <div>Pareri: {pareriDet.length > 0 ? pareriDet.map(p => p.tipo).join(', ') : 'nessuno'}</div>
                           <div style={{ marginTop: 4 }}>
