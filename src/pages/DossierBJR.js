@@ -183,6 +183,26 @@ export default function DossierBJR() {
       }
       const spacer = (h = 8) => { y -= h }
 
+      // Logo azienda (se presente): incorporabile solo se png/jpg
+      let logoImg = null
+      if (azienda?.logo_url) {
+        try {
+          const resp = await fetch(azienda.logo_url)
+          const blob = await resp.blob()
+          const bytes = new Uint8Array(await blob.arrayBuffer())
+          if (blob.type.includes('png')) logoImg = await pdfDoc.embedPng(bytes)
+          else if (blob.type.includes('jpeg') || blob.type.includes('jpg')) logoImg = await pdfDoc.embedJpg(bytes)
+        } catch (e) { /* logo non incorporabile: procedo senza */ }
+      }
+      if (logoImg) {
+        const maxW = 90, maxH = 40
+        const scale = Math.min(maxW / logoImg.width, maxH / logoImg.height, 1)
+        const w = logoImg.width * scale, h = logoImg.height * scale
+        page.drawImage(logoImg, { x: PAGE_W - MARGIN - w, y: y - h + 10, width: w, height: h })
+      }
+      if (azienda?.nome) drawText(azienda.nome, { size: 12, f: fontBold, color: colTitolo })
+      spacer(4)
+
       drawText(`Dossier BJR — ${dossier.ad.titolo}`, { size: 16, f: fontBold, color: colTitolo })
       drawText(`${ORGANO_LABEL[dossier.organo?.tipo] || 'Organo'} · N. ${numFmt(dossier.ad)} · Verbalizzata il ${dataFmt(dossier.ad.data_verbale)}`, { size: 10, color: colGrigio })
       if (dossier.ad.hash_documento) drawText(`SHA-256: ${dossier.ad.hash_documento}`, { size: 7, color: colGrigio })
@@ -374,7 +394,14 @@ export default function DossierBJR() {
         .testoLbl { font-size: 10px; font-weight: 700; color: #888; margin-top: 4px; }
         .atto { border-top: 1px dashed #E0E0E0; padding-top: 6px; font-size: 11.5px; color: #555; }
         .evento { font-size: 11px; color: #555; margin-bottom: 2px; }
+        .testataAz { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1A3A5C; padding-bottom: 8px; margin-bottom: 14px; }
+        .nomeAz { font-size: 15px; font-weight: 700; color: #1A3A5C; }
+        .logoAz { max-height: 50px; max-width: 160px; object-fit: contain; }
       </style></head><body>
+      <div class="testataAz">
+        <div class="nomeAz">${esc(azienda?.nome || '')}</div>
+        ${azienda?.logo_url ? `<img class="logoAz" src="${esc(azienda.logo_url)}" onerror="this.style.display='none'" />` : ''}
+      </div>
       <h1>Dossier BJR — ${esc(ad.titolo)}</h1>
       <div class="sub">${esc(ORGANO_LABEL[organo?.tipo] || 'Organo')} · N. ${numFmt(ad)} · Verbalizzata il ${dataFmt(ad.data_verbale)}</div>
       ${ad.hash_documento ? `<div class="hash">SHA-256: ${esc(ad.hash_documento)}</div>` : ''}
