@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
 
 export const RUOLI_STANDARD = [
-  { sigla: 'CdA',    nome: 'Consiglio di Amministrazione' },
   { sigla: 'DL',     nome: 'Direzione / Datore di Lavoro' },
   { sigla: 'AMM',    nome: 'Amministrazione' },
   { sigla: 'CG',     nome: 'Contabilità Generale' },
@@ -24,7 +23,6 @@ export const RUOLI_STANDARD = [
 
 // Ruoli standard per il settore SERVIZI
 const RUOLI_SERVIZI = [
-  { sigla: 'CdA',  nome: 'Consiglio di Amministrazione' },
   { sigla: 'DL',   nome: 'Direzione / Datore di Lavoro' },
   { sigla: 'AMM',  nome: 'Amministrazione' },
   { sigla: 'CG',   nome: 'Contabilità Generale' },
@@ -108,19 +106,31 @@ export default function Organigramma() {
   const [modoPagina, setModoPagina] = useState('organigramma')  // 'organigramma' | 'funzionigramma'
   const [promuovi, setPromuovi] = useState(null)  // ruolo per cui va scelto il nuovo responsabile
   const [importModal, setImportModal] = useState(false)
+  const [organoAmm, setOrganoAmm] = useState(null)        // organo amministrativo reale (cda | amministratore_unico), da Governance
+  const [componentiAmm, setComponentiAmm] = useState([])  // suoi componenti reali (organo_membri)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [r, m, t, p] = await Promise.all([
+    const [r, m, t, p, org] = await Promise.all([
       supabase.from('ruoli').select('*').eq('azienda_id', azienda.id).order('sigla'),
       supabase.from('membri').select('id, nome, cognome').eq('azienda_id', azienda.id).order('cognome'),
       supabase.from('ruolo_team').select('*').eq('azienda_id', azienda.id),
       supabase.from('procedure_azienda').select('codice, titolo, stato, ruolo_id').eq('azienda_id', azienda.id).not('ruolo_id', 'is', null),
+      supabase.from('organi').select('id, tipo, nome').eq('azienda_id', azienda.id).in('tipo', ['cda', 'amministratore_unico']),
     ])
     setRuoli(r.data || [])
     setMembri(m.data || [])
     setTeam(t.data || [])
     setProcedure(p.data || [])
+    const orgReale = (org.data || [])[0] || null
+    setOrganoAmm(orgReale)
+    if (orgReale) {
+      const { data: comp } = await supabase.from('organo_membri')
+        .select('membro_id, ruolo, membri(nome, cognome)').eq('organo_id', orgReale.id)
+      setComponentiAmm(comp || [])
+    } else {
+      setComponentiAmm([])
+    }
     setLoading(false)
   }, [azienda.id])
 
@@ -245,7 +255,8 @@ export default function Organigramma() {
 
       {/* Vista: organigramma a fasce/albero, oppure funzionigramma */}
       {!loading && ruoli.length > 0 && modoPagina === 'organigramma' && (
-        <OrganigrammaVista ruoli={ruoli} membri={membri} team={team} azienda={azienda} />
+        <OrganigrammaVista ruoli={ruoli} membri={membri} team={team} azienda={azienda}
+          organoAmm={organoAmm} componentiAmm={componentiAmm} />
       )}
       {!loading && ruoli.length > 0 && modoPagina === 'funzionigramma' && (
         <FunzionigrammaVista ruoli={ruoli} membri={membri} procedure={procedure} azienda={azienda} />
@@ -483,12 +494,41 @@ const FASCE_VISTA = [
   { key: 'staff',      label: 'Supporto (Staff)', colore: '#2B5FA5', bg: '#EAF2FC' },
 ]
 
-function OrganigrammaVista({ ruoli, membri, team = [], azienda }) {
+function OrganigrammaVista({ ruoli, membri, team = [], azienda, organoAmm = null, componentiAmm = [] }) {
   const [vista, setVista] = useState('fasce')   // 'fasce' | 'albero'
   const nomeMembro = (id) => {
     const m = membri.find(x => x.id === id)
     return m ? `${m.nome || ''} ${m.cognome || ''}`.trim() : null
   }
+
+  // Quando Governance ha un organo amministrativo reale, le vecchie righe "CdA/CDA..."
+  // create a mano nell'organigramma (prima che esistesse questo collegamento) vanno
+  // nascoste dalla resa grafica per evitare caselle duplicate: la casella reale la
+  // sostituisce. Le righe restano comunque nella lista gestionale più sotto.
+  const escludiDaOrganigramma = r => !!organoAmm && (r.sigla || '').toUpperCase().startsWith('CDA')
+  const isCdaReale = organoAmm?.tipo === 'cda'
+  const siglaOrgano = isCdaReale ? 'CdA' : 'AU'
+  const titoloOrgano = isCdaReale ? 'Consiglio di Amministrazione' : 'Amministratore Unico'
+
+  // Casella dell'organo amministrativo reale (sola lettura, da organi/organo_membri)
+  const CasellaOrgano = () => (
+    <div className="og-node">
+      <div style={{
+        border: '1.5px solid #CBD5E1', background: '#fff', borderRadius: 10, padding: '10px 14px',
+        minWidth: 170, maxWidth: 240, textAlign: 'center', boxShadow: '0 1px 3px rgba(26,58,92,0.08)',
+      }}>
+        <div style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, background: '#1A3A5C', color: '#fff', padding: '2px 8px', borderRadius: 10, marginBottom: 5 }}>{siglaOrgano}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#1A3A5C', lineHeight: 1.25 }}>{titoloOrgano}</div>
+        {componentiAmm.length === 0 ? (
+          <div style={{ fontSize: 12, color: '#B9770E', marginTop: 4 }}>— Non assegnato —</div>
+        ) : componentiAmm.map((c, i) => (
+          <div key={c.membro_id} style={{ fontSize: i === 0 ? 12 : 11, color: i === 0 ? '#2B8A6B' : '#8A94A0', marginTop: i === 0 ? 4 : 2, lineHeight: 1.4 }}>
+            {`${c.membri?.nome || ''} ${c.membri?.cognome || ''}`.trim()}{c.ruolo ? ` — ${c.ruolo}` : ''}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 
   // Stampa / PDF dell'organigramma in A4 orizzontale
   function stampa() {
@@ -511,15 +551,23 @@ function OrganigrammaVista({ ruoli, membri, team = [], azienda }) {
       </div>`
     }
 
-    const primaFascia = FASCE_VISTA.find(x => ruoli.some(r => r.fascia === x.key))?.key
+    const organoHtml = () => `<div class="nodo"><div class="box">
+        <div class="sigla">${esc(siglaOrgano)}</div>
+        <div class="nome">${esc(titoloOrgano)}</div>
+        ${componentiAmm.length === 0 ? '<div class="persona">— Non assegnato —</div>' :
+          componentiAmm.map(c => `<div class="persona">${esc(`${c.membri?.nome || ''} ${c.membri?.cognome || ''}`.trim())}${c.ruolo ? ` — ${esc(c.ruolo)}` : ''}</div>`).join('')}
+      </div></div>`
+
+    const primaFascia = FASCE_VISTA.find(x => (x.key === 'governance' && organoAmm) || ruoli.some(r => r.fascia === x.key))?.key
     const bande = FASCE_VISTA.map(f => {
-      const nella = ruoli.filter(r => r.fascia === f.key)
+      const mostraOrgano = f.key === 'governance' && !!organoAmm
+      const nella = ruoli.filter(r => r.fascia === f.key && !escludiDaOrganigramma(r))
       const radici = nella.filter(r => !r.parent_id || !nella.some(x => x.id === r.parent_id))
-      if (nella.length === 0) return ''
+      if (nella.length === 0 && !mostraOrgano) return ''
       const connettore = (vista === 'albero' && f.key !== primaFascia) ? '<div class="linea-tra"></div>' : ''
       return `${connettore}<div class="banda" style="background:${f.bg}">
         <div class="banda-tit" style="color:${f.colore}"><span class="dot" style="background:${f.colore}"></span>${f.label}</div>
-        <div class="riga">${radici.map(casellaHtml).join('')}</div>
+        <div class="riga">${mostraOrgano ? organoHtml() : ''}${radici.map(casellaHtml).join('')}</div>
       </div>`
     }).join('')
     const contenuto = vista === 'albero'
@@ -623,13 +671,14 @@ function OrganigrammaVista({ ruoli, membri, team = [], azienda }) {
       </div>
 
       {vista === 'albero' ? (
-        <AlberoVista ruoli={ruoli} Casella={Casella} />
+        <AlberoVista ruoli={ruoli} Casella={Casella} organoAmm={organoAmm} CasellaOrgano={CasellaOrgano} escludiDaOrganigramma={escludiDaOrganigramma} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {FASCE_VISTA.map(f => {
-            const nella = ruoli.filter(r => r.fascia === f.key)
+            const mostraOrgano = f.key === 'governance' && !!organoAmm
+            const nella = ruoli.filter(r => r.fascia === f.key && !escludiDaOrganigramma(r))
             const radici = nella.filter(r => !r.parent_id || !nella.some(x => x.id === r.parent_id))
-            if (nella.length === 0) return null
+            if (nella.length === 0 && !mostraOrgano) return null
             return (
               <div key={f.key} style={{ background: f.bg, borderRadius: 12, padding: '14px 16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
@@ -637,6 +686,7 @@ function OrganigrammaVista({ ruoli, membri, team = [], azienda }) {
                   <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: f.colore }}>{f.label}</span>
                 </div>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                  {mostraOrgano && <CasellaOrgano />}
                   {radici.map(r => <Casella key={r.id} r={r} livello={0} />)}
                 </div>
               </div>
@@ -652,14 +702,14 @@ function OrganigrammaVista({ ruoli, membri, team = [], azienda }) {
 }
 
 // Vista ad albero (Modo 2): le tre fasce impilate come livelli, collegate da linee
-function AlberoVista({ ruoli, Casella }) {
+function AlberoVista({ ruoli, Casella, organoAmm = null, CasellaOrgano = null, escludiDaOrganigramma = () => false }) {
   const perFascia = (key) => {
-    const nella = ruoli.filter(r => r.fascia === key)
+    const nella = ruoli.filter(r => r.fascia === key && !escludiDaOrganigramma(r))
     return nella.filter(r => !r.parent_id || !nella.some(x => x.id === r.parent_id))
   }
   const livelli = FASCE_VISTA
-    .map(f => ({ ...f, radici: perFascia(f.key) }))
-    .filter(l => l.radici.length > 0)
+    .map(f => ({ ...f, radici: perFascia(f.key), mostraOrgano: f.key === 'governance' && !!organoAmm }))
+    .filter(l => l.radici.length > 0 || l.mostraOrgano)
 
   if (livelli.length === 0) {
     return <div style={{ fontSize: 13, color: '#999' }}>Assegna una fascia ai ruoli per vedere l'albero.</div>
@@ -675,6 +725,7 @@ function AlberoVista({ ruoli, Casella }) {
               <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: l.colore, marginRight: 6 }} />{l.label}
             </div>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'flex-start', background: l.bg, borderRadius: 12, padding: '14px 16px', width: '100%' }}>
+              {l.mostraOrgano && <CasellaOrgano />}
               {l.radici.map(r => <Casella key={r.id} r={r} livello={0} />)}
             </div>
           </div>
