@@ -310,7 +310,7 @@ export default function Impostazioni() {
         <div className="card-header"><span className="card-title">🧑‍💼 Modalità Solo</span></div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: 8, background: '#F7F8FA', border: '1px solid #E0E0E0' }}>
           <div>
-            <div style={{ fontWeight: 600, color: '#333' }}>Libero professionista senza struttura</div>
+            <div style={{ fontWeight: 600, color: '#333' }}>Imprenditore senza struttura (solopreneur)</div>
             <div style={{ fontSize: 12, color: '#888' }}>Semplifica l'app per <strong>{azienda?.nome}</strong> nascondendo le voci pensate per organizzazioni con più persone (es. Organigramma).</div>
           </div>
           <button

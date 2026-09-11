@@ -486,7 +486,7 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
           <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', padding: '12px 14px', border: `2px solid ${modalitaSolo ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: modalitaSolo ? '#EBF4FC' : 'white', marginBottom: 14 }}>
             <input type="checkbox" checked={modalitaSolo} onChange={e => setModalitaSolo(e.target.checked)} style={{ marginTop: 2 }} />
             <span>
-              <div style={{ fontWeight: 600, color: '#1A3A5C', fontSize: 13 }}>🧑‍💼 Modalità Solo — libero professionista senza struttura</div>
+              <div style={{ fontWeight: 600, color: '#1A3A5C', fontSize: 13 }}>🧑‍💼 Modalità Solo — imprenditore senza struttura (solopreneur)</div>
               <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Semplifica l'app nascondendo le voci pensate per organizzazioni con più persone (es. Organigramma). Potrai cambiarlo in seguito dalle Impostazioni.</div>
             </span>
           </label>
