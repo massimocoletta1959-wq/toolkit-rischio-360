@@ -9,6 +9,9 @@ const COMUNI = [
   { id: 'organigramma', label: 'Organigramma', icon: '🏛️' },
 ]
 
+// Voci che in Modalità Solo non sono pertinenti (pensate per organi collegiali)
+const VOCI_NASCOSTE_SOLO = ['verbali', 'modelli_verbale']
+
 // Menù specifico di ciascun modulo (colore + voci)
 const MODULI = {
   rischi: {
@@ -59,17 +62,21 @@ export default function Layout({ children }) {
   }, [azienda])
 
   const mod = modulo ? MODULI[modulo] : null
+  const modalitaSolo = !!azienda?.modalita_solo
 
   // Etichetta adattiva per la voce determine/delibere in base all'organo
   const etichettaAtti = organoAmm === 'cda' ? 'Preparazione Delibere CdA' : 'Preparazione Determine AU'
   const etichettaModelli = organoAmm === 'cda' ? 'Modelli delibere' : 'Modelli determine'
-  const vociMod = mod && modulo === 'governance'
+  const vociMod = (mod && modulo === 'governance'
     ? mod.voci.map(v => {
         if (v.id === 'au_registro') return { ...v, label: etichettaAtti }
         if (v.id === 'modelli_determina') return { ...v, label: etichettaModelli }
         return v
       })
     : (mod ? mod.voci : [])
+  ).filter(v => !(modalitaSolo && VOCI_NASCOSTE_SOLO.includes(v.id)))
+
+  const comuni = COMUNI.filter(v => !(modalitaSolo && v.id === 'organigramma'))
 
   const NavItem = ({ item }) => (
     <div className={`nav-item${page === item.id ? ' active' : ''}`} onClick={() => setPage(item.id)}>
@@ -119,7 +126,7 @@ export default function Layout({ children }) {
               <div className="nav-item" onClick={tornaHome}>
                 <span>←</span><span>Torna alla home</span>
               </div>
-              {COMUNI.map(item => <NavItem key={item.id} item={item} />)}
+              {comuni.map(item => <NavItem key={item.id} item={item} />)}
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '14px 0 6px', padding: '0 4px' }}>
                 <span style={{ width: 9, height: 9, borderRadius: '50%', background: mod.colore }} />
@@ -132,7 +139,7 @@ export default function Layout({ children }) {
               <div className={`nav-item${page === 'home' ? ' active' : ''}`} onClick={() => setPage('home')}>
                 <span>🏠</span><span>Home</span>
               </div>
-              {COMUNI.map(item => <NavItem key={item.id} item={item} />)}
+              {comuni.map(item => <NavItem key={item.id} item={item} />)}
             </>
           )}
 

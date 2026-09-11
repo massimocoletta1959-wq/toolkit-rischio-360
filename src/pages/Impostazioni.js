@@ -27,6 +27,7 @@ export default function Impostazioni() {
   const [editForm, setEditForm]     = useState({ nome: '', piva: '', settore: '', dimensione: '' })
   const [lic, setLic]               = useState(null)
   const [modLoading, setModLoading] = useState(null)
+  const [soloLoading, setSoloLoading] = useState(false)
   const [impRischi, setImpRischi]   = useState(false)   // mostra la finestra import rischi
   const [impScelta, setImpScelta]   = useState(null)
   const [impLoading, setImpLoading] = useState(false)
@@ -72,6 +73,13 @@ export default function Impostazioni() {
     }
     setImpLoading(false); setImpRischi(false)
     await reload()
+  }
+
+  async function toggleModalitaSolo() {
+    setSoloLoading(true)
+    await supabase.from('aziende').update({ modalita_solo: !azienda.modalita_solo }).eq('id', azienda.id)
+    await reload()
+    setSoloLoading(false)
   }
 
   async function eliminaAzienda() {
@@ -295,6 +303,23 @@ export default function Impostazioni() {
               </div>
             )
           })}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-header"><span className="card-title">🧑‍💼 Modalità Solo</span></div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: 8, background: '#F7F8FA', border: '1px solid #E0E0E0' }}>
+          <div>
+            <div style={{ fontWeight: 600, color: '#333' }}>Libero professionista senza struttura</div>
+            <div style={{ fontSize: 12, color: '#888' }}>Semplifica l'app per <strong>{azienda?.nome}</strong> nascondendo le voci pensate per organizzazioni con più persone (es. Organigramma).</div>
+          </div>
+          <button
+            className={`btn btn-sm${azienda?.modalita_solo ? ' btn-primary' : ''}`}
+            disabled={soloLoading}
+            onClick={toggleModalitaSolo}
+          >
+            {soloLoading ? '…' : azienda?.modalita_solo ? '✓ Attiva' : 'Attiva'}
+          </button>
         </div>
       </div>
 

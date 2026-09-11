@@ -27,6 +27,7 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
   const [settore, setSettore]   = useState('')
   const [dimensione, setDimensione] = useState('')
   const [nomeProfilo, setNomeProfilo] = useState('')
+  const [modalitaSolo, setModalitaSolo] = useState(false)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState(null)
   const [aziendaId, setAziendaId] = useState(null)
@@ -101,6 +102,7 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
         ateco: a.ateco || null,
         attivita: a.attivita || null,
         oggetto_sociale: a.oggetto_sociale || null,
+        modalita_solo: modalitaSolo,
       }).select().single()
     if (e1) { setError(e1.message); setLoading(false); return }
 
@@ -481,6 +483,13 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
               🏗️ Per il settore <strong>{settore}</strong> ci sono rischi e procedure specifici — sceglierai al passo dei dati iniziali.
             </div>
           )}
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', padding: '12px 14px', border: `2px solid ${modalitaSolo ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: modalitaSolo ? '#EBF4FC' : 'white', marginBottom: 14 }}>
+            <input type="checkbox" checked={modalitaSolo} onChange={e => setModalitaSolo(e.target.checked)} style={{ marginTop: 2 }} />
+            <span>
+              <div style={{ fontWeight: 600, color: '#1A3A5C', fontSize: 13 }}>🧑‍💼 Modalità Solo — libero professionista senza struttura</div>
+              <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Semplifica l'app nascondendo le voci pensate per organizzazioni con più persone (es. Organigramma). Potrai cambiarlo in seguito dalle Impostazioni.</div>
+            </span>
+          </label>
           <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
             {nuovaAzienda && onAnnulla && (
               <button type="button" className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={onAnnulla}>
