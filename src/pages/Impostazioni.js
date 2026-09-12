@@ -29,6 +29,7 @@ export default function Impostazioni() {
   const [lic, setLic]               = useState(null)
   const [modLoading, setModLoading] = useState(null)
   const [soloLoading, setSoloLoading] = useState(false)
+  const [soggettoLoading, setSoggettoLoading] = useState(false)
   const [impRischi, setImpRischi]   = useState(false)   // mostra la finestra import rischi
   const [impScelta, setImpScelta]   = useState(null)
   const [impLoading, setImpLoading] = useState(false)
@@ -74,6 +75,16 @@ export default function Impostazioni() {
     }
     setImpLoading(false); setImpRischi(false)
     await reload()
+  }
+
+  async function impostaTipoSoggetto(val) {
+    if (val === azienda.tipo_soggetto) return
+    setSoggettoLoading(true)
+    const payload = { tipo_soggetto: val }
+    if (val === 'individuale' && !azienda.modalita_solo) payload.modalita_solo = true // proposta automatica, resta modificabile
+    await supabase.from('aziende').update(payload).eq('id', azienda.id)
+    await reload()
+    setSoggettoLoading(false)
   }
 
   async function toggleModalitaSolo() {
@@ -304,6 +315,31 @@ export default function Impostazioni() {
               </div>
             )
           })}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-header"><span className="card-title">🏷️ Tipo di soggetto</span></div>
+        <p style={{ fontSize: 13, color: '#666', marginBottom: 14 }}>
+          Definisce se <strong>{azienda?.nome}</strong> è una società di capitali (con organo amministrativo) o un'impresa individuale/professionista senza organi.
+        </p>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            className={`btn btn-sm${azienda?.tipo_soggetto !== 'individuale' ? ' btn-primary' : ''}`}
+            disabled={soggettoLoading}
+            onClick={() => impostaTipoSoggetto('societa')}
+            style={{ flex: 1, justifyContent: 'center' }}
+          >
+            {soggettoLoading ? '…' : '🏢 Società di capitali'}
+          </button>
+          <button
+            className={`btn btn-sm${azienda?.tipo_soggetto === 'individuale' ? ' btn-primary' : ''}`}
+            disabled={soggettoLoading}
+            onClick={() => impostaTipoSoggetto('individuale')}
+            style={{ flex: 1, justifyContent: 'center' }}
+          >
+            {soggettoLoading ? '…' : '🧑‍💼 Impresa individuale / Professionista'}
+          </button>
         </div>
       </div>
 

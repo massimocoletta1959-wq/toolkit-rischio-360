@@ -29,6 +29,11 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
   const [dimensione, setDimensione] = useState('')
   const [nomeProfilo, setNomeProfilo] = useState('')
   const [modalitaSolo, setModalitaSolo] = useState(false)
+  const [tipoSoggetto, setTipoSoggetto] = useState('societa')
+  function selezionaTipoSoggetto(val) {
+    setTipoSoggetto(val)
+    if (val === 'individuale') setModalitaSolo(true) // proposta automatica, resta modificabile
+  }
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState(null)
   const [aziendaId, setAziendaId] = useState(null)
@@ -104,6 +109,7 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
         attivita: a.attivita || null,
         oggetto_sociale: a.oggetto_sociale || null,
         modalita_solo: modalitaSolo,
+        tipo_soggetto: tipoSoggetto,
       }).select().single()
     if (e1) { setError(e1.message); setLoading(false); return }
 
@@ -484,6 +490,19 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
               🏗️ Per il settore <strong>{settore}</strong> ci sono rischi e procedure specifici — sceglierai al passo dei dati iniziali.
             </div>
           )}
+          <div className="form-group">
+            <label className="form-label">Tipo di soggetto</label>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div onClick={() => selezionaTipoSoggetto('societa')} style={{ flex: 1, cursor: 'pointer', padding: '12px 14px', border: `2px solid ${tipoSoggetto === 'societa' ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: tipoSoggetto === 'societa' ? '#EBF4FC' : 'white' }}>
+                <div style={{ fontWeight: 600, color: '#1A3A5C', fontSize: 13 }}>🏢 Società di capitali</div>
+                <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>S.r.l., S.p.A. — organo amministrativo, determine/delibere</div>
+              </div>
+              <div onClick={() => selezionaTipoSoggetto('individuale')} style={{ flex: 1, cursor: 'pointer', padding: '12px 14px', border: `2px solid ${tipoSoggetto === 'individuale' ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: tipoSoggetto === 'individuale' ? '#EBF4FC' : 'white' }}>
+                <div style={{ fontWeight: 600, color: '#1A3A5C', fontSize: 13 }}>🧑‍💼 Impresa individuale o Professionista</div>
+                <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>Partita IVA senza organi — Registro delle Decisioni</div>
+              </div>
+            </div>
+          </div>
           <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', padding: '12px 14px', border: `2px solid ${modalitaSolo ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: modalitaSolo ? '#EBF4FC' : 'white', marginBottom: 14 }}>
             <input type="checkbox" checked={modalitaSolo} onChange={e => setModalitaSolo(e.target.checked)} style={{ marginTop: 2 }} />
             <span>
