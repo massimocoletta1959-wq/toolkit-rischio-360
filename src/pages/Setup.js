@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { RISCHI_DEFAULT, RISCHI_PER_SETTORE, RISCHI_231_EDILIZIA, RISCHI_231_GENERICO } from '../lib/constants'
+import { etichettaModulo } from '../lib/modalitaSolo'
 
 const SETTORI = ['Manifatturiero','Servizi','Commercio','Edilizia','Hotel','Sanità','Tecnologia','Agricoltura','Trasporti','Altro']
 const DIMENSIONI = ['Micro (< 10 dipendenti)','Piccola (10-49)','Media (50-249)','Grande (250+)']
@@ -291,8 +292,8 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
         </div>
         {error && <div className="alert alert-error">{error}</div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-          {cardModulo(modRischi, setModRischi, '🛡️', 'Rischi', 'Mappatura e valutazione dei rischi, azioni, registro.', incl('rischi'))}
-          {cardModulo(modProcedure, setModProcedure, '📋', 'Procedure', 'Catalogo procedure per settore, approvazione e personalizzazione.', incl('procedure'))}
+          {cardModulo(modRischi, setModRischi, '🛡️', etichettaModulo('rischi', 'Rischi', modalitaSolo), 'Mappatura e valutazione dei rischi, azioni, registro.', incl('rischi'))}
+          {cardModulo(modProcedure, setModProcedure, '📋', etichettaModulo('procedure', 'Procedure', modalitaSolo), 'Catalogo procedure per settore, approvazione e personalizzazione.', incl('procedure'))}
           {cardModulo(modGovernance, setModGovernance, '⚖️', 'Governance', 'Organi, componenti, riunioni e delibere.', incl('governance'))}
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
@@ -319,7 +320,7 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
         {/* --- RISCHI --- */}
         {modRischi && (
           <div style={{ marginBottom: 22 }}>
-            <div style={{ fontWeight: 700, color: '#1A3A5C', marginBottom: 8 }}>🛡️ Rischi</div>
+            <div style={{ fontWeight: 700, color: '#1A3A5C', marginBottom: 8 }}>🛡️ {etichettaModulo('rischi', 'Rischi', modalitaSolo)}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div onClick={() => setScelta('standard')} style={{ cursor: 'pointer', padding: '12px 14px', border: `2px solid ${scelta === 'standard' ? '#2B5FA5' : '#E0E0E0'}`, borderRadius: 8, background: scelta === 'standard' ? '#EBF4FC' : 'white' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -365,7 +366,7 @@ export default function Setup({ onDone, onAnnulla, userId, userEmail, nuovaAzien
         {/* --- PROCEDURE --- */}
         {modProcedure && (
           <div style={{ marginBottom: 22 }}>
-            <div style={{ fontWeight: 700, color: '#1A3A5C', marginBottom: 8 }}>📋 Procedure</div>
+            <div style={{ fontWeight: 700, color: '#1A3A5C', marginBottom: 8 }}>📋 {etichettaModulo('procedure', 'Procedure', modalitaSolo)}</div>
             <div className="alert alert-info" style={{ margin: 0 }}>
               ✓ Le procedure standard del settore {settore || ''} saranno disponibili nel catalogo, pronte da valutare e approvare.
             </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
 import { CATALOGO_PROCEDURE } from '../lib/procedure'
+import { etichettaModulo } from '../lib/modalitaSolo'
 
 const TIER = [
   { key: 't1', label: 'Critici',      col: '#E5484D' },
@@ -26,6 +27,9 @@ export default function Home() {
     procedure: !!azienda?.mod_procedure,
     governance: !!azienda?.mod_governance,
   }
+  const modalitaSolo = !!azienda?.modalita_solo
+  const labelRischi = etichettaModulo('rischi', 'Rischi', modalitaSolo)
+  const labelProcedure = etichettaModulo('procedure', 'Procedure', modalitaSolo)
 
   const load = useCallback(async () => {
     if (!azienda?.id) return
@@ -126,7 +130,7 @@ export default function Home() {
           <div className="blob" style={{ background: '#2B6FD0' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <div className="kicker" style={{ color: '#2B6FD0' }}>■ Rischi</div>
+              <div className="kicker" style={{ color: '#2B6FD0' }}>■ {labelRischi}</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginTop: 12 }}>
                 <span className="huge" style={{ color: attivo.rischi ? '#12233A' : '#B4BCC6' }}>{d.rischi.n}</span>
                 <span style={{ fontSize: 14, color: '#8A94A0' }}>rischi mappati</span>
@@ -161,7 +165,7 @@ export default function Home() {
         {/* ---------- PROCEDURE ---------- */}
         <div className={`tile t-proc${attivo.procedure ? '' : ' off'}`} onClick={() => open('procedure')}>
           <div className="blob" style={{ background: '#128A66' }} />
-          <div className="kicker" style={{ color: '#128A66' }}>■ Procedure</div>
+          <div className="kicker" style={{ color: '#128A66' }}>■ {labelProcedure}</div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 12 }}>
             <span className="huge" style={{ color: attivo.procedure ? '#12233A' : '#B4BCC6' }}>{d.procedure.n}</span>
             <span style={{ fontSize: 14, color: '#8A94A0' }}>adottate</span>

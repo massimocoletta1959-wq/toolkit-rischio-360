@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
 import { RISCHI_DEFAULT, RISCHI_PER_SETTORE, RISCHI_231_EDILIZIA, RISCHI_231_GENERICO } from '../lib/constants'
+import { etichettaModulo } from '../lib/modalitaSolo'
 
 const SETTORI = ['Manifatturiero','Servizi','Commercio','Edilizia','Sanità','Tecnologia','Agricoltura','Trasporti','Altro']
 const DIMENSIONI = ['Micro (< 10 dipendenti)','Piccola (10-49)','Media (50-249)','Grande (250+)']
@@ -278,8 +279,8 @@ export default function Impostazioni() {
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[
-            { campo: 'mod_rischi',     incl: 'incl_rischi',     label: 'Gestione Rischi', desc: "Registro rischi, piano d'azione, cruscotto", colore: '#378ADD' },
-            { campo: 'mod_procedure',  incl: 'incl_procedure',  label: 'Procedure',       desc: 'Catalogo, adozione e presa visione',        colore: '#1D9E75' },
+            { campo: 'mod_rischi',     incl: 'incl_rischi',     label: `Gestione ${etichettaModulo('rischi', 'Rischi', !!azienda?.modalita_solo)}`, desc: "Registro rischi, piano d'azione, cruscotto", colore: '#378ADD' },
+            { campo: 'mod_procedure',  incl: 'incl_procedure',  label: etichettaModulo('procedure', 'Procedure', !!azienda?.modalita_solo), desc: 'Catalogo, adozione e presa visione',        colore: '#1D9E75' },
             { campo: 'mod_governance', incl: 'incl_governance', label: 'Governance',      desc: 'Organi, riunioni, delibere e verbali',      colore: '#7F77DD' },
           ].map(m => {
             const incluso = lic ? !!lic[m.incl] : true

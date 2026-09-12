@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../App'
+import { etichettaModulo } from '../lib/modalitaSolo'
 
 // Funzioni comuni, disponibili sia dalla Home sia dentro un modulo
 const COMUNI = [
@@ -63,6 +64,8 @@ export default function Layout({ children }) {
 
   const mod = modulo ? MODULI[modulo] : null
   const modalitaSolo = !!azienda?.modalita_solo
+  // In Modalità Solo il nome del modulo cambia (solo etichetta, non id/logica)
+  const modLabel = mod ? etichettaModulo(modulo, mod.label, modalitaSolo) : null
 
   // Etichetta adattiva per la voce determine/delibere in base all'organo
   const etichettaAtti = organoAmm === 'cda' ? 'Preparazione Delibere CdA' : 'Preparazione Determine AU'
@@ -73,7 +76,7 @@ export default function Layout({ children }) {
         if (v.id === 'modelli_determina') return { ...v, label: etichettaModelli }
         return v
       })
-    : (mod ? mod.voci : [])
+    : (mod ? mod.voci.map(v => (v.label === mod.label ? { ...v, label: modLabel } : v)) : [])
   ).filter(v => !(modalitaSolo && VOCI_NASCOSTE_SOLO.includes(v.id)))
 
   const comuni = COMUNI.filter(v => !(modalitaSolo && v.id === 'organigramma'))
@@ -130,7 +133,7 @@ export default function Layout({ children }) {
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '14px 0 6px', padding: '0 4px' }}>
                 <span style={{ width: 9, height: 9, borderRadius: '50%', background: mod.colore }} />
-                <span style={{ fontSize: 11, letterSpacing: 0.5, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>{mod.label}</span>
+                <span style={{ fontSize: 11, letterSpacing: 0.5, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>{modLabel}</span>
               </div>
               {vociMod.map(item => <NavItem key={item.id} item={item} />)}
             </>
